@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../controllers/composition_controller.dart';
+import '../enums/hand.dart';
 
 class NoteCellWidget extends StatelessWidget {
   final CompositionController controller;
@@ -8,6 +9,7 @@ class NoteCellWidget extends StatelessWidget {
   final int row;
   final double width;
   final double height;
+
 
   const NoteCellWidget({
     super.key,
@@ -20,32 +22,28 @@ class NoteCellWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final note = controller.getNoteAt(beatIndex, row);
+    final isActive = note != null;
 
-    final notes = controller.getNotesAtBeat(beatIndex);
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          print("beat: $beatIndex row: $row");
 
-    final isActive = notes.any((n) => n.row == row);
+          final existing = controller.getNoteAt(beatIndex, row);
 
-    return GestureDetector(
-      onTap: () {
-      final existing = controller.notes
-          .where((n) => n.startBeat == beatIndex && n.row == row)
-          .toList();
-      if (existing.isEmpty) {
-        controller.addNote(
-          beat: beatIndex,
-          row: row,
-        );
-      } else {
-        controller.removeNote(existing.first);
-      }
-    },
-      child: Container(
-        width: width,
-        height: height,
-        margin: const EdgeInsets.all(0.5),
-        decoration: BoxDecoration(
-          color: isActive ? Colors.blue : Colors.grey[200],
-          border: Border.all(color: Colors.black12),
+          if (existing == null) {
+            controller.addNote(
+              beat: beatIndex,
+              row: row,
+            );
+          } else {
+            controller.removeNote(existing);
+          }
+        },
+        child: Container(
+          color: Colors.transparent,
         ),
       ),
     );

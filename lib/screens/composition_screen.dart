@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../controllers/composition_controller.dart';
+import '../enums/hand.dart';
 import '../widgets/grid_widget.dart';
 
-class CompositionScreen extends StatefulWidget {
+class CompositionScreen extends StatelessWidget {
   final CompositionController controller;
 
   const CompositionScreen({
@@ -12,86 +13,99 @@ class CompositionScreen extends StatefulWidget {
   });
 
   @override
-  State<CompositionScreen> createState() => _CompositionScreenState();
-}
-
-class _CompositionScreenState extends State<CompositionScreen> {
-  @override
-  void initState() {
-    super.initState();
-
-    // Listen to controller updates
-    widget.controller.addListener(_onUpdate);
-  }
-
-  void _onUpdate() {
-    setState(() {});
-  }
-
-  @override
-  void dispose() {
-    widget.controller.removeListener(_onUpdate);
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final controller = widget.controller;
-
     return Scaffold(
-      appBar: AppBar(
-        title: Text(controller.composition.title),
+      body: AnimatedBuilder(
+        animation: controller,
+        builder: (context, _) {
+          return Row(
+            children: [
+              // =====================================================
+              // LEFT TOOLBAR (APP BAR REPLACEMENT)
+              // =====================================================
+              Container(
+                width: 70,
+                color: Colors.grey.shade900,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 20),
 
-        actions: [
-          // Zoom out
-          IconButton(
-            icon: const Icon(Icons.zoom_out),
-            onPressed: () {
-              controller.setZoom(
-                controller.zoomX - 0.1,
-                controller.zoomY - 0.1,
-              );
-            },
-          ),
+                    // HAND TOGGLE
+                    IconButton(
+                      icon: Icon(
+                        controller.currentHand == Hand.left
+                            ? Icons.pan_tool
+                            : Icons.back_hand,
+                        color:  controller.currentHand == Hand.left
+                        ? Colors.white
+                        : Colors.blue,
+                      ),
+                      onPressed: controller.toggleHand,
+                    ),
 
-          // Zoom in
-          IconButton(
-            icon: const Icon(Icons.zoom_in),
-            onPressed: () {
-              controller.setZoom(
-                controller.zoomX + 0.1,
-                controller.zoomY + 0.1,
-              );
-            },
-          ),
+                    const Divider(color: Colors.white24),
 
-          // Reset zoom
-          IconButton(
-            icon: const Icon(Icons.center_focus_strong),
-            onPressed: () {
-              controller.setZoom(1.0, 1.0);
-            },
-          ),
-        ],
-      ),
+                    // ZOOM IN
+                    IconButton(
+                      icon: const Icon(Icons.zoom_in, color: Colors.white),
+                      onPressed: () {
+                        controller.setZoom(
+                          controller.zoomX + 0.1,
+                          controller.zoomY + 0.1,
+                        );
+                      },
+                    ),
 
-      body: Column(
-        children: [
-          // Zoom indicator (useful for debugging)
-          Container(
-            padding: const EdgeInsets.all(8),
-            color: Colors.grey[200],
-            child: Text(
-              "Zoom X: ${controller.zoomX.toStringAsFixed(1)}   "
-                  "Zoom Y: ${controller.zoomY.toStringAsFixed(1)}",
-            ),
-          ),
+                    // ZOOM OUT
+                    IconButton(
+                      icon: const Icon(Icons.zoom_out, color: Colors.white),
+                      onPressed: () {
+                        controller.setZoom(
+                          controller.zoomX - 0.1,
+                          controller.zoomY - 0.1,
+                        );
+                      },
+                    ),
 
-          // GRID
-          Expanded(
-            child: GridWidget(controller: controller),
-          ),
-        ],
+                    // RESET ZOOM
+                    IconButton(
+                      icon: const Icon(Icons.center_focus_strong,
+                          color: Colors.white),
+                      onPressed: controller.resetZoom,
+                    ),
+
+                    const Divider(color: Colors.white24),
+
+                    // ZOOM INFO
+                    Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: Text(
+                        "X:${controller.zoomX.toStringAsFixed(1)}\n"
+                            "Y:${controller.zoomY.toStringAsFixed(1)}",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // =====================================================
+              // MAIN GRID AREA
+              // =====================================================
+              Expanded(
+                child: Container(
+                  color: Colors.grey.shade100,
+                  child: GridWidget(controller: controller),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

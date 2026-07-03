@@ -13,58 +13,78 @@ class GridWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
 
-    final beats =
-        controller.composition.numberOfMeasures *
-            controller.composition.beatsPerMeasure;
 
-    final rows = controller.composition.numberOfOctaves * 12;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final height = constraints.maxHeight;
 
-    final cellWidth = (size.width / beats) * controller.zoomX;
-    final cellHeight = (size.height / rows) * controller.zoomY;
+        final beats = controller.maxBeats;
+        final rows = controller.maxRows;
 
-    return GestureDetector(
-      onScaleUpdate: (details) {
-        controller.applyGestureZoom(details.scale);
-      },
-      onScaleEnd: (_) {
-        controller.commitZoom();
-      },
-      child: Stack(
-        children: [
-          // =====================================================
-          // GRID BACKGROUND (LIGHTWEIGHT - NO WIDGET EXPLOSION)
-          // =====================================================
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _GridPainter(
-                beats: beats,
-                rows: rows,
-                cellWidth: cellWidth,
-                cellHeight: cellHeight,
+        final cellWidth = (width / beats) * controller.zoomX;
+        final cellHeight = (height / rows) * controller.zoomY;
+
+        return Stack(
+          children: [
+            // ================= VISUAL GRID =================
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _GridPainter(
+                  beats: beats,
+                  rows: rows,
+                  cellWidth: cellWidth,
+                  cellHeight: cellHeight,
+                ),
               ),
             ),
-          ),
 
-          // =====================================================
-          // NOTES LAYER (DAW OBJECTS)
-          // =====================================================
-          ...controller.notes
-              .map((note) => NoteBlockWidget(
-            note: note,
-            cellWidth: cellWidth,
-            cellHeight: cellHeight,
-            controller: controller,
-          ))
-              .toList(),
-        ],
-      ),
+
+// ================= TAP LAYER =================
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTapDown: (details) {
+                  final x = details.localPosition.dx;
+                  final y = details.localPosition.dy;
+
+                  final beat = (x / cellWidth).floor();
+                  final row = (y / cellHeight).floor();
+
+                  if (beat < 0 || beat >= beats) return;
+                  if (row < 0 || row >= rows) return;
+
+                  final existing = controller.getNoteAt(beat, row);
+
+                  if (existing == null) {
+                    controller.addNote(
+                      beat: beat,
+                      row: row,
+                    );
+                  } else {
+                    controller.removeNote(existing);
+                  }
+                },
+                child: const SizedBox.expand(),
+              ),
+            ),
+
+            // ================= NOTES =================
+            ...controller.notes.map((note) {
+              return NoteBlockWidget(
+                note: note,
+                cellWidth: cellWidth,
+                cellHeight: cellHeight,
+                controller: controller,
+              );
+            }).toList(),
+          ],
+        );
+      },
     );
   }
 }
-
-
 
 // Grid Painter
 
@@ -87,25 +107,26 @@ class _GridPainter extends CustomPainter {
       ..color = Colors.grey.shade300
       ..strokeWidth = 0.5;
 
-    // vertical lines (beats)
+// Vertical lines
     for (int i = 0; i <= beats; i++) {
       final x = i * cellWidth;
       canvas.drawLine(
         Offset(x, 0),
-        Offset(x, rows * cellHeight),
+        Offset(x, size.height),
         paint,
       );
     }
 
-    // horizontal lines (rows)
+// Horizontal lines
     for (int i = 0; i <= rows; i++) {
       final y = i * cellHeight;
       canvas.drawLine(
         Offset(0, y),
-        Offset(beats * cellWidth, y),
+        Offset(size.width, y),
         paint,
       );
     }
+
   }
 
   @override
