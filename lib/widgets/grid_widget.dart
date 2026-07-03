@@ -24,13 +24,13 @@ class GridWidget extends StatelessWidget {
     final cellWidth = (size.width / beats) * controller.zoomX;
     final cellHeight = (size.height / rows) * controller.zoomY;
 
-    return SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: SingleChildScrollView(
-            scrollDirection: Axis.vertical,
-            child: SizedBox(
-              width: beats * cellWidth,
-              height: rows * cellHeight,
+    return GestureDetector(
+      onScaleUpdate: (details) {
+        controller.applyGestureZoom(details.scale);
+      },
+      onScaleEnd: (_) {
+        controller.commitZoom();
+      },
       child: Stack(
         children: [
           // =====================================================
@@ -60,8 +60,6 @@ class GridWidget extends StatelessWidget {
               .toList(),
         ],
       ),
-    ),
-    ),
     );
   }
 }

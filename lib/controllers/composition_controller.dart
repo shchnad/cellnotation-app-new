@@ -18,11 +18,28 @@ class CompositionController extends ChangeNotifier {
     notifyListeners();
   }
 
+  //gesture-safe zoom function
+
+  double _baseZoomX = 1.0;
+  double _baseZoomY = 1.0;
+
+  void applyGestureZoom(double scale) {
+    zoomX = (_baseZoomX * scale).clamp(0.5, 3.0);
+    zoomY = (_baseZoomY * scale).clamp(0.5, 3.0);
+    notifyListeners();
+  }
+
   void zoomIn() => setZoom(zoomX + 0.1, zoomY + 0.1);
 
   void zoomOut() => setZoom(zoomX - 0.1, zoomY - 0.1);
 
   void resetZoom() => setZoom(1.0, 1.0);
+
+  void commitZoom() {
+    _baseZoomX = zoomX;
+    _baseZoomY = zoomY;
+  }
+
 
   // ---------------- NOTES (DAW SYSTEM) ----------------
 
