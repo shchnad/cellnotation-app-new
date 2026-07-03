@@ -19,6 +19,9 @@ class NoteBlockWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final label = controller.getDegree(note.row);
+
+    final fontSize = cellHeight * 0.7;
 
     return Positioned(
       left: note.startBeat * cellWidth,
@@ -26,31 +29,32 @@ class NoteBlockWidget extends StatelessWidget {
       width: note.duration * cellWidth,
       height: cellHeight,
       child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-
-        onTap: () {
-          controller.removeNote(note);
-        },
+        onTap: () => controller.removeNote(note),
 
         onPanUpdate: (details) {
-          final dx = details.delta.dx;
-          final dy = details.delta.dy;
-
-          final beatChange = dx / cellWidth;
-          final rowChange = dy / cellHeight;
-
-          final newBeat = (note.startBeat + beatChange).round();
-          final newRow = (note.row + rowChange).round();
-
-          controller.updateNote(note, newBeat, newRow);
+          controller.updateNote(
+            note,
+            (note.startBeat + details.delta.dx / cellWidth).round(),
+            (note.row + details.delta.dy / cellHeight).round(),
+          );
         },
 
         child: Container(
           decoration: BoxDecoration(
             color: note.hand == Hand.left
-            ? Colors.blue
-            : Colors.black,
+                ? Colors.blue
+                : Colors.black,
             borderRadius: BorderRadius.circular(4),
+          ),
+          child: Center(
+            child: Text(
+              controller.getDegree(note.row),
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: cellHeight * 0.7,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ),
       ),

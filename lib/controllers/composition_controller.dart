@@ -2,80 +2,126 @@ import 'package:flutter/foundation.dart';
 import '../models/composition.dart';
 import '../models/note.dart';
 import '../enums/hand.dart';
+import '../utils/scale_resolver.dart';
 
 class CompositionController extends ChangeNotifier {
   final Composition composition;
+
   CompositionController(this.composition);
 
+  // ================= HAND =================
   Hand currentHand = Hand.right;
 
   void toggleHand() {
-    currentHand =
-    currentHand == Hand.right ? Hand.left : Hand.right;
+    currentHand = currentHand == Hand.right
+        ? Hand.left
+        : Hand.right;
     notifyListeners();
   }
 
-  // ---------------- GRID CONFIG ----------------
+  // ================= SCALE =================
+  final List<String> availableScales = [
+    //major
+    'major C',
+    'major C sharp',
+    'major D flat',
+    'major D',
+    'major E flat',
+    'major E',
+    'major F',
+    'major F sharp',
+    'major G flat',
+    'major G',
+    'major A flat',
+    'major A',
+    'major B flat',
+    //minor
+    'minor C',
+    'minor C sharp',
+    'minor D',
+    'minor D sharp',
+    'minor E flat',
+    'minor E',
+    'minor F',
+    'minor G',
+    'minor G sharp',
+    'minor A flat',
+    'minor A',
+    'minor A sharp',
+    'minor B flat',
+    'minor B'
+  ];
 
+  int _scaleIndex = 0;
+
+  String get scaleName => availableScales[_scaleIndex];
+
+  List<String> get currentScale =>
+      ScaleResolver.getScale(scaleName);
+
+  String getDegree(int row) {
+    final scale = currentScale;
+    if (scale.isEmpty) return '';
+    return scale[row % scale.length];
+  }
+
+  void setScale(int index) {
+    _scaleIndex = index;
+    notifyListeners();
+  }
+
+  void nextScale() {
+    _scaleIndex = (_scaleIndex + 1) % availableScales.length;
+    notifyListeners();
+  }
+
+  void previousScale() {
+    _scaleIndex =
+        (_scaleIndex - 1 + availableScales.length) %
+            availableScales.length;
+    notifyListeners();
+  }
+
+  // ================= GRID =================
   int get maxRows => composition.numberOfOctaves * 7;
   int get maxBeats =>
-      composition.numberOfMeasures * composition.beatsPerMeasure;
+      composition.numberOfMeasures *
+          composition.beatsPerMeasure;
 
-
-  // ---------------- ZOOM ----------------
-
+  // ================= ZOOM =================
   double zoomX = 1.0;
   double zoomY = 1.0;
+
   void setZoom(double zx, double zy) {
     zoomX = zx.clamp(0.5, 3.0);
     zoomY = zy.clamp(0.5, 3.0);
     notifyListeners();
   }
 
-
-  double _baseZoomX = 1.0;
-  double _baseZoomY = 1.0;
-
-  void applyGestureZoom(double scale) {
-    zoomX = (_baseZoomX * scale).clamp(0.5, 3.0);
-    zoomY = (_baseZoomY * scale).clamp(0.5, 3.0);
+  void resetZoom() {
+    zoomX = 1.0;
+    zoomY = 1.0;
     notifyListeners();
   }
 
-  void zoomIn() => setZoom(zoomX + 0.1, zoomY + 0.1);
-  void zoomOut() => setZoom(zoomX - 0.1, zoomY - 0.1);
-  void resetZoom() => setZoom(1.0, 1.0);
-  void commitZoom() {
-    _baseZoomX = zoomX;
-    _baseZoomY = zoomY;
-  }
-
-
-  // ---------------- NOTES (DAW SYSTEM) ----------------
+  // ================= NOTES =================
   final List<Note> notes = [];
 
-  void addNote({
-    required int beat,
-    required int row,
-  }) {
-    final note = Note(
-      row: row,
-      startBeat: beat,
-      duration: 1,
-      hand: currentHand, // IMPORTANT
+  void addNote({required int beat, required int row}) {
+    notes.add(
+      Note(
+        row: row.clamp(0, maxRows),
+        startBeat: beat.clamp(0, maxBeats),
+        duration: 1,
+        hand: currentHand,
+      ),
     );
-    notes.add(note);
     notifyListeners();
   }
 
   void removeNote(Note note) {
     notes.remove(note);
     notifyListeners();
-  }
-
-  //for analysis or playback
-  List<Note> getNotesAtBeat(int beat) {
-    return notes.where((n) => n.startBeat == beat).toList();
   }
 
   Note? getNoteAt(int beat, int row) {
@@ -92,19 +138,15 @@ class CompositionController extends ChangeNotifier {
     final index = notes.indexOf(note);
     if (index == -1) return;
 
-    final clampedBeat = newBeat.clamp(0, maxBeats);
-    final clampedRow = newRow.clamp(0, maxRows);
-
     notes[index] = Note(
-      row: clampedRow,
-      startBeat: clampedBeat,
+      row: newRow.clamp(0, maxRows),
+      startBeat: newBeat.clamp(0, maxBeats),
       duration: note.duration,
       hand: note.hand,
     );
 
     notifyListeners();
   }
-
 
   void clearAll() {
     notes.clear();

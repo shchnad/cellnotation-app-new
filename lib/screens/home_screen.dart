@@ -15,6 +15,7 @@ class HomeScreen extends StatelessWidget {
       beatsPerMeasure: 4,
       numberOfOctaves: 8,
       notes: [],
+      scaleName: 'natural minor A',
     );
   }
 

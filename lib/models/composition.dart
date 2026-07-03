@@ -5,8 +5,8 @@ class Composition {
   final int numberOfMeasures;
   final int beatsPerMeasure;
   final int numberOfOctaves;
-
   final List<Note> notes;
+  final String scaleName; // MUST ALWAYS EXIST
 
   Composition({
     required this.title,
@@ -14,5 +14,6 @@ class Composition {
     required this.beatsPerMeasure,
     required this.numberOfOctaves,
     required this.notes,
+    required this.scaleName,
   });
 }
