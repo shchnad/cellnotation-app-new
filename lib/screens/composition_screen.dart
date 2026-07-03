@@ -38,8 +38,8 @@ class CompositionScreen extends StatelessWidget {
                             ? Icons.pan_tool
                             : Icons.back_hand,
                         color:  controller.currentHand == Hand.left
-                        ? Colors.white
-                        : Colors.blue,
+                        ? Colors.blue
+                        : Colors.white,
                       ),
                       onPressed: controller.toggleHand,
                     ),

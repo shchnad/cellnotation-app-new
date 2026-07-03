@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../controllers/composition_controller.dart';
+import '../enums/hand.dart';
 import '../models/note.dart';
 
 class NoteBlockWidget extends StatelessWidget {
@@ -46,7 +47,9 @@ class NoteBlockWidget extends StatelessWidget {
 
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.blue,
+            color: note.hand == Hand.left
+            ? Colors.blue
+            : Colors.black,
             borderRadius: BorderRadius.circular(4),
           ),
         ),
