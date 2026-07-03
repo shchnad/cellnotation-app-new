@@ -13,35 +13,71 @@ class GridPainter extends CustomPainter {
     required this.cellHeight,
   });
 
+  // ================= VERTICAL HELPERS =================
+
+  bool _isBarLine(int beat) => beat % 4 == 0;
+
+  // ================= HORIZONTAL HELPERS =================
+
+  bool _isOctaveBoundary(int row) => row % 7 == 0;
+
+  bool _isMiddleLine(int row) => row == (rows ~/ 2);
+
   @override
   void paint(Canvas canvas, Size size) {
+    // ================= PAINTS =================
+
     final thin = Paint()
       ..color = Colors.grey.shade300
       ..strokeWidth = 0.5;
 
-    final thick = Paint()
-      ..color = Colors.grey.shade500
+    final beatLine = Paint()
+      ..color = Colors.grey.shade400
+      ..strokeWidth = 0.8;
+
+    final barLine = Paint()
+      ..color = Colors.grey.shade600
       ..strokeWidth = 1.5;
 
-    // Vertical beat lines
+    final octaveLine = Paint()
+      ..color = Colors.grey.shade600
+      ..strokeWidth = 1.2;
+
+    final middleLine = Paint()
+      ..color = Colors.black87
+      ..strokeWidth = 2.5;
+
+    // ================= VERTICAL LINES (BEATS) =================
+
     for (int beat = 0; beat <= beats; beat++) {
       final x = beat * cellWidth;
 
       canvas.drawLine(
         Offset(x, 0),
         Offset(x, size.height),
-        beat % 4 == 0 ? thick : thin,
+        _isBarLine(beat) ? barLine : beatLine,
       );
     }
 
-    // Horizontal note lines
+    // ================= HORIZONTAL LINES (NOTES / OCTAVES) =================
+
     for (int row = 0; row <= rows; row++) {
       final y = row * cellHeight;
+
+      Paint paint;
+
+      if (_isMiddleLine(row)) {
+        paint = middleLine;
+      } else if (_isOctaveBoundary(row)) {
+        paint = octaveLine;
+      } else {
+        paint = thin;
+      }
 
       canvas.drawLine(
         Offset(0, y),
         Offset(size.width, y),
-        thin,
+        paint,
       );
     }
   }
