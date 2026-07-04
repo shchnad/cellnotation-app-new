@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../controllers/composition_controller.dart';
+import '../dialogs/duration_dialog.dart';
 import '../enums/hand.dart';
 import '../widgets/grid_widget.dart';
 
@@ -148,6 +149,16 @@ class CompositionScreen extends StatelessWidget {
                           color: Colors.white),
                       onPressed: () {
                         showScaleDialog(context, controller);
+                      },
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // DURATION CHOICE
+                    IconButton(
+                      icon: const Icon(Icons.av_timer, color: Colors.white),
+                      onPressed: () {
+                        showDurationDialog(context, controller);
                       },
                     ),
 

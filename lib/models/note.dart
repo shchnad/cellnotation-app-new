@@ -1,9 +1,10 @@
+import '../enums/duration.dart';
 import '../enums/hand.dart';
 
 class Note {
   final int row;
   final int startBeat;
-  final int duration;
+  final NoteDuration duration;
   final Hand hand;
 
   const Note({
@@ -16,13 +17,14 @@ class Note {
   Note copyWith({
     int? row,
     int? startBeat,
-    int? duration,
+    NoteDuration? duration,
+    Hand? hand,
   }) {
     return Note(
       row: row ?? this.row,
       startBeat: startBeat ?? this.startBeat,
       duration: duration ?? this.duration,
-      hand: hand,
+      hand: hand ?? this.hand,
     );
   }
 }

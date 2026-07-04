@@ -1,13 +1,23 @@
 import 'package:flutter/foundation.dart';
+import '../enums/duration.dart';
 import '../models/composition.dart';
 import '../models/note.dart';
 import '../enums/hand.dart';
 import '../utils/scale_resolver.dart';
 
 class CompositionController extends ChangeNotifier {
-  final Composition composition;
 
+  Composition composition;
   CompositionController(this.composition);
+
+  // ================DURATION==============
+
+  NoteDuration get currentDuration => composition.duration;
+
+  void setDuration(NoteDuration d) {
+    composition = composition.copyWith(duration: d);
+    notifyListeners();
+  }
 
   // ================= HAND =================
   Hand currentHand = Hand.right;
@@ -112,10 +122,11 @@ class CompositionController extends ChangeNotifier {
       Note(
         row: row.clamp(0, maxRows),
         startBeat: beat.clamp(0, maxBeats),
-        duration: 1,
+        duration: composition.duration,
         hand: currentHand,
       ),
     );
+
     notifyListeners();
   }
 

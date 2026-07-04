@@ -26,7 +26,7 @@ class NoteBlockWidget extends StatelessWidget {
     return Positioned(
       left: note.startBeat * cellWidth,
       top: note.row * cellHeight,
-      width: note.duration * cellWidth,
+      width: note.duration.beats * cellWidth,
       height: cellHeight,
       child: GestureDetector(
         onTap: () => controller.removeNote(note),
@@ -41,9 +41,7 @@ class NoteBlockWidget extends StatelessWidget {
 
         child: Container(
           decoration: BoxDecoration(
-            color: note.hand == Hand.left
-                ? Colors.blue
-                : Colors.black,
+            color: note.hand == Hand.left ? Colors.blue : Colors.black,
             borderRadius: BorderRadius.circular(4),
           ),
           child: Center(
