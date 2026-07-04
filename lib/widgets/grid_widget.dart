@@ -46,6 +46,15 @@ class GridWidget extends StatelessWidget {
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
 
+                // PINCH ZOOM
+                onScaleUpdate: (details) {
+                  controller.setZoom(
+                    controller.zoomX * details.scale,
+                    controller.zoomY * details.scale,
+                  );
+                },
+
+                // TAP LOGIC
                 onTapDown: (details) {
                   final x = details.localPosition.dx;
                   final y = details.localPosition.dy;
@@ -59,10 +68,7 @@ class GridWidget extends StatelessWidget {
                   final note = controller.getNoteAt(beat, row);
 
                   if (note == null) {
-                    controller.addNote(
-                      beat: beat,
-                      row: row,
-                    );
+                    controller.addNote(beat: beat, row: row);
                   } else {
                     controller.removeNote(note);
                   }

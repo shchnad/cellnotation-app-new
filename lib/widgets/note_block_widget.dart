@@ -44,13 +44,17 @@ class NoteBlockWidget extends StatelessWidget {
             color: note.hand == Hand.left ? Colors.blue : Colors.black,
             borderRadius: BorderRadius.circular(4),
           ),
-          child: Center(
-            child: Text(
-              controller.getDegree(note.row),
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: cellHeight * 0.7,
-                fontWeight: FontWeight.bold,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: Text(
+                controller.getDegree(note.row),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: cellHeight * 0.7,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
