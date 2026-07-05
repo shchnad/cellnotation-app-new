@@ -1,43 +1,63 @@
-import '../enums/duration.dart';
 import 'note.dart';
+import 'timeline.dart';
 
 class Composition {
   final String title;
-  final int numberOfMeasures;
-  final int beatsPerMeasure;
+  final String composer;
+  final String style;
+  final String instrument;
+
+  final int userId;
+
+  final DateTime createdAt;
+  final DateTime editedAt;
+
   final int numberOfOctaves;
-  final List<Note> notes;
   final String scaleName;
 
-  final NoteDuration duration; // default tool setting
+  final Timeline timeline;
+  final List<Note> notes;
 
   Composition({
     required this.title,
-    required this.numberOfMeasures,
-    required this.beatsPerMeasure,
+    required this.composer,
+    required this.style,
+    required this.instrument,
+    required this.userId,
+    DateTime? createdAt,
+    DateTime? editedAt,
     required this.numberOfOctaves,
-    required this.notes,
     required this.scaleName,
-    this.duration = NoteDuration.quarter,
-  });
+    required this.timeline,
+    required this.notes,
+  })  : createdAt = createdAt ?? DateTime.now(),
+        editedAt = editedAt ?? DateTime.now();
 
   Composition copyWith({
     String? title,
-    int? numberOfMeasures,
-    int? beatsPerMeasure,
+    String? composer,
+    String? style,
+    String? instrument,
+    int? userId,
+    DateTime? createdAt,
+    DateTime? editedAt,
     int? numberOfOctaves,
-    List<Note>? notes,
     String? scaleName,
-    NoteDuration? duration,
+    Timeline? timeline,
+    List<Note>? notes,
   }) {
     return Composition(
       title: title ?? this.title,
-      numberOfMeasures: numberOfMeasures ?? this.numberOfMeasures,
-      beatsPerMeasure: beatsPerMeasure ?? this.beatsPerMeasure,
+      composer: composer ?? this.composer,
+      style: style ?? this.style,
+      instrument: instrument ?? this.instrument,
+      userId: userId ?? this.userId,
+      createdAt: createdAt ?? this.createdAt,
+      editedAt: editedAt ?? this.editedAt,
       numberOfOctaves: numberOfOctaves ?? this.numberOfOctaves,
-      notes: notes ?? this.notes,
       scaleName: scaleName ?? this.scaleName,
-      duration: duration ?? this.duration,
+      timeline: timeline ?? this.timeline,
+      notes: notes ?? this.notes,
     );
   }
 }

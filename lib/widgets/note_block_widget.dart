@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../controllers/composition_controller.dart';
 import '../enums/hand.dart';
 import '../models/note.dart';
@@ -19,43 +20,45 @@ class NoteBlockWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = controller.getDegree(note.row);
-
-    final fontSize = cellHeight * 0.7;
+    final fontSize = cellHeight * 0.6;
 
     return Positioned(
-      left: note.startBeat * cellWidth,
+      left: note.startTick * cellWidth,
       top: note.row * cellHeight,
-      width: note.duration.beats * cellWidth,
+      width: note.durationTicks * cellWidth,
       height: cellHeight,
+
       child: GestureDetector(
         onTap: () => controller.removeNote(note),
 
         onPanUpdate: (details) {
+          final dxTicks = (details.delta.dx / cellWidth).round();
+          final dyRows = (details.delta.dy / cellHeight).round();
+
           controller.updateNote(
             note,
-            (note.startBeat + details.delta.dx / cellWidth).round(),
-            (note.row + details.delta.dy / cellHeight).round(),
+            note.startTick + dxTicks,
+            note.row + dyRows,
           );
         },
 
         child: Container(
+          width: double.infinity,
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.only(left: 6),
           decoration: BoxDecoration(
-            color: note.hand == Hand.left ? Colors.blue : Colors.black,
+            color: note.hand == Hand.left
+                ? Colors.blue
+                : Colors.black,
             borderRadius: BorderRadius.circular(4),
           ),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: const EdgeInsets.only(left: 6),
-              child: Text(
-                controller.getDegree(note.row),
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: cellHeight * 0.7,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+          child: Text(
+            controller.getDegree(note.row),
+            textAlign: TextAlign.left,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: fontSize,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ),

@@ -22,74 +22,75 @@ class GridWidget extends StatelessWidget {
         final beats = controller.maxBeats;
         final rows = controller.maxRows;
 
-        final cellWidth = width / beats * controller.zoomX;
-        final cellHeight = height / rows * controller.zoomY;
+        // grid cell size (zoom-safe)
+        final cellWidth = (width / beats) * controller.zoomX;
+        final cellHeight = (height / rows) * controller.zoomY;
 
-        return Stack(
-          children: [
-            // ================= GRID =================
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
 
-            Positioned.fill(
-              child: CustomPaint(
-                painter: GridPainter(
-                  beats: beats,
-                  rows: rows,
-                  cellWidth: cellWidth,
-                  cellHeight: cellHeight,
-                  barLines: controller.barLines,
+          // ================= PINCH ZOOM =================
+          onScaleUpdate: (details) {
+            controller.setZoom(
+              (controller.zoomX * details.scale),
+              (controller.zoomY * details.scale),
+            );
+          },
+
+          child: Stack(
+            children: [
+              // ================= GRID =================
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: GridPainter(
+                    beats: beats,
+                    rows: rows,
+                    cellWidth: cellWidth,
+                    cellHeight: cellHeight,
+                    barLines: controller.barLines,
+                  ),
                 ),
               ),
-            ),
 
-            // ================= TAP LAYER =================
+              // ================= TAP LAYER =================
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
 
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
+                  onTapDown: (details) {
+                    final x = details.localPosition.dx;
+                    final y = details.localPosition.dy;
 
-                // PINCH ZOOM
-                onScaleUpdate: (details) {
-                  controller.setZoom(
-                    controller.zoomX * details.scale,
-                    controller.zoomY * details.scale,
-                  );
-                },
+                    final beat = (x / cellWidth).floor();
+                    final row = (y / cellHeight).floor();
 
-                // TAP LOGIC
-                onTapDown: (details) {
-                  final x = details.localPosition.dx;
-                  final y = details.localPosition.dy;
+                    if (beat < 0 || beat >= beats) return;
+                    if (row < 0 || row >= rows) return;
 
-                  final beat = (x / cellWidth).floor();
-                  final row = (y / cellHeight).floor();
+                    final note = controller.getNoteAt(beat, row);
 
-                  if (beat < 0 || beat >= beats) return;
-                  if (row < 0 || row >= rows) return;
+                    if (note == null) {
+                      controller.addNote(tick: beat, row: row);
+                    } else {
+                      controller.removeNote(note);
+                    }
+                  },
 
-                  final note = controller.getNoteAt(beat, row);
-
-                  if (note == null) {
-                    controller.addNote(beat: beat, row: row);
-                  } else {
-                    controller.removeNote(note);
-                  }
-                },
-
-                child: const SizedBox.expand(),
+                  child: const SizedBox.expand(),
+                ),
               ),
-            ),
 
-            // ================= NOTES =================
-
-            ...controller.notes.map(
-                  (note) => NoteBlockWidget(
-                note: note,
-                cellWidth: cellWidth,
-                cellHeight: cellHeight,
-                controller: controller,
+              // ================= NOTES =================
+              ...controller.notes.map(
+                    (note) => NoteBlockWidget(
+                  note: note,
+                  cellWidth: cellWidth,
+                  cellHeight: cellHeight,
+                  controller: controller,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );

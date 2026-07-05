@@ -1,37 +1,41 @@
 import 'package:flutter/foundation.dart';
-import '../enums/duration.dart';
+
 import '../models/composition.dart';
 import '../models/note.dart';
+import '../models/measure.dart';
+import '../models/time_signature.dart';
 import '../enums/hand.dart';
+import '../enums/duration.dart';
 import '../utils/scale_resolver.dart';
 
 class CompositionController extends ChangeNotifier {
-
   Composition composition;
+
   CompositionController(this.composition);
 
-  // ================DURATION==============
 
-  NoteDuration get currentDuration => composition.duration;
+  // ================= DURATION (UI STATE) =================
+
+  NoteDuration currentDuration = NoteDuration.quarter;
 
   void setDuration(NoteDuration d) {
-    composition = composition.copyWith(duration: d);
+    currentDuration = d;
     notifyListeners();
   }
 
   // ================= HAND =================
+
   Hand currentHand = Hand.right;
 
   void toggleHand() {
-    currentHand = currentHand == Hand.right
-        ? Hand.left
-        : Hand.right;
+    currentHand =
+    currentHand == Hand.right ? Hand.left : Hand.right;
     notifyListeners();
   }
 
   // ================= SCALE =================
+
   final List<String> availableScales = [
-    //major
     'major C',
     'major C sharp',
     'major D flat',
@@ -45,7 +49,6 @@ class CompositionController extends ChangeNotifier {
     'major A flat',
     'major A',
     'major B flat',
-    //minor
     'minor C',
     'minor C sharp',
     'minor D',
@@ -59,7 +62,7 @@ class CompositionController extends ChangeNotifier {
     'minor A',
     'minor A sharp',
     'minor B flat',
-    'minor B'
+    'minor B',
   ];
 
   int _scaleIndex = 0;
@@ -92,21 +95,44 @@ class CompositionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  //=============== MEASURES ==================
+  // ================= TIMELINE / MEASURES =================
 
-  final List<Measure> measures = [];
+  int get maxBeats => composition.timeline.totalTicks;
+  int get maxRows => composition.numberOfOctaves * 7;
 
-  Set<int> get barLines {
-    return measures.map((m) => m.startBeat).toSet();
+  List<Measure> get measures => composition.timeline.measures;
+
+  Set<int> get barLines =>
+      composition.timeline.measures
+          .map((m) => m.startTick)
+          .toSet();
+
+  int get totalTicks => composition.timeline.totalTicks;
+
+  bool isBarLine(int tick) => barLines.contains(tick);
+
+  void addMeasure(TimeSignature sig) {
+    composition.timeline.addMeasure(sig);
+    notifyListeners();
   }
 
-  // ================= GRID =================
-  int get maxRows => composition.numberOfOctaves * 7;
-  int get maxBeats =>
-      composition.numberOfMeasures *
-          composition.beatsPerMeasure;
+  void insertMeasure(int index, TimeSignature sig) {
+    composition.timeline.insertMeasure(index, sig);
+    notifyListeners();
+  }
+
+  void deleteMeasure(int index) {
+    composition.timeline.deleteMeasure(index);
+    notifyListeners();
+  }
+
+  void changeSignature(int index, TimeSignature sig) {
+    composition.timeline.changeSignature(index, sig);
+    notifyListeners();
+  }
 
   // ================= ZOOM =================
+
   double zoomX = 1.0;
   double zoomY = 1.0;
 
@@ -122,15 +148,19 @@ class CompositionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ================= NOTES =================
-  final List<Note> notes = [];
+  // ================= NOTES (TICK-BASED) =================
 
-  void addNote({required int beat, required int row}) {
-    notes.add(
+  List<Note> get notes => composition.notes;
+
+  void addNote({
+    required int row,
+    required int tick,
+  }) {
+    composition.notes.add(
       Note(
-        row: row.clamp(0, maxRows),
-        startBeat: beat.clamp(0, maxBeats),
-        duration: composition.duration,
+        row: row,
+        startTick: tick,
+        durationTicks: currentDuration.ticks,
         hand: currentHand,
       ),
     );
@@ -139,28 +169,28 @@ class CompositionController extends ChangeNotifier {
   }
 
   void removeNote(Note note) {
-    notes.remove(note);
+    composition.notes.remove(note);
     notifyListeners();
   }
 
-  Note? getNoteAt(int beat, int row) {
+  Note? getNoteAt(int tick, int row) {
     try {
-      return notes.firstWhere(
-            (n) => n.startBeat == beat && n.row == row,
+      return composition.notes.firstWhere(
+            (n) => n.startTick == tick && n.row == row,
       );
     } catch (_) {
       return null;
     }
   }
 
-  void updateNote(Note note, int newBeat, int newRow) {
-    final index = notes.indexOf(note);
+  void updateNote(Note note, int newTick, int newRow) {
+    final index = composition.notes.indexOf(note);
     if (index == -1) return;
 
-    notes[index] = Note(
-      row: newRow.clamp(0, maxRows),
-      startBeat: newBeat.clamp(0, maxBeats),
-      duration: note.duration,
+    composition.notes[index] = Note(
+      row: newRow,
+      startTick: newTick,
+      durationTicks: note.durationTicks,
       hand: note.hand,
     );
 
@@ -168,19 +198,7 @@ class CompositionController extends ChangeNotifier {
   }
 
   void clearAll() {
-    notes.clear();
+    composition.notes.clear();
     notifyListeners();
   }
-}
-
-class Measure {
-  final int id;
-  final int startBeat;
-  final int beatsCount;
-
-  const Measure({
-    required this.id,
-    required this.startBeat,
-    required this.beatsCount,
-  });
 }
