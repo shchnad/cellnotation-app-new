@@ -36,6 +36,7 @@ class GridWidget extends StatelessWidget {
                   rows: rows,
                   cellWidth: cellWidth,
                   cellHeight: cellHeight,
+                  barLines: controller.barLines,
                 ),
               ),
             ),

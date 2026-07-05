@@ -92,6 +92,14 @@ class CompositionController extends ChangeNotifier {
     notifyListeners();
   }
 
+  //=============== MEASURES ==================
+
+  final List<Measure> measures = [];
+
+  Set<int> get barLines {
+    return measures.map((m) => m.startBeat).toSet();
+  }
+
   // ================= GRID =================
   int get maxRows => composition.numberOfOctaves * 7;
   int get maxBeats =>
@@ -163,4 +171,16 @@ class CompositionController extends ChangeNotifier {
     notes.clear();
     notifyListeners();
   }
+}
+
+class Measure {
+  final int id;
+  final int startBeat;
+  final int beatsCount;
+
+  const Measure({
+    required this.id,
+    required this.startBeat,
+    required this.beatsCount,
+  });
 }

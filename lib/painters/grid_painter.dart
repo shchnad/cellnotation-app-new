@@ -6,16 +6,19 @@ class GridPainter extends CustomPainter {
   final double cellWidth;
   final double cellHeight;
 
+  final Set<int> barLines;
+
   GridPainter({
     required this.beats,
     required this.rows,
     required this.cellWidth,
     required this.cellHeight,
+    required this.barLines,
   });
 
   // ================= VERTICAL HELPERS =================
 
-  bool _isBarLine(int beat) => beat % 4 == 0;
+  bool _isBarLine(int beat) => barLines.contains(beat);
 
   // ================= HORIZONTAL HELPERS =================
 
@@ -25,6 +28,7 @@ class GridPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+
     // ================= PAINTS =================
 
     final thin = Paint()
