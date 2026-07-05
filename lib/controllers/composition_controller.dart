@@ -147,6 +147,9 @@ class CompositionController extends ChangeNotifier {
     zoomY = 1.0;
     notifyListeners();
   }
+ // ======= CELL WIDTH =================================
+  double gridScale = 1.0;
+
 
   // ================= NOTES (TICK-BASED) =================
 

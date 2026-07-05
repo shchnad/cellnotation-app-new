@@ -23,8 +23,11 @@ class GridWidget extends StatelessWidget {
         final rows = controller.maxRows;
 
         // grid cell size (zoom-safe)
-        final cellWidth = (width / beats) * controller.zoomX;
         final cellHeight = (height / rows) * controller.zoomY;
+        final cellWidth = (width / beats) *
+            controller.zoomX *
+            controller.gridScale;
+
 
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
@@ -79,6 +82,8 @@ class GridWidget extends StatelessWidget {
                   child: const SizedBox.expand(),
                 ),
               ),
+
+
 
               // ================= NOTES =================
               ...controller.notes.map(

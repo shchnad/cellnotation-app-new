@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../controllers/composition_controller.dart';
 import '../dialogs/duration_dialog.dart';
+import '../dialogs/grid_scale_dialog.dart';
 import '../enums/hand.dart';
 import '../widgets/grid_widget.dart';
 
@@ -175,6 +176,16 @@ class CompositionScreen extends StatelessWidget {
                             : Colors.white,
                       ),
                       onPressed: controller.toggleHand,
+                    ),
+
+                    const Divider(color: Colors.white24),
+
+                    // GRID SCALING
+                    IconButton(
+                      icon: const Icon(Icons.grid_on, color: Colors.white),
+                      onPressed: () {
+                        showGridScaleDialog(context, controller);
+                      },
                     ),
 
                     const Divider(color: Colors.white24),
