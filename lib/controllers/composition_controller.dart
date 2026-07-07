@@ -16,10 +16,6 @@ class CompositionController extends ChangeNotifier {
 
   CompositionController(this.composition);
 
-  int _nextNoteId = 1;
-  int _generateNoteId() => _nextNoteId++;
-
-
   // ================= DURATION (UI STATE) =================
 
   NoteDuration currentDuration = NoteDuration.quarter;
@@ -155,10 +151,20 @@ class CompositionController extends ChangeNotifier {
  // ======= CELL WIDTH =================================
 
   double _gridScale = 1.0;
+
   double get gridScale => _gridScale;
+
   void setGridScale(double value) {
     _gridScale = value.clamp(0.125, 4.0);
     notifyListeners();
+  }
+
+  // ======= NOTES ID CREATION ========================
+
+  int _nextNoteId = 1;
+
+  int _generateNoteId() {
+    return _nextNoteId++;
   }
 
 
