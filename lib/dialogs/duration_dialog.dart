@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../controllers/composition_controller.dart';
-import '../enums/duration.dart';
+import '../enums/note_duration.dart';
 
 void showDurationDialog(
     BuildContext context,

@@ -37,7 +37,6 @@ class Timeline {
         signature: sig,
       ),
     );
-
     _rebuild();
   }
 
@@ -45,9 +44,7 @@ class Timeline {
 
   void deleteMeasure(int index) {
     if (index < 0 || index >= measures.length) return;
-
     measures.removeAt(index);
-
     _rebuild();
   }
 
@@ -55,12 +52,10 @@ class Timeline {
 
   void _rebuild() {
     int tick = 0;
-
     for (int i = 0; i < measures.length; i++) {
       measures[i]
         ..id = i
         ..startTick = tick;
-
       tick += measures[i].lengthTicks;
     }
   }
@@ -70,9 +65,7 @@ class Timeline {
 
   void changeSignature(int index, TimeSignature sig) {
     if (index < 0 || index >= measures.length) return;
-
     measures[index].signature = sig;
-
     _rebuild();
   }
 

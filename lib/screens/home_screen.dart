@@ -1,7 +1,7 @@
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
-import 'package:music_composer/enums/duration.dart';
+import 'package:music_composer/enums/note_duration.dart';
 
 import '../models/composition.dart';
 

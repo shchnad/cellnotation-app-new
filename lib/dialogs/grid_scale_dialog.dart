@@ -36,7 +36,7 @@ void showGridScaleDialog(
                         tempValue = value;
                       });
 
-                      controller.gridScale = value;
+                      controller.setGridScale(value);
                       controller.setZoom(
                         controller.zoomX,
                         controller.zoomY,
@@ -53,7 +53,7 @@ void showGridScaleDialog(
                   setState(() {
                     tempValue = 1.0;
                   });
-                  controller.gridScale = 1.0;
+                  controller.setGridScale(1.0);
                   controller.setZoom(
                     controller.zoomX,
                     controller.zoomY,

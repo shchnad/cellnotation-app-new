@@ -1,6 +1,4 @@
-
-
-import '../enums/duration.dart';
+import '../enums/note_duration.dart';
 
 class TimeSignature {
   final int beats;

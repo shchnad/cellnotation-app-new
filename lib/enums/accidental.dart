@@ -6,6 +6,5 @@ enum Accidental {
   doubleFlat('--');
 
   final String value;
-
   const Accidental(this.value);
 }

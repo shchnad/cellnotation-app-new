@@ -19,7 +19,7 @@ class GridWidget extends StatelessWidget {
         final width = constraints.maxWidth;
         final height = constraints.maxHeight;
 
-        final beats = controller.maxBeats;
+        final beats = controller.maxTicks;
         final rows = controller.maxRows;
 
         // grid cell size (zoom-safe)

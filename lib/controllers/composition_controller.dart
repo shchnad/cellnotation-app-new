@@ -4,14 +4,20 @@ import '../models/composition.dart';
 import '../models/note.dart';
 import '../models/measure.dart';
 import '../models/time_signature.dart';
+
 import '../enums/hand.dart';
-import '../enums/duration.dart';
+import '../enums/note_duration.dart';
+
 import '../utils/scale_resolver.dart';
+
 
 class CompositionController extends ChangeNotifier {
   Composition composition;
 
   CompositionController(this.composition);
+
+  int _nextNoteId = 1;
+  int _generateNoteId() => _nextNoteId++;
 
 
   // ================= DURATION (UI STATE) =================
@@ -28,8 +34,9 @@ class CompositionController extends ChangeNotifier {
   Hand currentHand = Hand.right;
 
   void toggleHand() {
-    currentHand =
-    currentHand == Hand.right ? Hand.left : Hand.right;
+    currentHand = currentHand == Hand.right
+        ? Hand.left
+        : Hand.right;
     notifyListeners();
   }
 
@@ -95,9 +102,7 @@ class CompositionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ================= TIMELINE / MEASURES =================
-
-  int get maxBeats => composition.timeline.totalTicks;
+  int get maxTicks => composition.timeline.totalTicks;
   int get maxRows => composition.numberOfOctaves * 7;
 
   List<Measure> get measures => composition.timeline.measures;
@@ -148,7 +153,13 @@ class CompositionController extends ChangeNotifier {
     notifyListeners();
   }
  // ======= CELL WIDTH =================================
-  double gridScale = 1.0;
+
+  double _gridScale = 1.0;
+  double get gridScale => _gridScale;
+  void setGridScale(double value) {
+    _gridScale = value.clamp(0.125, 4.0);
+    notifyListeners();
+  }
 
 
   // ================= NOTES (TICK-BASED) =================
@@ -161,13 +172,13 @@ class CompositionController extends ChangeNotifier {
   }) {
     composition.notes.add(
       Note(
+        id: _generateNoteId(),
         row: row,
         startTick: tick,
         durationTicks: currentDuration.ticks,
         hand: currentHand,
       ),
     );
-
     notifyListeners();
   }
 
@@ -189,12 +200,9 @@ class CompositionController extends ChangeNotifier {
   void updateNote(Note note, int newTick, int newRow) {
     final index = composition.notes.indexOf(note);
     if (index == -1) return;
-
-    composition.notes[index] = Note(
-      row: newRow,
+    composition.notes[index] = note.copyWith(
       startTick: newTick,
-      durationTicks: note.durationTicks,
-      hand: note.hand,
+      row: newRow,
     );
 
     notifyListeners();
