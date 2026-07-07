@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../controllers/composition_controller.dart';
 import '../dialogs/duration_dialog.dart';
 import '../dialogs/grid_scale_dialog.dart';
+import '../dialogs/message_dialog.dart';
 import '../enums/hand.dart';
 import '../widgets/grid_widget.dart';
 
@@ -187,6 +188,29 @@ class CompositionScreen extends StatelessWidget {
                         showGridScaleDialog(context, controller);
                       },
                     ),
+
+                    const Divider(color: Colors.white24),
+
+                    // PASTE MODE - long tap on the note starts this mode,
+                    // so the note is copied and can be paste everywhere,
+                    // if do not wish to paste it any more, toggle this mode
+                    if (controller.canPaste)
+                      IconButton(
+                        icon: Icon(
+                          controller.pasteMode
+                              ? Icons.copy
+                              : Icons.content_paste,
+                        color: controller.pasteMode ? Colors.blue : Colors.white),
+                        onPressed: () {
+                          if (controller.pasteMode) {
+                            controller.exitPasteMode();
+                          } else {
+                            showCopyPasteHelpDialog(context, 'Long tap the note you want to copy, '
+                                'than paste it to where you wish. To stop copying tap this button.');
+                            // controller.enterPasteMode();
+                          }
+                        },
+                      ),
 
                     const Divider(color: Colors.white24),
 

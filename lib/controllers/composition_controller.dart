@@ -12,9 +12,27 @@ import '../utils/scale_resolver.dart';
 
 
 class CompositionController extends ChangeNotifier {
-  Composition composition;
 
-  CompositionController(this.composition);
+  Composition composition; // Controller receives composition.
+
+  // ======= NOTES ID CREATION ========================
+
+  int _nextNoteId = 1;
+
+  int _generateNoteId() {
+    return _nextNoteId++;
+  }
+
+  // Looks at existing notes. Finds the highest ID.
+  // Starts creating new notes from the next number.
+  CompositionController(this.composition) {
+    if (composition.notes.isNotEmpty) {
+      _nextNoteId = composition.notes
+          .map((n) => n.id)
+          .reduce((a, b) => a > b ? a : b) +
+          1;
+    }
+  }
 
   // ================= DURATION (UI STATE) =================
 
@@ -159,14 +177,6 @@ class CompositionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ======= NOTES ID CREATION ========================
-
-  int _nextNoteId = 1;
-
-  int _generateNoteId() {
-    return _nextNoteId++;
-  }
-
 
   // ================= NOTES (TICK-BASED) =================
 
@@ -218,4 +228,43 @@ class CompositionController extends ChangeNotifier {
     composition.notes.clear();
     notifyListeners();
   }
+
+
+  // ======= COPY AND PASTE NOTE =================
+
+  Note? copiedNote;
+  bool pasteMode = false;
+  bool get canPaste => copiedNote != null;
+
+  void copyNote(Note note) {
+    copiedNote = note.copyWith();
+  }
+
+  void enterPasteMode() {
+    if (copiedNote == null) return;
+    pasteMode = true;
+    notifyListeners();
+  }
+
+  void exitPasteMode() {
+    pasteMode = false;
+    notifyListeners();
+  }
+
+  void pasteNote({
+    required int tick,
+    required int row,
+  }) {
+    if (copiedNote == null) return;
+    notes.add(
+      copiedNote!.copyWith(
+        id: _generateNoteId(),
+        startTick: tick,
+        row: row,
+      ),
+    );
+    notifyListeners();
+  }
+
+
 }

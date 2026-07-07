@@ -33,6 +33,7 @@ class Note {
   });
 
   Note copyWith({
+    int? id,
     int? startTick,
     int? durationTicks,
     int? row,
@@ -44,7 +45,7 @@ class Note {
     PlayingTechnique? playingTechnique,
   }) {
     return Note(
-      id: id,
+      id: id ?? this.id,
       startTick: startTick ?? this.startTick,
       durationTicks: durationTicks ?? this.durationTicks,
       row: row ?? this.row,

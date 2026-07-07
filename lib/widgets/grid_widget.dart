@@ -33,6 +33,7 @@ class GridWidget extends StatelessWidget {
           behavior: HitTestBehavior.opaque,
 
           // ================= PINCH ZOOM =================
+
           onScaleUpdate: (details) {
             controller.setZoom(
               (controller.zoomX * details.scale),
@@ -42,7 +43,8 @@ class GridWidget extends StatelessWidget {
 
           child: Stack(
             children: [
-              // ================= GRID =================
+
+              // GRID
               Positioned.fill(
                 child: CustomPaint(
                   painter: GridPainter(
@@ -55,28 +57,39 @@ class GridWidget extends StatelessWidget {
                 ),
               ),
 
-              // ================= TAP LAYER =================
+
+              // EMPTY CELL TAP
               Positioned.fill(
                 child: GestureDetector(
                   behavior: HitTestBehavior.translucent,
 
                   onTapDown: (details) {
-                    final x = details.localPosition.dx;
-                    final y = details.localPosition.dy;
-
-                    final beat = (x / cellWidth).floor();
-                    final row = (y / cellHeight).floor();
-
-                    if (beat < 0 || beat >= beats) return;
-                    if (row < 0 || row >= rows) return;
-
-                    final note = controller.getNoteAt(beat, row);
-
-                    if (note == null) {
-                      controller.addNote(tick: beat, row: row);
-                    } else {
-                      controller.removeNote(note);
+                    final tick =
+                    (details.localPosition.dx / cellWidth).floor();
+                    final row =
+                    (details.localPosition.dy / cellHeight).floor();
+                    if (controller.getNoteAt(tick,row) == null) {
+                      if (controller.pasteMode) {
+                        controller.pasteNote(
+                          tick: tick,
+                          row: row,
+                        );
+                      } else {
+                        controller.addNote(
+                          tick: tick,
+                          row: row,
+                        );
+                      }
                     }
+                  },
+
+                  onLongPressStart: (details) {
+                    final tick = (details.localPosition.dx / cellWidth).floor();
+                    final row = (details.localPosition.dy / cellHeight).floor();
+                    controller.pasteNote(
+                      tick: tick,
+                      row: row,
+                    );
                   },
 
                   child: const SizedBox.expand(),
@@ -84,8 +97,7 @@ class GridWidget extends StatelessWidget {
               ),
 
 
-
-              // ================= NOTES =================
+              // NOTES LAST
               ...controller.notes.map(
                     (note) => NoteBlockWidget(
                   note: note,
@@ -94,6 +106,7 @@ class GridWidget extends StatelessWidget {
                   controller: controller,
                 ),
               ),
+
             ],
           ),
         );
