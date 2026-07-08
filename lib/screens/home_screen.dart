@@ -29,7 +29,7 @@ class HomeScreen extends StatelessWidget {
         Measure(
           id: 0,
           startTick: 0,
-          signature: TimeSignature(beats: 4, beatUnit: NoteDuration.quarter),
+          timeSignature: TimeSignature(beats: 4, beatUnit: NoteDuration.quarter),
         ),
       ]),
       notes: [],

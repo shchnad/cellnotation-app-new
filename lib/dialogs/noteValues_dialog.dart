@@ -2,19 +2,22 @@ import 'package:flutter/material.dart';
 import '../controllers/composition_controller.dart';
 import '../enums/note_duration.dart';
 
-void showDurationDialog(
+void noteValuesDialog(
     BuildContext context,
-    CompositionController controller,
+    controllerCurrentValue, // controller.currentDuration
+    controllerFunction,
+    String titleOfDialog,
+    valuesList // NoteDuration.values
     ) {
   showDialog(
     context: context,
     builder: (_) {
       return AlertDialog(
-        title: const Text(
-           'Select Duration',
-           textAlign: TextAlign.center,
+        title: Text(
+          titleOfDialog,
+          textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 22),
+              fontSize: 22),
         ),
         content: SizedBox(
           width: 340,
@@ -24,8 +27,8 @@ void showDurationDialog(
             mainAxisSpacing: 8,
             crossAxisSpacing: 8,
             childAspectRatio: 2.2,
-            children: NoteDuration.values.map((d) {
-              final selected = controller.currentDuration == d;
+            children: valuesList.map((d) {
+              final selected = controllerCurrentValue == d;
 
               return ElevatedButton(
                 style: ElevatedButton.styleFrom(
@@ -37,7 +40,7 @@ void showDurationDialog(
                   ),
                 ),
                 onPressed: () {
-                  controller.setDuration(d);
+                  controllerFunction(d);
                   Navigator.pop(context);
                 },
                 child: Text(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../controllers/composition_controller.dart';
+import '../dialogs/note_dialog.dart';
 import '../enums/hand.dart';
 import '../models/note.dart';
 
@@ -78,6 +79,18 @@ class NoteBlockWidget extends StatelessWidget {
             note,
             note.startTick + dxTicks,
             note.row + dyRows,
+          );
+        },
+
+        onDoubleTap: () {
+          showDialog(
+            context: context,
+            builder: (_) {
+              return NoteDialog(
+                note: note,
+                controller: controller,
+              );
+            },
           );
         },
 

@@ -177,6 +177,63 @@ class CompositionController extends ChangeNotifier {
     notifyListeners();
   }
 
+// ================= NOTE INFORMATION =================
+
+  int getOctave(Note note) {
+    return (note.row ~/ 7) + 1;
+  }
+
+  int getMeasureNumber(Note note) {
+    final measures = composition.timeline.measures;
+    for (int i = 0; i < measures.length; i++) {
+      final current = measures[i];
+      final nextStart = i + 1 < measures.length
+          ? measures[i + 1].startTick
+          : composition.timeline.totalTicks;
+      if (note.startTick >= current.startTick &&
+          note.startTick < nextStart) {
+        return i + 1; // user display starts from measure 1
+      }
+    }
+    return 1;
+  }
+
+
+  int getBeatNumber(Note note) {
+    final measures = composition.timeline.measures;
+    for (int i = 0; i < measures.length; i++) {
+      final measure = measures[i];
+      final nextStart = i + 1 < measures.length
+          ? measures[i + 1].startTick
+          : composition.timeline.totalTicks;
+      if (note.startTick >= measure.startTick &&
+          note.startTick < nextStart) {
+        final tickInsideMeasure =
+            note.startTick - measure.startTick;
+        return (tickInsideMeasure ~/
+            measure.timeSignature.ticksPerBeat)
+            + 1;
+      }
+    }
+    return 1;
+  }
+
+  String durationLabel(Note note) {
+    switch (note.durationTicks) {
+      case 1:
+        return '1/16';
+      case 2:
+        return '1/8';
+      case 4:
+        return '1/4';
+      case 8:
+        return '1/2';
+      case 16:
+        return '1';
+      default:
+        return '';
+    }
+  }
 
   // ================= NOTES (TICK-BASED) =================
 
@@ -266,5 +323,17 @@ class CompositionController extends ChangeNotifier {
     notifyListeners();
   }
 
+// REPLACE NOTE
+
+  void replaceNote(
+      Note oldNote,
+      Note newNote,
+      ) {
+    final index =
+    notes.indexOf(oldNote);
+    if (index == -1) return;
+    notes[index] = newNote;
+    notifyListeners();
+  }
 
 }

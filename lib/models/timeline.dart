@@ -21,7 +21,7 @@ class Timeline {
       Measure(
         id: measures.length,
         startTick: totalTicks,
-        signature: sig,
+        timeSignature: sig,
       ),
     );
   }
@@ -34,7 +34,7 @@ class Timeline {
       Measure(
         id: index,
         startTick: 0,
-        signature: sig,
+        timeSignature: sig,
       ),
     );
     _rebuild();
@@ -65,7 +65,7 @@ class Timeline {
 
   void changeSignature(int index, TimeSignature sig) {
     if (index < 0 || index >= measures.length) return;
-    measures[index].signature = sig;
+    measures[index].timeSignature = sig;
     _rebuild();
   }
 
