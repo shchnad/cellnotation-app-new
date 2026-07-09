@@ -325,6 +325,8 @@ class NoteDialog extends StatelessWidget {
                 style:
                 TextStyle(
                   fontSize: 22,
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
