@@ -1,24 +1,21 @@
 import 'package:flutter/material.dart';
 
 class GridPainter extends CustomPainter {
-  final int beats;
+  final int totalTicks;
+  final int ppqn; // Ticks per beat (Pulses Per Quarter Note)
   final int rows;
-  final double cellWidth;
+  final double pixelsPerBeat;
   final double cellHeight;
-
-  final Set<int> barLines;
+  final Set<int> barLines; // Set of bar indexes (Measure numbers)
 
   GridPainter({
-    required this.beats,
+    required this.totalTicks,
+    required this.ppqn,
     required this.rows,
-    required this.cellWidth,
+    required this.pixelsPerBeat,
     required this.cellHeight,
     required this.barLines,
   });
-
-  // ================= VERTICAL HELPERS =================
-
-  bool _isBarLine(int beat) => barLines.contains(beat);
 
   // ================= HORIZONTAL HELPERS =================
 
@@ -28,11 +25,12 @@ class GridPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final double pixelsPerTick = pixelsPerBeat / ppqn;
 
     // ================= PAINTS =================
 
-    final thin = Paint()
-      ..color = Colors.grey.shade300
+    final subdivisionLine = Paint()
+      ..color = Colors.grey.shade200
       ..strokeWidth = 0.5;
 
     final beatLine = Paint()
@@ -44,29 +42,45 @@ class GridPainter extends CustomPainter {
       ..strokeWidth = 1.5;
 
     final octaveLine = Paint()
-      ..color = Colors.grey.shade600
+      ..color = Colors.grey.shade500
       ..strokeWidth = 1.2;
 
     final middleLine = Paint()
       ..color = Colors.black87
       ..strokeWidth = 2.5;
 
-    // ================= VERTICAL LINES (BEATS) =================
+    // ================= VERTICAL LINES (DAW TIMING GRID) =================
 
-    for (int beat = 0; beat <= beats; beat++) {
-      final x = beat * cellWidth;
+    // FL Studio Default Subdivision: 16th notes (4 steps per beat)
+    final int stepTicks = ppqn ~/ 4;
+    final int ticksPerBar = ppqn * 4; // Assuming 4/4 time signature placeholder for grid drawing
+
+    for (int tick = 0; tick <= totalTicks; tick += stepTicks) {
+      final double x = tick * pixelsPerTick;
+      if (x > size.width) break;
+
+      Paint paint;
+
+      if (tick % ticksPerBar == 0) {
+        paint = barLine; // Major Measure boundary
+      } else if (tick % ppqn == 0) {
+        paint = beatLine; // Individual Quarter Note Beat
+      } else {
+        paint = subdivisionLine; // 16th Note Step
+      }
 
       canvas.drawLine(
         Offset(x, 0),
         Offset(x, size.height),
-        _isBarLine(beat) ? barLine : beatLine,
+        paint,
       );
     }
 
     // ================= HORIZONTAL LINES (NOTES / OCTAVES) =================
 
     for (int row = 0; row <= rows; row++) {
-      final y = row * cellHeight;
+      final double y = row * cellHeight;
+      if (y > size.height) break;
 
       Paint paint;
 
@@ -75,7 +89,7 @@ class GridPainter extends CustomPainter {
       } else if (_isOctaveBoundary(row)) {
         paint = octaveLine;
       } else {
-        paint = thin;
+        paint = subdivisionLine;
       }
 
       canvas.drawLine(
@@ -88,9 +102,11 @@ class GridPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(GridPainter oldDelegate) {
-    return oldDelegate.cellWidth != cellWidth ||
+    return oldDelegate.pixelsPerBeat != pixelsPerBeat ||
         oldDelegate.cellHeight != cellHeight ||
-        oldDelegate.beats != beats ||
-        oldDelegate.rows != rows;
+        oldDelegate.totalTicks != totalTicks ||
+        oldDelegate.ppqn != ppqn ||
+        oldDelegate.rows != rows ||
+        oldDelegate.barLines != barLines;
   }
 }

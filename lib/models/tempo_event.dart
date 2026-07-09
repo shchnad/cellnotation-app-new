@@ -6,4 +6,6 @@ class TempoEvent {
     required this.tick,
     required this.bpm,
   });
+
+
 }

@@ -125,14 +125,19 @@ class CompositionScreen extends StatelessWidget {
                           controller.pasteMode
                               ? Icons.copy
                               : Icons.content_paste,
-                        color: controller.pasteMode ? Colors.blue : Colors.white),
+                          color: controller.pasteMode ? Colors.blue : Colors.white,
+                        ),
                         onPressed: () {
                           if (controller.pasteMode) {
+                            // Turns off copy mode and reverts the icon back to white
                             controller.exitPasteMode();
                           } else {
-                            showCopyPasteHelpDialog(context, 'Long tap the note you want to copy, '
-                                'than paste it to where you wish. To stop copying tap this button.');
-                            // controller.enterPasteMode();
+                            // Shows your instruction alert if they tap it while empty
+                            showCopyPasteHelpDialog(
+                              context,
+                              'Long tap the note you want to copy, '
+                                  'then paste it to where you wish. To stop copying tap this button.',
+                            );
                           }
                         },
                       ),

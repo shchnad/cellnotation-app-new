@@ -28,7 +28,7 @@ void showGridScaleDialog(
                   child: Slider(
                     value: tempValue,
                     min: 0.125,
-                    max: 2.0,
+                    max: 10.0,
                     divisions: 7,
                     label: tempValue.toStringAsFixed(2),
                     onChanged: (value) {

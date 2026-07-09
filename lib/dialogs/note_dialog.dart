@@ -48,7 +48,7 @@ class NoteDialog extends StatelessWidget {
             textAlign: TextAlign.center,
             'Note - C${editedNote.startTick + 1} / R${editedNote.row + 1}',
             style: const TextStyle(
-              color: Colors.blue,
+              color: Colors.black,
               fontSize: 22,
               fontWeight: FontWeight.bold,
             ),
@@ -110,8 +110,8 @@ class NoteDialog extends StatelessWidget {
 
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white,
+                        backgroundColor: Colors.grey.shade200,
+                        foregroundColor: Colors.blue,
                         minimumSize: const Size(48, 36),
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
@@ -169,7 +169,7 @@ class NoteDialog extends StatelessWidget {
                       duration,
                       title: 'Set Duration',
                       values: NoteDuration.values,
-                      numberOfColumns: 2,
+                      numberOfColumns: 3,
                       labelBuilder: (d) => d.label,
                       onSelected: (d) {
                         controller.setNoteDuration(editedNote, d);
@@ -386,8 +386,8 @@ class NoteDialog extends StatelessWidget {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
+              backgroundColor: Colors.grey.shade200,
+              foregroundColor: Colors.blue,
               // minimumSize: const Size(110, 36),
               fixedSize: _buttonSize,
               padding: const EdgeInsets.symmetric(

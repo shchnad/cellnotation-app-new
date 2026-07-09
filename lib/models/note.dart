@@ -177,4 +177,7 @@ class Note {
   }
 
 
+ // The final tick position where the note ends.
+  int get endTick => startTick + durationTicks;
+
 }

@@ -19,21 +19,25 @@ class GridWidget extends StatelessWidget {
         final width = constraints.maxWidth;
         final height = constraints.maxHeight;
 
-        final beats = controller.maxTicks;
-        final rows = controller.maxRows;
+        final int totalTicks = controller.maxTicks;
+        final int rows = controller.maxRows;
 
-        // grid cell size (zoom-safe)
-        final cellHeight = (height / rows) * controller.zoomY;
-        final cellWidth = (width / beats) *
-            controller.zoomX *
-            controller.gridScale;
+        // 1. Calculate continuous pixel mapping scaling instead of fixed cell widths
+        // zoomX represents pixels per beat. gridScale acts as an extra multiplier.
+        final double pixelsPerBeat = controller.zoomX * controller.gridScale;
+        final double cellHeight = (height / rows) * controller.zoomY;
 
+        // 2. Fetch PPQN directly from the timeline to know how many ticks fit in a beat
+        final int ppqn = controller.timeline.measures.isNotEmpty
+            ? controller.timeline.measures.first.timeSignature.ticksPerBeat
+            : 96; // Fallback default to standard PPQN if timeline is empty
+
+        final double pixelsPerTick = pixelsPerBeat / ppqn;
 
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
 
           // ================= PINCH ZOOM =================
-
           onScaleUpdate: (details) {
             controller.setZoom(
               (controller.zoomX * details.scale),
@@ -44,39 +48,42 @@ class GridWidget extends StatelessWidget {
           child: Stack(
             children: [
 
-              // GRID
+              // LAYER 1: THE BACKGROUND GRID CANVAS
               Positioned.fill(
                 child: CustomPaint(
                   painter: GridPainter(
-                    beats: beats,
+                    totalTicks: totalTicks,
+                    ppqn: ppqn,
                     rows: rows,
-                    cellWidth: cellWidth,
+                    pixelsPerBeat: pixelsPerBeat,
                     cellHeight: cellHeight,
                     barLines: controller.barLines,
                   ),
                 ),
               ),
 
-
-              // EMPTY CELL TAP
+              // LAYER 2: INTERACTION OVERLAY FOR CREATING NOTES
               Positioned.fill(
                 child: GestureDetector(
                   behavior: HitTestBehavior.translucent,
 
                   onTapDown: (details) {
-                    final tick =
-                    (details.localPosition.dx / cellWidth).floor();
-                    final row =
-                    (details.localPosition.dy / cellHeight).floor();
-                    if (controller.getNoteAt(tick,row) == null) {
+                    // Convert raw pixel position into timeline ticks
+                    final int rawTick = (details.localPosition.dx / pixelsPerTick).floor();
+                    final int row = (details.localPosition.dy / cellHeight).floor();
+
+                    // Snap the target tick (e.g., to the nearest 16th note or beat)
+                    final int snappedTick = controller.snapTick(rawTick);
+
+                    if (controller.getNoteAt(snappedTick, row) == null) {
                       if (controller.pasteMode) {
                         controller.pasteNote(
-                          tick: tick,
+                          tick: snappedTick,
                           row: row,
                         );
                       } else {
                         controller.addNote(
-                          tick: tick,
+                          tick: snappedTick,
                           row: row,
                         );
                       }
@@ -84,10 +91,12 @@ class GridWidget extends StatelessWidget {
                   },
 
                   onLongPressStart: (details) {
-                    final tick = (details.localPosition.dx / cellWidth).floor();
-                    final row = (details.localPosition.dy / cellHeight).floor();
+                    final int rawTick = (details.localPosition.dx / pixelsPerTick).floor();
+                    final int row = (details.localPosition.dy / cellHeight).floor();
+                    final int snappedTick = controller.snapTick(rawTick);
+
                     controller.pasteNote(
-                      tick: tick,
+                      tick: snappedTick,
                       row: row,
                     );
                   },
@@ -96,17 +105,15 @@ class GridWidget extends StatelessWidget {
                 ),
               ),
 
-
-              // NOTES LAST
+              // LAYER 3: DYNAMICALLY POSITIONED NOTE BLOCK WIDGETS
               ...controller.notes.map(
                     (note) => NoteBlockWidget(
                   note: note,
-                  cellWidth: cellWidth,
+                  pixelsPerTick: pixelsPerTick,
                   cellHeight: cellHeight,
                   controller: controller,
                 ),
               ),
-
             ],
           ),
         );
