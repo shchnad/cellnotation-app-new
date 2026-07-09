@@ -1,15 +1,18 @@
 enum PlayingTechnique {
-  none(''),
-  pizzicato('pz'),
-  arco('ar'),
-  spiccato('sp'),
-  ricochet('rc'),
-  vibrato('vb'),
-  flageolet('fl'),
-  slapping('sl'),
-  portamento('pt');
+  pizzicato('Pizzicato', 'pz'),
+  arco('Arco', 'ar'),
+  spiccato('Spiccato', 'sp'),
+  ricochet('Ricochet', 'rc'),
+  vibrato('Vibrato', 'vb'),
+  flageolet('Flageolet', 'fl'),
+  slapping('Slapping', 'sl'),
+  portamento('Portamento', 'pt');
 
+  final String label;
   final String abbreviation;
 
-  const PlayingTechnique(this.abbreviation);
+  const PlayingTechnique(
+      this.label,
+      this.abbreviation,
+      );
 }

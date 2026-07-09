@@ -84,6 +84,7 @@ class CompositionScreen extends StatelessWidget {
                     IconButton(
                       icon: const Icon(Icons.av_timer, color: Colors.white),
                       onPressed: () {
+
                         showDurationDialog(context, controller);
                       },
                     ),

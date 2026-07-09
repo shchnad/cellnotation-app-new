@@ -9,7 +9,6 @@ enum MusicalDynamic {
   fff('fff'),
   sfz('sfz');
 
-  final String value;
-
-  const MusicalDynamic(this.value);
+  final String label;
+  const MusicalDynamic(this.label);
 }
