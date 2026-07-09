@@ -384,7 +384,32 @@ class CompositionController extends ChangeNotifier {
 
 
   int getOctave(Note note) =>
-      (note.row ~/ 7) + 1;
+      (composition.numberOfOctaves - 1) - (note.row ~/ 7);
+
+  String getOctaveName(int octave) {
+    switch (octave) {
+      case 0:
+        return 'Subcontra octave';
+      case 1:
+        return 'Contra octave';
+      case 2:
+        return 'Great octave';
+      case 3:
+        return 'Small octave';
+      case 4:
+        return '1st octave';
+      case 5:
+        return '2nd octave';
+      case 6:
+        return '3rd octave';
+      case 7:
+        return '4th octave';
+      case 8:
+        return '5th octave';
+      default:
+        return 'Octave $octave';
+    }
+  }
 
 
   int getMeasureNumber(

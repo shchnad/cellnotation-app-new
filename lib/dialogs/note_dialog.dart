@@ -81,9 +81,12 @@ class NoteDialog extends StatelessWidget {
                   children: [
 
                     Expanded(
-                      child: _infoRow(
+                      child: _octaveInfo(
                         'Octave',
                         controller.getOctave(editedNote).toString(),
+                        controller.getOctaveName(
+                          controller.getOctave(editedNote),
+                        ),
                       ),
                     ),
 
@@ -393,6 +396,50 @@ class NoteDialog extends StatelessWidget {
       ),
     );
   }
+
+  Widget _octaveInfo(
+      String title,
+      String value,
+      String subLabel,
+      ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        vertical: 4,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                '$title: ',
+                style: const TextStyle(
+                  fontSize: 22,
+                ),
+              ),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue,
+                ),
+              ),
+            ],
+          ),
+          Text(
+            subLabel.toLowerCase(),
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.blue,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 
 
 }
