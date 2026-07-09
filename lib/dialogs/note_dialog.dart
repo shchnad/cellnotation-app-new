@@ -26,6 +26,8 @@ class NoteDialog extends StatelessWidget {
     required this.controller,
   });
 
+  static const Size _buttonSize = Size(150, 44);
+
   Note get currentNote {
     return controller.notes.firstWhere(
           (n) => n.id == note.id,
@@ -41,10 +43,12 @@ class NoteDialog extends StatelessWidget {
       builder: (context, _) {
         final editedNote = currentNote;
         return AlertDialog(
+          contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
           title: Text(
-            // 'Note #${editedNote.id}',
-            'Note:  C ${note.startTick + 1} / R ${note.row + 1}',
+            textAlign: TextAlign.center,
+            'Note - C${editedNote.startTick + 1} / R${editedNote.row + 1}',
             style: const TextStyle(
+              color: Colors.blue,
               fontSize: 22,
               fontWeight: FontWeight.bold,
             ),
@@ -54,7 +58,7 @@ class NoteDialog extends StatelessWidget {
               mainAxisSize:
               MainAxisSize.min,
               children: [
-                const Divider(),
+                const Divider(height: 8, thickness: 0.5),
                 Row(
                   children: [
 
@@ -74,7 +78,7 @@ class NoteDialog extends StatelessWidget {
                   ],
                 ),
 
-                const Divider(),
+                const Divider(height: 8, thickness: 0.5),
 
 
                 Row(
@@ -108,9 +112,9 @@ class NoteDialog extends StatelessWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
                         foregroundColor: Colors.white,
-                        minimumSize: const Size(55, 45),
+                        minimumSize: const Size(48, 36),
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
+                          horizontal: 10,
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -149,7 +153,7 @@ class NoteDialog extends StatelessWidget {
                   ],
                 ),
 
-                const Divider(),
+                const Divider(height: 8, thickness: 0.5),
 
                 _editButton(
                   'Duration',
@@ -177,7 +181,7 @@ class NoteDialog extends StatelessWidget {
                 _editButton(
                   'Hand',
                   editedNote.hand.name,
-                  () {
+                      () {
                     noteValuesDialog<Hand>(
                       context: context,
                       currentValue:
@@ -199,8 +203,8 @@ class NoteDialog extends StatelessWidget {
                 _editButton(
                   'Finger',
                   editedNote.finger?.value.toString() ?? 'none',
-                  () {
-                      noteValuesDialog<Finger>(
+                      () {
+                    noteValuesDialog<Finger>(
                       context: context,
                       currentValue:
                       editedNote.finger,
@@ -220,7 +224,7 @@ class NoteDialog extends StatelessWidget {
 
                 _editButton(
                   'Articulation',
-                  editedNote.articulation?.name ?? 'None',
+                  editedNote.articulation?.label ?? 'None',
                       () {
                     noteValuesDialog<Articulation>(
                       context: context,
@@ -248,7 +252,7 @@ class NoteDialog extends StatelessWidget {
                 _editButton(
                   'Ornament',
                   editedNote.ornament?.label ?? 'None',
-                  () {
+                      () {
                     noteValuesDialog<Ornament>(
                       context: context,
                       currentValue: editedNote.ornament,
@@ -275,7 +279,7 @@ class NoteDialog extends StatelessWidget {
                 _editButton(
                   'Technique',
                   editedNote.playingTechnique?.label ?? 'None',
-                  () {
+                      () {
                     noteValuesDialog<PlayingTechnique>(
                       context: context,
                       currentValue: editedNote.playingTechnique,
@@ -299,10 +303,18 @@ class NoteDialog extends StatelessWidget {
                   },
                 ),
 
+                // ---- Add your 2-3 new buttons here ----
+                // _editButton(
+                //   'Label',
+                //   'Value',
+                //   () {},
+                // ),
+
               ],
             ),
           ),
 
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           actions: [
             TextButton(
               onPressed: () {
@@ -330,7 +342,7 @@ class NoteDialog extends StatelessWidget {
       ) {
     return Padding(
       padding: const EdgeInsets.symmetric(
-        vertical: 4,
+        vertical: 2,
       ),
       child: Row(
         children: [
@@ -361,11 +373,10 @@ class NoteDialog extends StatelessWidget {
       ) {
     return Padding(
       padding: const EdgeInsets.symmetric(
-        vertical: 4,
+        vertical: 2,
       ),
       child: Row(
-        mainAxisAlignment:
-        MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             '$title: ',
@@ -374,11 +385,14 @@ class NoteDialog extends StatelessWidget {
             ),
           ),
           ElevatedButton(
-            style:
-            ElevatedButton.styleFrom(
+            style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue,
               foregroundColor: Colors.white,
-              minimumSize: const Size(130, 48),
+              // minimumSize: const Size(110, 36),
+              fixedSize: _buttonSize,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+              ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -397,6 +411,8 @@ class NoteDialog extends StatelessWidget {
     );
   }
 
+
+
   Widget _octaveInfo(
       String title,
       String value,
@@ -404,10 +420,11 @@ class NoteDialog extends StatelessWidget {
       ) {
     return Padding(
       padding: const EdgeInsets.symmetric(
-        vertical: 4,
+        vertical: 2,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
