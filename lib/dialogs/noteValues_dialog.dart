@@ -38,10 +38,12 @@ void noteValuesDialog<T>({
 
   final buttonWidth = maxWidth + 40;
 
-
+// Convert the integer math to a double first, then clamp
   final dialogWidth = (((buttonWidth * numberOfColumns) +
       spacing * (numberOfColumns - 1) +
-      48).clamp(0.0, screenWidth * 0.8)).toDouble();
+      48.0)
+      .toDouble() // <-- Add this right here
+      .clamp(0.0, screenWidth * 0.8));
 
 
   final buttons = [

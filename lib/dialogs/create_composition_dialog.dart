@@ -5,7 +5,12 @@ import '../models/measure.dart';
 import '../models/timeline.dart';
 import '../models/time_signature.dart';
 import '../enums/note_duration.dart';
+import '../enums/music_style.dart';
+import '../enums/instrument.dart';
 import '../models/note.dart';
+import 'noteValues_dialog.dart';
+import 'scale_dialog.dart';
+
 
 class CreateCompositionDialog extends StatefulWidget {
   final Function(Composition) onCompositionCreated;
@@ -24,24 +29,14 @@ class CreateCompositionDialog extends StatefulWidget {
 class _CreateCompositionDialogState extends State<CreateCompositionDialog> {
   final _formKey = GlobalKey<FormState>();
 
-  // Text Form Fields Configuration Controllers
   final _titleController = TextEditingController(text: 'My Composition');
   final _composerController = TextEditingController(text: 'Anonymous');
   final _measuresController = TextEditingController(text: '4');
 
-  // Exact Model Param Trackers
   int _beatsPerMeasure = 4;
   NoteDuration _selectedBeatUnit = NoteDuration.quarter;
-
-  late String _selectedScale;
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedScale = widget.controller.availableScales.isNotEmpty
-        ? widget.controller.availableScales.first
-        : 'major C';
-  }
+  MusicStyle _selectedStyle = MusicStyle.classical;
+  Instrument _selectedInstrument = Instrument.piano;
 
   @override
   void dispose() {
@@ -51,145 +46,264 @@ class _CreateCompositionDialogState extends State<CreateCompositionDialog> {
     super.dispose();
   }
 
+  Widget _buildSelectionField({
+    required String label,
+    required String valueText,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: () {
+        FocusScope.of(context).unfocus(); // Drops the keyboard safely before switching dialogs
+        onTap();
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          border: const OutlineInputBorder(),
+          prefixIcon: Icon(icon, size: 22),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                valueText,
+                style: const TextStyle(fontSize: 20, color: Colors.blue, fontWeight: FontWeight.bold),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const Icon(Icons.arrow_drop_down, color: Colors.blue),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    const double fontSize = 20.0;
+    final parts = widget.controller.scaleName.split(' ');
+    final scaleDisplayLabel = parts.length == 2
+        ? '${parts[1]} ${parts[0]}'
+        : parts.length > 2
+        ? '${parts.sublist(1).join(' ')} ${parts[0]}'
+        : widget.controller.scaleName;
 
-    return AlertDialog(
-      title: const Text(
-        'New Composition',
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.blue),
-      ),
-      content: SizedBox(
-        width: MediaQuery.of(context).size.width * 0.85,
-        child: SingleChildScrollView(
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextFormField(
-                  controller: _titleController,
-                  decoration: const InputDecoration(
-                    labelText: 'Composition Title',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.title),
-                  ),
-                  style: const TextStyle(fontSize: fontSize),
-                  validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _composerController,
-                  decoration: const InputDecoration(
-                    labelText: 'Composer Name',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person),
-                  ),
-                  style: const TextStyle(fontSize: fontSize),
-                  validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
-                ),
-                const Divider(height: 32, thickness: 1),
-
-                const Text(
-                  'Time Signature',
-                  style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<int>(
-                        value: _beatsPerMeasure,
-                        decoration: const InputDecoration(labelText: 'Beats', border: OutlineInputBorder()),
-                        items: [1, 2, 3, 4, 5, 6, 7, 9, 12].map((b) {
-                          return DropdownMenuItem(value: b, child: Text('$b', style: const TextStyle(fontSize: fontSize)));
-                        }).toList(),
-                        onChanged: (val) => setState(() => _beatsPerMeasure = val ?? 4),
-                      ),
-                    ),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12.0),
-                      child: Text('/', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
-                    ),
-                    Expanded(
-                      child: DropdownButtonFormField<NoteDuration>(
-                        value: _selectedBeatUnit,
-                        decoration: const InputDecoration(labelText: 'Beat Unit', border: OutlineInputBorder()),
-                        items: NoteDuration.values.map((duration) {
-                          return DropdownMenuItem(
-                            value: duration,
-                            child: Text(
-                              duration.label,
-                              style: const TextStyle(fontSize: fontSize),
+    return SafeArea(
+      child: AlertDialog(
+        alignment: Alignment.topCenter, // Anchors the card upwards
+        insetPadding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 12.0),
+        title: const Text(
+          'New Composition',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black),
+        ),
+        content: SizedBox(
+          width: MediaQuery.of(context).size.width * 0.85,
+          child: SingleChildScrollView( // <-- Bulletproof fix against keyboard shrinking screen space
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ================= LEFT COLUMN =================
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextFormField(
+                              controller: _titleController,
+                              decoration: const InputDecoration(
+                                labelText: 'Composition Title',
+                                isDense: true,
+                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.title, size: 22),
+                              ),
+                              style: const TextStyle(fontSize: 20, color: Colors.blue, fontWeight: FontWeight.bold),
+                              validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
                             ),
-                          );
-                        }).toList(),
-                        onChanged: (val) => setState(() => _selectedBeatUnit = val ?? NoteDuration.quarter),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _composerController,
+                              decoration: const InputDecoration(
+                                labelText: 'Composer Name',
+                                isDense: true,
+                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.person, size: 22),
+                              ),
+                              style: const TextStyle(fontSize: 20, color: Colors.blue, fontWeight: FontWeight.bold),
+                              validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildSelectionField(
+                              label: 'Musical Style',
+                              valueText: _selectedStyle.label,
+                              icon: Icons.palette,
+                              onTap: () {
+                                noteValuesDialog<MusicStyle>(
+                                  context: context,
+                                  title: 'Select Style',
+                                  currentValue: _selectedStyle,
+                                  values: MusicStyle.values,
+                                  labelBuilder: (s) => s.label,
+                                  numberOfColumns: 3,
+                                  onSelected: (style) => setState(() => _selectedStyle = style),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 12),
+                            _buildSelectionField(
+                              label: 'Target Instrument',
+                              valueText: _selectedInstrument.label,
+                              icon: Icons.piano,
+                              onTap: () {
+                                noteValuesDialog<Instrument>(
+                                  context: context,
+                                  title: 'Select Instrument',
+                                  currentValue: _selectedInstrument,
+                                  values: Instrument.values,
+                                  labelBuilder: (i) => i.label,
+                                  numberOfColumns: 3,
+                                  onSelected: (inst) => setState(() => _selectedInstrument = inst),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const Divider(height: 32, thickness: 1),
+                      const SizedBox(width: 16),
 
-                const Text(
-                  'Initial Scale Key',
-                  style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: _selectedScale,
-                  decoration: const InputDecoration(border: OutlineInputBorder(), prefixIcon: Icon(Icons.music_note)),
-                  isExpanded: true,
-                  items: widget.controller.availableScales.map((scale) {
-                    return DropdownMenuItem(
-                      value: scale,
-                      child: Text(scale, style: const TextStyle(fontSize: fontSize)),
-                    );
-                  }).toList(),
-                  onChanged: (val) => setState(() => _selectedScale = val ?? _selectedScale),
-                ),
-                const Divider(height: 32, thickness: 1),
-
-                TextFormField(
-                  controller: _measuresController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Number of Measures to Generate',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.playlist_add_check),
+                      // ================= RIGHT COLUMN =================
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey.shade400),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Time Signature', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black54)),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: DropdownButtonFormField<int>(
+                                          value: _beatsPerMeasure,
+                                          isDense: true,
+                                          decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4), border: OutlineInputBorder()),
+                                          items: [1, 2, 3, 4, 5, 6, 7, 9, 12].map((b) {
+                                            return DropdownMenuItem(value: b, child: Text('$b', style: const TextStyle(fontSize: 18, color: Colors.blue, fontWeight: FontWeight.bold)));
+                                          }).toList(),
+                                          onChanged: (val) => setState(() => _beatsPerMeasure = val ?? 4),
+                                        ),
+                                      ),
+                                      const Padding(
+                                        padding: EdgeInsets.symmetric(horizontal: 6.0),
+                                        child: Text('/', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                                      ),
+                                      Expanded(
+                                        child: InkWell(
+                                          onTap: () {
+                                            FocusScope.of(context).unfocus();
+                                            noteValuesDialog<NoteDuration>(
+                                              context: context,
+                                              title: 'Select Duration',
+                                              currentValue: _selectedBeatUnit,
+                                              values: NoteDuration.values,
+                                              labelBuilder: (d) => d.label,
+                                              numberOfColumns: 3,
+                                              onSelected: (dur) => setState(() => _selectedBeatUnit = dur),
+                                            );
+                                          },
+                                          child: InputDecorator(
+                                            decoration: const InputDecoration(
+                                              isDense: true,
+                                              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                              border: OutlineInputBorder(),
+                                            ),
+                                            child: Text(_selectedBeatUnit.label, style: const TextStyle(fontSize: 18, color: Colors.blue, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            _buildSelectionField(
+                              label: 'Scale Key',
+                              valueText: scaleDisplayLabel,
+                              icon: Icons.music_note,
+                              onTap: () {
+                                showScaleDialog(context, widget.controller);
+                                Future.delayed(const Duration(milliseconds: 250), () {
+                                  if (mounted) setState(() {});
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _measuresController,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'Measures to Generate',
+                                isDense: true,
+                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.playlist_add_check, size: 22),
+                              ),
+                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blue),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) return 'Required';
+                                final num = int.tryParse(value);
+                                if (num == null || num <= 0) return 'Must be > 0';
+                                return null;
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  style: const TextStyle(fontSize: fontSize),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Required';
-                    final num = int.tryParse(value);
-                    if (num == null || num <= 0) return 'Must be greater than 0';
-                    return null;
-                  },
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
-      ),
-      actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel', style: TextStyle(fontSize: 20, color: Colors.grey)),
-        ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black)),
           ),
-          onPressed: _submitForm,
-          child: const Text('Create', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-        ),
-      ],
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(120, 44),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              elevation: 0,
+            ),
+            onPressed: _submitForm,
+            child: const Text('Create', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -201,31 +315,23 @@ class _CreateCompositionDialogState extends State<CreateCompositionDialog> {
       beatUnit: _selectedBeatUnit,
     );
 
-    // FIXED TYPE INFUSION: Explicitly casts the array type to solve compiler inference failures
     final timeline = Timeline(measures: <Measure>[]);
-
     final int countOfMeasures = int.parse(_measuresController.text);
     for (int i = 0; i < countOfMeasures; i++) {
       timeline.addMeasure(timeSignature);
     }
 
-    // Matches every single required parameter found within your exact model specification
     final newComposition = Composition(
       title: _titleController.text.trim(),
       composer: _composerController.text.trim(),
-      style: 'Classical',
-      instrument: 'Piano',
+      style: _selectedStyle.label,
+      instrument: _selectedInstrument.label,
       userId: 1,
       numberOfOctaves: 8,
-      scaleName: _selectedScale,
+      scaleName: widget.controller.scaleName,
       timeline: timeline,
       notes: <Note>[],
     );
-
-    final targetIndex = widget.controller.availableScales.indexOf(_selectedScale);
-    if (targetIndex != -1) {
-      widget.controller.setScale(targetIndex);
-    }
 
     widget.onCompositionCreated(newComposition);
     Navigator.pop(context);
