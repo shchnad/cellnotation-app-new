@@ -32,8 +32,7 @@ void showScaleDialog(
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
               padding: EdgeInsets.zero,
-              backgroundColor:
-              isSelected ? Colors.blue : null,
+              backgroundColor: isSelected ? Colors.blue : null,
               minimumSize: const Size(130, 48),
               shape: RoundedRectangleBorder(
                 borderRadius:
@@ -47,8 +46,10 @@ void showScaleDialog(
             child: Text(
               scale,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 22,
+                color: isSelected ? Colors.white : Colors.blue,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ),
@@ -66,6 +67,8 @@ void showScaleDialog(
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
           ),
         ),
         content: SizedBox(

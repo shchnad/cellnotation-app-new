@@ -187,6 +187,12 @@ class CompositionController extends ChangeNotifier {
 
   bool isBarLine(int tick) => barLines.contains(tick);
 
+  void updateComposition(Composition newComp) {
+    composition = newComp;
+    _nextNoteId = 1; // Reset ID counter for the new song
+    notifyListeners(); // This refreshes the whole UI
+  }
+
   void addMeasure(TimeSignature signature) {
     timeline.addMeasure(signature);
     notifyListeners();
@@ -220,6 +226,7 @@ class CompositionController extends ChangeNotifier {
     timeline.removeTempoEvent(event);
     notifyListeners();
   }
+
 
   // ================= ZOOM =================
 

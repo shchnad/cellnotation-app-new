@@ -38,28 +38,23 @@ void noteValuesDialog<T>({
 
   final buttonWidth = maxWidth + 40;
 
-  final dialogWidth =
-  (((buttonWidth * numberOfColumns) +
-      spacing * (numberOfColumns - 1) +
-      48)
-      .clamp(0.0, screenWidth * 0.8))
-      .toDouble();
 
+  final dialogWidth = (((buttonWidth * numberOfColumns) +
+      spacing * (numberOfColumns - 1) +
+      48).clamp(0.0, screenWidth * 0.8)).toDouble();
 
 
   final buttons = [
 
     ...values.map(
-
           (value) {
-
         final selected = value == currentValue;
 
         return _button(
           labelBuilder(value),
           selected,
           buttonWidth,
-              () {
+          () {
             onSelected(value);
             Navigator.pop(context);
           },
@@ -68,14 +63,13 @@ void noteValuesDialog<T>({
 
     ),
 
-
     if (onClear != null)
 
       _button(
         'None',
         currentValue == null,
         buttonWidth,
-            () {
+        () {
           onClear();
           Navigator.pop(context);
         },
@@ -91,7 +85,11 @@ void noteValuesDialog<T>({
       title: Text(
         title,
         textAlign: TextAlign.center,
-        style: const TextStyle(fontSize: fontSize),
+        style: const TextStyle(
+            fontSize: fontSize,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+        ),
       ),
 
       content: SizedBox(
@@ -140,11 +138,9 @@ Widget _button(
       text,
       textAlign: TextAlign.center,
       style: TextStyle(
-        color:
-        selected
-            ? Colors.white
-            : Colors.blue,
+        color: selected ? Colors.white : Colors.blue,
         fontSize: 22,
+        fontWeight: FontWeight.bold,
       ),
     ),
 

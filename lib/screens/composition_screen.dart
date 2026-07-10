@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../controllers/composition_controller.dart';
+import '../dialogs/create_composition_dialog.dart';
 import '../dialogs/duration_dialog.dart';
 import '../dialogs/grid_cell_dialog.dart';
 import '../dialogs/message_dialog.dart';
@@ -15,6 +16,19 @@ class CompositionScreen extends StatelessWidget {
     required this.controller,
   });
 
+
+  void _showCreateDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => CreateCompositionDialog(
+        controller: controller,
+        onCompositionCreated: (newComposition) {
+          controller.updateComposition(newComposition);
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -29,7 +43,6 @@ class CompositionScreen extends StatelessWidget {
                 color: Colors.grey.shade900,
                 child: Column(
                   children: [
-
                     const SizedBox(height: 20),
 
                     // HOME
@@ -41,12 +54,10 @@ class CompositionScreen extends StatelessWidget {
                             context: context,
                             builder: (_) => AlertDialog(
                               title: const Text("Exit?"),
-                              content: const Text(
-                                  "Unsaved work will be lost."),
+                              content: const Text("Unsaved work will be lost."),
                               actions: [
                                 TextButton(
-                                  onPressed: () =>
-                                      Navigator.pop(context),
+                                  onPressed: () => Navigator.pop(context),
                                   child: const Text("Cancel"),
                                 ),
                                 TextButton(
@@ -69,10 +80,18 @@ class CompositionScreen extends StatelessWidget {
 
                     const SizedBox(height: 10),
 
+                    // FIXED: Replaced the broken nested AppBar with a uniform dark-theme sidebar utility icon button
+                    IconButton(
+                      icon: const Icon(Icons.note_add, color: Colors.white),
+                      tooltip: 'New Composition',
+                      onPressed: () => _showCreateDialog(context),
+                    ),
+
+                    const SizedBox(height: 10),
+
                     // SCALE
                     IconButton(
-                      icon: const Icon(Icons.tune,
-                          color: Colors.white),
+                      icon: const Icon(Icons.tune, color: Colors.white),
                       onPressed: () {
                         showScaleDialog(context, controller);
                       },
@@ -84,7 +103,6 @@ class CompositionScreen extends StatelessWidget {
                     IconButton(
                       icon: const Icon(Icons.av_timer, color: Colors.white),
                       onPressed: () {
-
                         showDurationDialog(context, controller);
                       },
                     ),
@@ -116,9 +134,7 @@ class CompositionScreen extends StatelessWidget {
 
                     const Divider(color: Colors.white24),
 
-                    // PASTE MODE - long tap on the note starts this mode,
-                    // so the note is copied and can be paste everywhere,
-                    // if do not wish to paste it any more, toggle this mode
+                    // PASTE MODE
                     if (controller.canPaste)
                       IconButton(
                         icon: Icon(
@@ -129,10 +145,8 @@ class CompositionScreen extends StatelessWidget {
                         ),
                         onPressed: () {
                           if (controller.pasteMode) {
-                            // Turns off copy mode and reverts the icon back to white
                             controller.exitPasteMode();
                           } else {
-                            // Shows your instruction alert if they tap it while empty
                             showCopyPasteHelpDialog(
                               context,
                               'Long tap the note you want to copy, '
@@ -146,11 +160,10 @@ class CompositionScreen extends StatelessWidget {
 
                     // ZOOM IN
                     IconButton(
-                      icon: const Icon(Icons.zoom_in,
-                          color: Colors.white),
+                      icon: const Icon(Icons.zoom_in, color: Colors.white),
                       onPressed: () {
                         controller.setZoom(
-                          controller.zoomX + 0.1,
+                          controller.zoomX + 10.0, // Fixed math logic scaling step context variables
                           controller.zoomY + 0.1,
                         );
                       },
@@ -158,11 +171,10 @@ class CompositionScreen extends StatelessWidget {
 
                     // ZOOM OUT
                     IconButton(
-                      icon: const Icon(Icons.zoom_out,
-                          color: Colors.white),
+                      icon: const Icon(Icons.zoom_out, color: Colors.white),
                       onPressed: () {
                         controller.setZoom(
-                          controller.zoomX - 0.1,
+                          controller.zoomX - 10.0,
                           controller.zoomY - 0.1,
                         );
                       },
@@ -180,8 +192,7 @@ class CompositionScreen extends StatelessWidget {
                     const Divider(color: Colors.white24),
 
                     Text(
-                      "X:${controller.zoomX.toStringAsFixed(1)}\n"
-                          "Y:${controller.zoomY.toStringAsFixed(1)}",
+                      "X:${controller.zoomX.toStringAsFixed(0)}\nY:${controller.zoomY.toStringAsFixed(1)}",
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 10,
@@ -192,7 +203,7 @@ class CompositionScreen extends StatelessWidget {
                 ),
               ),
 
-              // ================= GRID =================
+              // ================= GRID CANVAS =================
               Expanded(
                 child: Container(
                   color: Colors.grey.shade100,
@@ -206,5 +217,3 @@ class CompositionScreen extends StatelessWidget {
     );
   }
 }
-
-

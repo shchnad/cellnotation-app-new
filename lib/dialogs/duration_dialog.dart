@@ -14,7 +14,10 @@ void showDurationDialog(
            'Select Duration',
            textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 22),
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
         ),
         content: SizedBox(
           width: 340,
@@ -42,7 +45,11 @@ void showDurationDialog(
                 },
                 child: Text(
                   d.label,
-                  style: const TextStyle(fontSize: 22),
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: selected ? Colors.white : Colors.blue,
+                  ),
                 ),
               );
             }).toList(),

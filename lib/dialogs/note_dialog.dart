@@ -46,11 +46,11 @@ class NoteDialog extends StatelessWidget {
           contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
           title: Text(
             textAlign: TextAlign.center,
-            'Note - C${editedNote.startTick + 1} / R${editedNote.row + 1}',
+            'Note C${editedNote.startTick + 1} / R${editedNote.row + 1}',
             style: const TextStyle(
-              color: Colors.black,
               fontSize: 22,
               fontWeight: FontWeight.bold,
+              color: Colors.black,
             ),
           ),
           content: SingleChildScrollView(
@@ -110,7 +110,7 @@ class NoteDialog extends StatelessWidget {
 
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey.shade200,
+                        backgroundColor: null,
                         foregroundColor: Colors.blue,
                         minimumSize: const Size(48, 36),
                         padding: const EdgeInsets.symmetric(
@@ -303,13 +303,6 @@ class NoteDialog extends StatelessWidget {
                   },
                 ),
 
-                // ---- Add your 2-3 new buttons here ----
-                // _editButton(
-                //   'Label',
-                //   'Value',
-                //   () {},
-                // ),
-
               ],
             ),
           ),
@@ -325,8 +318,8 @@ class NoteDialog extends StatelessWidget {
                 style:
                 TextStyle(
                   fontSize: 22,
-                  color: Colors.black,
                   fontWeight: FontWeight.bold,
+                  color: Colors.black,
                 ),
               ),
             ),
@@ -384,11 +377,13 @@ class NoteDialog extends StatelessWidget {
             '$title: ',
             style: const TextStyle(
               fontSize: 22,
+              // fontWeight: FontWeight.bold,
+              color: Colors.black,
             ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.grey.shade200,
+              backgroundColor: null,
               foregroundColor: Colors.blue,
               // minimumSize: const Size(110, 36),
               fixedSize: _buttonSize,
@@ -405,6 +400,8 @@ class NoteDialog extends StatelessWidget {
               value,
               style: const TextStyle(
                 fontSize: 22,
+                // fontWeight: FontWeight.bold,
+                // color: Colors.blue,
               ),
             ),
           ),
