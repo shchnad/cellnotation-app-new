@@ -19,18 +19,17 @@ class GridWidget extends StatelessWidget {
         final width = constraints.maxWidth;
         final height = constraints.maxHeight;
 
-        final int totalTicks = controller.maxTicks;
-        final int rows = controller.maxRows;
+        final int rows = controller.maxRows.toInt();
+        final int totalTicks = controller.maxTicks.toInt();
 
         // 1. Calculate continuous pixel mapping scaling instead of fixed cell widths
-        // zoomX represents pixels per beat. gridScale acts as an extra multiplier.
         final double pixelsPerBeat = controller.zoomX * controller.gridScale;
         final double cellHeight = (height / rows) * controller.zoomY;
 
         // 2. Fetch PPQN directly from the timeline to know how many ticks fit in a beat
         final int ppqn = controller.timeline.measures.isNotEmpty
             ? controller.timeline.measures.first.timeSignature.ticksPerBeat
-            : 96; // Fallback default to standard PPQN if timeline is empty
+            : 96;
 
         final double pixelsPerTick = pixelsPerBeat / ppqn;
 
@@ -58,6 +57,9 @@ class GridWidget extends StatelessWidget {
                     pixelsPerBeat: pixelsPerBeat,
                     cellHeight: cellHeight,
                     barLines: controller.barLines,
+                    // 💡 FIXED: Now passing real timeline data so barlines calculate dynamic widths
+                    measures: controller.timeline.measures,
+                    currentScale: controller.currentScale,
                   ),
                 ),
               ),
@@ -68,11 +70,9 @@ class GridWidget extends StatelessWidget {
                   behavior: HitTestBehavior.translucent,
 
                   onTapDown: (details) {
-                    // Convert raw pixel position into timeline ticks
                     final int rawTick = (details.localPosition.dx / pixelsPerTick).floor();
                     final int row = (details.localPosition.dy / cellHeight).floor();
 
-                    // Snap the target tick (e.g., to the nearest 16th note or beat)
                     final int snappedTick = controller.snapTick(rawTick);
 
                     if (controller.getNoteAt(snappedTick, row) == null) {

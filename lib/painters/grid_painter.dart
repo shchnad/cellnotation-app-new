@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 
 class GridPainter extends CustomPainter {
   final int totalTicks;
-  final int ppqn; // Ticks per beat (Pulses Per Quarter Note)
+  final int ppqn;
   final int rows;
   final double pixelsPerBeat;
   final double cellHeight;
-  final Set<int> barLines; // 💡 The actual set of starting ticks for each measure
+  final Set<int> barLines;
+  final List<dynamic> measures; //actual measures list to read dynamic signatures
+  final List<String> currentScale; // active scale to calculate horizontal styling
 
   GridPainter({
     required this.totalTicks,
@@ -15,6 +17,8 @@ class GridPainter extends CustomPainter {
     required this.pixelsPerBeat,
     required this.cellHeight,
     required this.barLines,
+    required this.measures,
+    required this.currentScale,
   });
 
   bool _isOctaveBoundary(int row) => row % 7 == 0;
@@ -22,7 +26,7 @@ class GridPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // ================= 💡 FIX 1: FORCE WHITE BACKGROUND =================
+    // 1. Force White Canvas Background
     final backgroundPaint = Paint()..color = Colors.white;
     canvas.drawRect(Offset.zero & size, backgroundPaint);
 
@@ -30,57 +34,77 @@ class GridPainter extends CustomPainter {
 
     // ================= PAINTS =================
     final subdivisionLine = Paint()
-      ..color = Colors.grey.shade300 // Slightly darkened so it stands out beautifully on white
+      ..color = Colors.grey.shade200
       ..strokeWidth = 0.5;
 
     final beatLine = Paint()
       ..color = Colors.grey.shade400
-      ..strokeWidth = 0.8;
+      ..strokeWidth = 0.9;
 
     final barLine = Paint()
-      ..color = Colors.grey.shade700 // Crisp dark line for measure boundaries
-      ..strokeWidth = 1.8;
+      ..color = Colors.grey.shade800 // Bold line separating distinct measures
+      ..strokeWidth = 2.0;
 
     final octaveLine = Paint()
-      ..color = Colors.grey.shade500
+      ..color = Colors.grey.shade400
       ..strokeWidth = 1.2;
 
     final middleLine = Paint()
       ..color = Colors.black87
       ..strokeWidth = 2.5;
 
-    // ================= VERTICAL LINES (DYNAMIC MEASURE TIMING GRID) =================
-    final int stepTicks = ppqn ~/ 4; // 16th note steps
+    // ================= DYNAMIC VERTICAL MEASURE LINES =================
+    int currentStartTick = 0;
 
-    for (int tick = 0; tick <= totalTicks; tick += stepTicks) {
-      final double x = tick * pixelsPerTick;
-      if (x > size.width) break;
+    for (int i = 0; i < measures.length; i++) {
+      final measure = measures[i];
+      final timeSig = measure.timeSignature;
 
-      Paint paint;
+      // Calculate exactly how many ticks this specific measure contains
+      final int beatsInMeasure = timeSig.beats;
+      final int ticksPerBeat = timeSig.ticksPerBeat;
+      final int totalMeasureTicks = beatsInMeasure * ticksPerBeat;
+      final int stepTicks = ticksPerBeat ~/ 4; // 16th note subdivisions
 
-      // 💡 FIX 2: Check if this tick is an authentic measure boundary from your added measures
-      if (barLines.contains(tick) || tick == 0 || tick == totalTicks) {
-        paint = barLine; // Draws the real measure line dynamically!
-      } else if (tick % ppqn == 0) {
-        paint = beatLine; // Individual Quarter Note Beat
-      } else {
-        paint = subdivisionLine; // 16th Note Step
+      // A. Draw the Left Boundary of this Measure
+      final double startX = currentStartTick * pixelsPerTick;
+      if (startX <= size.width) {
+        canvas.drawLine(Offset(startX, 0), Offset(startX, size.height), barLine);
       }
 
-      canvas.drawLine(
-        Offset(x, 0),
-        Offset(x, size.height),
-        paint,
-      );
+      // B. Subdivide the interior of THIS measure based on ITS specific time signature
+      for (int mTick = 0; mTick < totalMeasureTicks; mTick += stepTicks) {
+        // Skip 0 because the main major barline is already drawn at startX
+        if (mTick == 0) continue;
+
+        final int absoluteTick = currentStartTick + mTick;
+        final double x = absoluteTick * pixelsPerTick;
+        if (x > size.width) break;
+
+        // Determine if this internal tick lands squarely on a beat or a sub-step
+        if (mTick % ticksPerBeat == 0) {
+          canvas.drawLine(Offset(x, 0), Offset(x, size.height), beatLine);
+        } else {
+          canvas.drawLine(Offset(x, 0), Offset(x, size.height), subdivisionLine);
+        }
+      }
+
+      // Move the pointer forward by the exact tick calculation of this specific signature
+      currentStartTick += totalMeasureTicks;
     }
 
-    // ================= HORIZONTAL LINES (NOTES / OCTAVES) =================
+    // Draw the final closing timeline boundary edge line
+    final double finalX = currentStartTick * pixelsPerTick;
+    if (finalX <= size.width) {
+      canvas.drawLine(Offset(finalX, 0), Offset(finalX, size.height), barLine);
+    }
+
+    // ================= HORIZONTAL LINES (SCALE MAPPING) =================
     for (int row = 0; row <= rows; row++) {
       final double y = row * cellHeight;
       if (y > size.height) break;
 
       Paint paint;
-
       if (_isMiddleLine(row)) {
         paint = middleLine;
       } else if (_isOctaveBoundary(row)) {
@@ -89,11 +113,7 @@ class GridPainter extends CustomPainter {
         paint = subdivisionLine;
       }
 
-      canvas.drawLine(
-        Offset(0, y),
-        Offset(size.width, y),
-        paint,
-      );
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
     }
   }
 
@@ -104,6 +124,8 @@ class GridPainter extends CustomPainter {
         oldDelegate.totalTicks != totalTicks ||
         oldDelegate.ppqn != ppqn ||
         oldDelegate.rows != rows ||
-        oldDelegate.barLines != barLines;
+        oldDelegate.barLines != barLines ||
+        oldDelegate.measures != measures ||
+        oldDelegate.currentScale != currentScale;
   }
 }

@@ -76,71 +76,73 @@ class _CreateCompositionDialogState extends State<CreateCompositionDialog> {
         textAlign: TextAlign.center,
         style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black),
       ),
-      content: SizedBox(
-        width: MediaQuery.of(context).size.width * 0.45,
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: _titleController,
-                decoration: const InputDecoration(
-                  labelText: 'Composition Title',
-                  isDense: true,
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.title, size: 22),
+      content: SingleChildScrollView(
+        child: SizedBox(
+          width: MediaQuery.of(context).size.width * 0.45,
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: _titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Composition Title',
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.title, size: 22),
+                  ),
+                  style: const TextStyle(fontSize: 20, color: Colors.blue, fontWeight: FontWeight.bold),
+                  validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
                 ),
-                style: const TextStyle(fontSize: 20, color: Colors.blue, fontWeight: FontWeight.bold),
-                validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _composerController,
-                decoration: const InputDecoration(
-                  labelText: 'Composer Name',
-                  isDense: true,
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person, size: 22),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _composerController,
+                  decoration: const InputDecoration(
+                    labelText: 'Composer Name',
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.person, size: 22),
+                  ),
+                  style: const TextStyle(fontSize: 20, color: Colors.blue, fontWeight: FontWeight.bold),
+                  validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
                 ),
-                style: const TextStyle(fontSize: 20, color: Colors.blue, fontWeight: FontWeight.bold),
-                validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
-              ),
-              const SizedBox(height: 12),
-              _buildSelectionField(
-                label: 'Musical Style',
-                valueText: _selectedStyle.label,
-                icon: Icons.palette,
-                onTap: () {
-                  noteValuesDialog<MusicStyle>(
-                    context: context,
-                    title: 'Select Style',
-                    currentValue: _selectedStyle,
-                    values: MusicStyle.values,
-                    labelBuilder: (s) => s.label,
-                    numberOfColumns: 3,
-                    onSelected: (style) => setState(() => _selectedStyle = style),
-                  );
-                },
-              ),
-              const SizedBox(height: 12),
-              _buildSelectionField(
-                label: 'Target Instrument',
-                valueText: _selectedInstrument.label,
-                icon: Icons.piano,
-                onTap: () {
-                  noteValuesDialog<Instrument>(
-                    context: context,
-                    title: 'Select Instrument',
-                    currentValue: _selectedInstrument,
-                    values: Instrument.values,
-                    labelBuilder: (i) => i.label,
-                    numberOfColumns: 3,
-                    onSelected: (inst) => setState(() => _selectedInstrument = inst),
-                  );
-                },
-              ),
-            ],
+                const SizedBox(height: 12),
+                _buildSelectionField(
+                  label: 'Musical Style',
+                  valueText: _selectedStyle.label,
+                  icon: Icons.palette,
+                  onTap: () {
+                    noteValuesDialog<MusicStyle>(
+                      context: context,
+                      title: 'Select Style',
+                      currentValue: _selectedStyle,
+                      values: MusicStyle.values,
+                      labelBuilder: (s) => s.label,
+                      numberOfColumns: 3,
+                      onSelected: (style) => setState(() => _selectedStyle = style),
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+                _buildSelectionField(
+                  label: 'Target Instrument',
+                  valueText: _selectedInstrument.label,
+                  icon: Icons.piano,
+                  onTap: () {
+                    noteValuesDialog<Instrument>(
+                      context: context,
+                      title: 'Select Instrument',
+                      currentValue: _selectedInstrument,
+                      values: Instrument.values,
+                      labelBuilder: (i) => i.label,
+                      numberOfColumns: 3,
+                      onSelected: (inst) => setState(() => _selectedInstrument = inst),
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),
