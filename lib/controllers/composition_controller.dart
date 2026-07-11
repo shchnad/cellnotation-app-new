@@ -1,415 +1,497 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:music_composer/enums/articulation.dart';
 
 import '../enums/accidental.dart';
 import '../enums/finger.dart';
 import '../enums/ornament.dart';
-import '../enums/hand.dart';
-import '../enums/note_duration.dart';
 import '../enums/playing_technique.dart';
-
 import '../models/composition.dart';
 import '../models/note.dart';
 import '../models/measure.dart';
 import '../models/time_signature.dart';
-import '../models/tempo_event.dart';
+import '../models/timeline.dart';
+
+import '../enums/hand.dart';
+import '../enums/note_duration.dart';
 
 import '../utils/scale_resolver.dart';
 
-import '../models/timeline.dart';
 
 class CompositionController extends ChangeNotifier {
+
   Composition composition;
 
-  CompositionController(this.composition) {
-    if (composition.notes.isNotEmpty) {
-      _nextNoteId = composition.notes
-          .map((n) => n.id)
-          .reduce((a, b) => a > b ? a : b) +
-          1;
-    }
-  }
 
-  // ================= NOTE ID =================
+  CompositionController({
+    required this.composition,
+  });
 
-  int _nextNoteId = 1;
-
-  int _generateNoteId() {
-    return _nextNoteId++;
-  }
-
-  // ================= DURATION =================
-
-  NoteDuration currentDuration = NoteDuration.quarter;
-
-  void setDuration(NoteDuration duration) {
-    currentDuration = duration;
-    notifyListeners();
-  }
-
-  void setNoteDuration(Note note, NoteDuration duration) {
-    final index = notes.indexWhere((n) => n.id == note.id);
-    if (index == -1) return;
-
-    notes[index] = notes[index].copyWith(
-      durationTicks: duration.ticks,
-    );
-    notifyListeners();
-  }
-
-  // ================= ORNAMENT =================
-
-  void setNoteOrnament(Note note, Ornament? ornament) {
-    final index = notes.indexWhere((n) => n.id == note.id);
-    if (index == -1) return;
-
-    notes[index] = notes[index].copyWith(
-      ornament: ornament,
-    );
-    notifyListeners();
-  }
-
-  // ================= FINGER =================
-
-  void setNoteFinger(Note note, Finger? finger) {
-    final index = notes.indexWhere((n) => n.id == note.id);
-    if (index == -1) return;
-
-    notes[index] = notes[index].copyWith(
-      finger: finger,
-    );
-    notifyListeners();
-  }
-
-  // ================= HAND =================
+  // =====================================================
+  // EDITOR STATE
+  // =====================================================
 
   Hand currentHand = Hand.right;
 
-  void toggleHand() {
-    currentHand = currentHand == Hand.right ? Hand.left : Hand.right;
-    notifyListeners();
+  // Duration of newly created notes
+  NoteDuration currentDuration = NoteDuration.quarter;
+
+  // Grid snapping resolution
+  NoteDuration gridResolution = NoteDuration.sixteenth;
+
+  // Visual zoom only
+  double zoomX = 5.0;
+  double zoomY = 1.0;
+  double get pixelsPerTick => zoomX;
+
+  double getCellHeight(BuildContext context) {
+    final availableHeight =
+        MediaQuery.of(context).size.height
+            - kToolbarHeight;
+    return (availableHeight / 28) * zoomY;
   }
 
-  void setNoteHand(Note note, Hand hand) {
-    final index = notes.indexWhere((n) => n.id == note.id);
-    if (index == -1) return;
-    notes[index] = notes[index].copyWith(
-      hand: hand,
-    );
-    notifyListeners();
-  }
 
-  // =========== ACCIDENTAL =============
+  // =====================================================
+  // CLIPBOARD
+  // =====================================================
 
-  void setNoteAccidental(Note note, Accidental? accidental) {
-    final index = notes.indexWhere((n) => n.id == note.id);
-    if (index == -1) return;
-    notes[index] = notes[index].copyWith(
-      accidental: accidental,
-    );
-    notifyListeners();
-  }
+  Note? copiedNote;
 
-  // ============ ARTICULATION ==========
+  bool pasteMode = false;
 
-  void setNoteArticulation(Note note, Articulation? articulation) {
-    final index = notes.indexWhere((n) => n.id == note.id);
-    if (index == -1) return;
-    notes[index] = notes[index].copyWith(
-      articulation: articulation,
-    );
-    notifyListeners();
-  }
+  bool get canPaste =>
+      copiedNote != null;
 
-  // ============ PLAYING TECHNIQUE ==========
 
-  void setNotePlayingTechnique(Note note, PlayingTechnique? technique) {
-    final index = notes.indexWhere((n) => n.id == note.id);
-    if (index == -1) return;
-    notes[index] = notes[index].copyWith(
-      playingTechnique: technique,
-    );
-    notifyListeners();
-  }
-
-  // ================= SCALE =================
-
-  final List<String> availableScales = [
-    'major C', 'major C sharp', 'major D flat', 'major D', 'major E flat',
-    'major E', 'major F', 'major F sharp', 'major G flat', 'major G',
-    'major A flat', 'major A', 'major B flat',
-    'minor C', 'minor C sharp', 'minor D', 'minor D sharp', 'minor E flat',
-    'minor E', 'minor F', 'minor G', 'minor G sharp', 'minor A flat',
-    'minor A', 'minor A sharp', 'minor B flat', 'minor B',
-  ];
-
-  int _scaleIndex = 0;
-
-  String get scaleName => availableScales[_scaleIndex];
-
-  List<String> get currentScale => ScaleResolver.getScale(scaleName);
-
-  String getDegree(int row) {
-    final scale = currentScale;
-    if (scale.isEmpty) return '';
-    return scale[row % scale.length];
-  }
-
-  void setScale(int index) {
-    if (index < 0 || index >= availableScales.length) return;
-    _scaleIndex = index;
-    notifyListeners();
-  }
-
-  void nextScale() {
-    _scaleIndex = (_scaleIndex + 1) % availableScales.length;
-    notifyListeners();
-  }
-
-  void previousScale() {
-    _scaleIndex = (_scaleIndex - 1 + availableScales.length) % availableScales.length;
-    notifyListeners();
-  }
-
-  // ================= TIMELINE =================
+  // =====================================================
+  // DATA ACCESS
+  // =====================================================
 
   Timeline get timeline => composition.timeline;
-
-  int get maxTicks => timeline.totalTicks;
-
-  int get maxRows => composition.numberOfOctaves * 7;
-
   List<Measure> get measures => timeline.measures;
-
-  Set<int> get barLines => measures.map((m) => m.startTick).toSet();
-
-  int get totalTicks => timeline.totalTicks;
-
-  bool isBarLine(int tick) => barLines.contains(tick);
-
-  void updateComposition(Composition newComp) {
-    composition = newComp;
-    _nextNoteId = 1; // Reset ID counter for the new song
-    notifyListeners(); // This refreshes the whole UI
-  }
-
-  void addMeasure(TimeSignature signature) {
-    timeline.addMeasure(signature);
-    notifyListeners();
-  }
-
-  void insertMeasure(int index, TimeSignature signature) {
-    timeline.insertMeasure(index, signature);
-    notifyListeners();
-  }
-
-  void deleteMeasure(int index) {
-    timeline.deleteMeasure(index);
-    notifyListeners();
-  }
-
-  void changeSignature(int index, TimeSignature signature) {
-    timeline.changeSignature(index, signature);
-    notifyListeners();
-  }
-
-  void updateTimelineBounds() {
-    // 💡 1. If your timeline model has its own internal recalculate method, trigger it here.
-    // Otherwise, your getters below will dynamically evaluate the new elements.
-
-    // 💡 2. Broadcast the state change directly to the GridWidget so it repaints
-    // using the newly extended measure boundaries.
-    notifyListeners();
-  }
-
-  // ================= TEMPO TIMELINE OPERATIONS =================
-
-  List<TempoEvent> get tempoEvents => timeline.tempoEvents;
-
-  void addTempoEvent(TempoEvent event) {
-    timeline.addTempoEvent(event);
-    notifyListeners();
-  }
-
-  void removeTempoEvent(TempoEvent event) {
-    timeline.removeTempoEvent(event);
-    notifyListeners();
-  }
-
-
-  // ================= ZOOM =================
-
-  double zoomX = 100.0;
-  double zoomY = 1.0;
-
-  void setZoom(double x, double y) {
-    zoomX = x.clamp(20.0, 400.0);
-    zoomY = y.clamp(0.5, 3.0);
-    notifyListeners();
-  }
-
-  void resetZoom() {
-    zoomX = 100.0;
-    zoomY = 1.0;
-    notifyListeners();
-  }
-
-  // ================= GRID =================
-
-  double _gridScale = 1.0;
-
-  double get gridScale => _gridScale;
-
-  void setGridScale(double value) {
-    _gridScale = value.clamp(0.125, 4.0);
-    notifyListeners();
-  }
-
-  int snapTick(int rawTick) {
-    final int stepTicks = currentDuration.ticks;
-    if (stepTicks <= 0) return rawTick;
-    return ((rawTick + stepTicks / 2) ~/ stepTicks) * stepTicks;
-  }
-
-  // ================= NOTE INFO =================
-
-  int getOctave(Note note) => (composition.numberOfOctaves - 1) - (note.row ~/ 7);
-
-  String getOctaveName(int octave) {
-    switch (octave) {
-      case 0: return 'Subcontra octave';
-      case 1: return 'Contra octave';
-      case 2: return 'Great octave';
-      case 3: return 'Small octave';
-      case 4: return '1st octave';
-      case 5: return '2nd octave';
-      case 6: return '3rd octave';
-      case 7: return '4th octave';
-      case 8: return '5th octave';
-      default: return 'Octave $octave';
-    }
-  }
-
-  int getMeasureNumber(Note note) {
-    for (int i = 0; i < measures.length; i++) {
-      final current = measures[i];
-      final next = i + 1 < measures.length ? measures[i + 1].startTick : totalTicks;
-      if (note.startTick >= current.startTick && note.startTick < next) {
-        return i + 1;
-      }
-    }
-    return 1;
-  }
-
-  int getBeatNumber(Note note) {
-    for (final measure in measures) {
-      final nextIndex = measures.indexOf(measure) + 1;
-      final next = nextIndex < measures.length ? measures[nextIndex].startTick : totalTicks;
-
-      if (note.startTick >= measure.startTick && note.startTick < next) {
-        return ((note.startTick - measure.startTick) ~/ measure.timeSignature.ticksPerBeat) + 1;
-      }
-    }
-    return 1;
-  }
-
-  String durationLabel(Note note) {
-    return NoteDuration.values
-        .firstWhere(
-          (d) => d.ticks == note.durationTicks,
-      orElse: () => NoteDuration.quarter,
-    )
-        .label;
-  }
-
-  // ================= NOTES =================
 
   List<Note> get notes => composition.notes;
 
-  void addNote({required int row, required int tick}) {
-    notes.add(
-      Note(
-        id: _generateNoteId(),
-        row: row,
-        startTick: tick,
-        durationTicks: currentDuration.ticks,
-        hand: currentHand,
-      ),
+  int get maxTicks => composition.timeline.totalTicks;
+
+  int get totalRows => composition.numberOfOctaves * 7;
+
+
+
+  String durationLabel(Note note) {
+  final duration = NoteDuration.values.firstWhere(
+          (d) => d.ticks == note.durationTicks,
+      orElse: () => NoteDuration.quarter,
+    );
+    return duration.label;
+  }
+
+
+  // =====================================================
+  // TIMELINE
+  // =====================================================
+
+  int getMeasureNumber(Note note) {
+    return measures.indexWhere( (m) =>
+      note.startTick >= m.startTick && note.startTick < m.endTick,
+    ) + 1;
+  }
+
+
+  Measure getMeasureAtTick(int tick){
+    return measures.firstWhere(
+          (measure) =>
+      tick >= measure.startTick &&
+          tick < measure.endTick,
+      orElse: () => measures.last,
+    );
+  }
+
+  void addMeasure( TimeSignature signature, String scaleName,) {
+    timeline.addMeasure(signature, scaleName,);
+    notifyListeners();
+  }
+
+  int selectedMeasureIndex = 0;
+
+  Measure get currentMeasure {
+    if (measures.isEmpty) {
+      throw Exception("No measures initialized.");
+    }
+    return measures[selectedMeasureIndex];
+  }
+
+  void updateCurrentMeasureScale(String newScaleName) {
+    if (measures.isEmpty) return;
+    final oldMeasure = currentMeasure;
+    measures[selectedMeasureIndex] =
+        oldMeasure.copyWith(
+          scaleName: newScaleName,
+        );
+    notifyListeners();
+  }
+
+
+  void updateMeasureScale(
+      int measureIndex,
+      String newScaleName,
+      ) {
+    if(measureIndex < 0 || measureIndex >= measures.length) {
+      return;
+    }
+    measures[measureIndex] = measures[measureIndex].copyWith(
+            scaleName: newScaleName
+        );
+    notifyListeners();
+  }
+
+
+  int getBeatNumber(Note note) {
+    final measure = getMeasureAtTick(note.startTick);
+    final tickInsideMeasure =
+        note.startTick - measure.startTick;
+    return tickInsideMeasure ~/
+        measure.timeSignature.ticksPerBeat +
+        1;
+  }
+
+
+  void addBeatToMeasure(int index){
+    final measure = measures[index];
+    measures[index] =
+        measure.copyWith(
+          timeSignature:
+          measure.timeSignature.addBeat(),
+        );
+    timeline.rebuild();
+    notifyListeners();
+  }
+
+  // =====================================================
+  // GRID / SNAP
+  // =====================================================
+
+
+  int snapTick(int rawTick){
+    final step = gridResolution.ticks;
+    if(step <= 0){
+      return rawTick;
+    }
+    return ((rawTick + step / 2) ~/ step) * step;
+  }
+
+
+  // =====================================================
+  // NOTE CREATION
+  // =====================================================
+
+  void addNoteAtGridPosition(
+      int tick,
+      int row,
+      ){
+    final note = Note(
+      id: DateTime.now().millisecondsSinceEpoch,
+      startTick: tick,
+      durationTicks: currentDuration.ticks,
+      row: row,
+      hand: currentHand,
+    );
+    composition.notes.add(note);
+    notifyListeners();
+  }
+
+
+  void removeNote(Note note){
+    composition.notes.removeWhere(
+          (n)=>n.id == note.id,
     );
     notifyListeners();
   }
 
-  void removeNote(Note note) {
-    notes.removeWhere((n) => n.id == note.id);
-    notifyListeners();
+  int getOctave(Note note) {
+    return note.row ~/ 7 + 1;
   }
 
-  Note? getNoteAt(int tick, int row) {
-    try {
-      return notes.firstWhere(
-            (n) => row == n.row && tick >= n.startTick && tick < n.endTick,
-      );
-    } catch (_) {
-      return null;
+
+  String getOctaveName(int octave) {
+    switch (octave) {
+      case 1:
+        return 'Sub-contra';
+      case 2:
+        return 'Contra';
+      case 3:
+        return 'Great';
+      case 4:
+        return 'Small';
+      case 5:
+        return 'One-line';
+      case 6:
+        return 'Two-line';
+      case 7:
+        return 'Three-line';
+      case 8:
+        return 'Four-line';
+      default:
+        return '';
     }
   }
+  // =====================================================
+  // NOTE MOVEMENT
+  // =====================================================
 
-  void updateNote(Note note, int newTick, int newRow) {
-    final index = notes.indexWhere((n) => n.id == note.id);
-    if (index == -1) return;
-
-    notes[index] = notes[index].copyWith(
+  void updateNote(
+      Note oldNote,
+      int newTick,
+      int newRow,
+      ){
+    final index = composition.notes.indexWhere(
+          (n)=>n.id == oldNote.id,
+    );
+    if(index == -1){
+      return;
+    }
+    final updated =  oldNote.copyWith(
       startTick: newTick,
       row: newRow,
     );
+    composition.notes[index] = updated;
     notifyListeners();
   }
 
-  void clearAll() {
-    notes.clear();
+  void _replaceNote(Note updated) {
+    final index = notes.indexWhere(
+          (n) => n.id == updated.id,
+    );
+    if (index == -1) return;
+    notes[index] = updated;
     notifyListeners();
   }
 
-  // ================= COPY PASTE =================
 
-  Note? copiedNote;
-  bool pasteMode = false;
+  void setNoteHand(
+      Note note,
+      Hand hand,
+      ) {
+    _replaceNote(
+      note.copyWith(hand: hand),
+    );
+  }
 
-  bool get canPaste => copiedNote != null;
+  void setNoteFinger(
+      Note note,
+      Finger? finger,
+      ) {
+    _replaceNote(
+      note.copyWith(finger: finger),
+    );
+  }
 
-  void copyNote(Note note) {
+  void setNoteAccidental(
+      Note note,
+      Accidental? accidental,
+      ) {
+    _replaceNote(
+      note.copyWith(accidental: accidental),
+    );
+  }
+
+  void setNoteDuration(
+      Note note,
+      NoteDuration duration,
+      ) {
+    _replaceNote(
+      note.copyWith(
+        durationTicks: duration.ticks,
+      ),
+    );
+  }
+
+
+  void setNoteArticulation(
+      Note note,
+      Articulation? articulation,
+      ) {
+    _replaceNote(
+      note.copyWith(articulation: articulation),
+    );
+  }
+
+
+  void setNoteOrnament(
+      Note note,
+      Ornament? ornament,
+      ) {
+    _replaceNote(
+      note.copyWith(ornament: ornament),
+    );
+  }
+
+
+  void setNotePlayingTechnique(
+      Note note,
+      PlayingTechnique? playingTechnique,
+      ) {
+    _replaceNote(
+      note.copyWith(playingTechnique: playingTechnique),
+    );
+  }
+
+
+  // =====================================================
+  // SCALE SYSTEM
+  // =====================================================
+
+  String getNotePitchName(Note note) {
+    final measure = getMeasureAtTick(
+      note.startTick,
+    );
+    final shiftedScale = ScaleResolver.transposeScale(
+      measure.scaleName,
+      measure.pitchOffsetSemitones,
+    );
+    final scale = ScaleResolver.getScale(
+      shiftedScale,
+    );
+    if (scale.isEmpty) {
+      return '';
+    }
+    return scale[note.row % scale.length];
+  }
+
+
+  List<String> get availableScales => [
+    'major C',
+    'major C sharp',
+    'major D flat',
+    'major D',
+    'major E flat',
+    'major E',
+    'major F',
+    'major F sharp',
+    'major G flat',
+    'major G',
+    'major A flat',
+    'major A',
+    'major B flat',
+
+    'minor C',
+    'minor C sharp',
+    'minor D',
+    'minor D sharp',
+    'minor E flat',
+    'minor E',
+    'minor F',
+    'minor F sharp',
+    'minor G',
+    'minor G sharp',
+    'minor A flat',
+    'minor A',
+    'minor A sharp',
+    'minor B flat',
+    'minor B',
+  ];
+
+  void raiseAllScales(){
+    for(int i = 0; i < measures.length; i++){
+      measures[i] = measures[i].copyWith(
+        pitchOffsetSemitones:
+        measures[i].pitchOffsetSemitones + 1,
+      );
+    }
+    notifyListeners();
+  }
+
+
+  void lowerAllScales(){
+    for(int i = 0; i < measures.length; i++){
+      measures[i] = measures[i].copyWith(
+        pitchOffsetSemitones:
+        measures[i].pitchOffsetSemitones - 1,
+      );
+    }
+    notifyListeners();
+  }
+
+
+  // =====================================================
+  // COPY / PASTE
+  // =====================================================
+
+
+  void copyNote(Note note){
     copiedNote = note.copyWith();
-  }
-
-  void enterPasteMode() {
-    if (!canPaste) return;
-    pasteMode = true;
     notifyListeners();
   }
 
-  void exitPasteMode() {
+  void enterPasteMode(){
+    if(copiedNote != null){
+      pasteMode = true;
+      notifyListeners();
+    }
+  }
+
+  void exitPasteMode(){
     pasteMode = false;
     notifyListeners();
   }
 
-  void pasteNote({required int tick, required int row}) {
-    if (!canPaste) return;
+  // =====================================================
+  // SETTINGS
+  // =====================================================
 
-    notes.add(
-      copiedNote!.copyWith(
-        id: _generateNoteId(),
-        startTick: tick,
-        row: row,
-      ),
-    );
+
+  void setDuration(
+      NoteDuration duration,
+      ){
+    currentDuration = duration;
     notifyListeners();
   }
 
-  void replaceNote(Note oldNote, Note newNote) {
-    final index = notes.indexWhere((n) => n.id == oldNote.id);
-    if (index == -1) return;
-
-    notes[index] = newNote;
+  void setGridResolution(
+      NoteDuration duration,
+      ){
+    gridResolution = duration;
     notifyListeners();
   }
+
+  void toggleHand(){
+    currentHand = currentHand == Hand.right
+        ? Hand.left
+        : Hand.right;
+    notifyListeners();
+  }
+
+
+  // =====================================================
+  // ZOOM
+  // =====================================================
+
+
+  void setZoom(
+      double x,
+      double y,
+      ){
+    zoomX = x.clamp(20, 500);
+    zoomY = y.clamp(0.5, 3);
+    notifyListeners();
+  }
+
+
+  void resetZoom(){
+    zoomX = 100;
+    zoomY = 1;
+    notifyListeners();
+  }
+
+  // =====================================================
+  // COMPOSITION REPLACEMENT
+  // =====================================================
+
+  void updateComposition(
+      Composition newComposition,
+      ){
+    composition = newComposition;
+    notifyListeners();
+  }
+
 }

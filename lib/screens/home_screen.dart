@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../dialogs/note_dialog.dart';
 import '../models/composition.dart';
 import '../controllers/composition_controller.dart';
 import '../dialogs/create_composition_dialog.dart';
@@ -15,7 +16,7 @@ class HomeScreen extends StatelessWidget {
           print("--- HOME SCREEN: Callback received! Starting navigation route ---");
 
           // The controller takes ownership of the composition model state
-          final controller = CompositionController(newComposition);
+          final controller = CompositionController(composition: newComposition);
 
           Navigator.push(
             routingContext,

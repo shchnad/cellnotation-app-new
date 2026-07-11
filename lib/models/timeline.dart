@@ -1,100 +1,184 @@
 import 'measure.dart';
 import 'time_signature.dart';
-import 'tempo_event.dart'; // Ensure this model import exists!
+import 'tempo_event.dart';
+
 
 class Timeline {
+
   final List<Measure> measures;
 
-  // ================= TEMPO EVENTS STORAGE =================
   final List<TempoEvent> tempoEvents;
+
 
   Timeline({
     required this.measures,
     List<TempoEvent>? tempoEvents,
   }) : tempoEvents = tempoEvents ?? [] {
-    // Inject a fallback default timeline engine speed at tick 0 if empty
-    if (this.tempoEvents.isEmpty) {
-      this.tempoEvents.add(TempoEvent(tick: 0, bpm: 120));
+
+
+    if(this.tempoEvents.isEmpty){
+      this.tempoEvents.add(
+        TempoEvent( tick: 0, bpm: 120,),
+      );
     }
+    rebuild();
     _sortTempoEvents();
   }
 
+
+  // =====================================================
+  // TOTAL LENGTH
+  // =====================================================
+
   int get totalTicks {
-    int sum = 0;
-    for (final m in measures) {
-      sum += m.lengthTicks;
+    if(measures.isEmpty){
+      return 0;
     }
-    return sum;
+    return measures.last.endTick;
   }
 
-  // ================= ADD MEASURE =================
 
-  void addMeasure(TimeSignature sig) {
+  // =====================================================
+  // MEASURE MANAGEMENT
+  // =====================================================
+
+
+  void addMeasure(
+      TimeSignature signature,
+      String scaleName,
+      ) {
     measures.add(
       Measure(
         id: measures.length,
         startTick: totalTicks,
-        timeSignature: sig,
+        timeSignature: signature,
+        scaleName: scaleName,
       ),
     );
+    rebuild();
   }
 
-  // ================= INSERT MEASURE =================
 
-  void insertMeasure(int index, TimeSignature sig) {
+  void insertMeasure(
+      int index,
+      TimeSignature signature,
+      String scaleName,
+      ){
     measures.insert(
       index,
       Measure(
         id: index,
         startTick: 0,
-        timeSignature: sig,
+        timeSignature: signature,
+        scaleName: scaleName,
       ),
     );
-    _rebuild();
+    rebuild();
   }
 
-  // ================= DELETE MEASURE =================
 
-  void deleteMeasure(int index) {
-    if (index < 0 || index >= measures.length) return;
+  void deleteMeasure(int index){
+    if(index < 0 ||
+        index >= measures.length){
+      return;
+    }
     measures.removeAt(index);
-    _rebuild();
+    rebuild();
   }
 
-  // ================= INTERNAL REBUILD =================
 
-  void _rebuild() {
+  // =====================================================
+  // TICK RECALCULATION
+  // =====================================================
+
+
+  void rebuild(){
     int tick = 0;
-    for (int i = 0; i < measures.length; i++) {
-      measures[i]
-        ..id = i
-        ..startTick = tick;
-      tick += measures[i].lengthTicks;
+    for(int i = 0;
+    i < measures.length;
+    i++){
+      final measure = measures[i];
+      measure.id = i;
+      measure.startTick = tick;
+      tick += measure.durationTicks;
     }
   }
 
-  // ============== CHANGE TIME SIGNATURE ===========
+  // =====================================================
+  // BEAT EDITING
+  // =====================================================
 
-  void changeSignature(int index, TimeSignature sig) {
-    if (index < 0 || index >= measures.length) return;
-    measures[index].timeSignature = sig;
-    _rebuild();
+  void addBeat(
+      int measureIndex,
+      ){
+    if(!_validIndex(measureIndex)){
+      return;
+    }
+    measures[measureIndex].addBeat();
+    rebuild();
   }
 
-  // ================= TEMPO UTILITIES =================
 
-  void _sortTempoEvents() {
-    tempoEvents.sort((a, b) => a.tick.compareTo(b.tick));
+  void removeBeat(
+      int measureIndex,
+      ){
+    if(!_validIndex(measureIndex)){
+      return;
+    }
+    measures[measureIndex].removeBeat();
+    rebuild();
   }
 
-  void addTempoEvent(TempoEvent event) {
-    tempoEvents.removeWhere((e) => e.tick == event.tick);
+
+  void changeTimeSignature(
+      int measureIndex,
+      TimeSignature signature,
+      ){
+    if(!_validIndex(measureIndex)){
+      return;
+    }
+    measures[measureIndex].timeSignature = signature;
+    rebuild();
+  }
+
+
+  bool _validIndex(int index){
+    return index >= 0 && index < measures.length;
+  }
+
+
+  // =====================================================
+  // TEMPO
+  // =====================================================
+
+
+  void addTempoEvent(
+      TempoEvent event,
+      ){
+    tempoEvents.removeWhere(
+            (e)=>e.tick == event.tick
+    );
     tempoEvents.add(event);
     _sortTempoEvents();
   }
 
-  void removeTempoEvent(TempoEvent event) {
-    if (event.tick == 0) return; // Keep anchor tempo protected
-    tempoEvents.removeWhere((e) => e.tick == event.tick);
+
+  void removeTempoEvent(
+      TempoEvent event,
+      ){
+    if(event.tick == 0){
+      return;
+    }
+    tempoEvents.removeWhere(
+            (e)=>e.tick == event.tick
+    );
+  }
+
+
+  void _sortTempoEvents(){
+    tempoEvents.sort(
+            (a,b)=>
+            a.tick.compareTo(b.tick)
+    );
   }
 }

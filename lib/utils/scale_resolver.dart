@@ -1,7 +1,40 @@
 class ScaleResolver {
+  // Chromatic lookup wheel structured exactly like your switch case suffixes
+  static const List<String> _chromaticNotes = [
+    'C', 'C sharp', 'D', 'E flat', 'E', 'F', 'F sharp', 'G', 'A flat', 'A', 'B flat', 'B'
+  ];
+
+  /// Shifts the base scale root note up or down by absolute semitones, matching your exact naming style.
+  static String transposeScale(String baseScale, int semitoneOffset) {
+    if (semitoneOffset == 0) return baseScale;
+
+    final parts = baseScale.split(' ');
+    if (parts.length < 2) return baseScale;
+
+    final String mode = parts[0]; // 'major' or 'minor'
+    final String baseRoot = parts.sublist(1).join(' '); // Reconstructs e.g. "C sharp"
+
+    // Find current position on the chromatic circle wheel
+    int currentIdx = _chromaticNotes.indexWhere(
+            (note) => note.toLowerCase() == baseRoot.toLowerCase()
+    );
+
+    if (currentIdx == -1) return baseScale; // Fallback safety
+
+    // Shift mathematically, cleanly accommodating negative wrapping
+    int newIdx = (currentIdx + semitoneOffset) % _chromaticNotes.length;
+    if (newIdx < 0) {
+      newIdx += _chromaticNotes.length;
+    }
+
+    final String newRoot = _chromaticNotes[newIdx];
+
+    // Returns structural strings like "major C sharp" or "minor E flat"
+    return '$mode $newRoot';
+  }
+
   static List<String> getScale(String name) {
     switch (name) {
-
     // MAJOR
 
       case 'major C':

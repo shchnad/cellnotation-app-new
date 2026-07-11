@@ -2,21 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:music_composer/enums/articulation.dart';
 
 import '../controllers/composition_controller.dart';
-
 import '../enums/accidental.dart';
 import '../enums/finger.dart';
 import '../enums/hand.dart';
 import '../enums/note_duration.dart';
 import '../enums/ornament.dart';
-
 import '../enums/playing_technique.dart';
 import '../models/note.dart';
-
 import 'note_values_dialog.dart';
 
-
 class NoteDialog extends StatelessWidget {
-
   final Note note;
   final CompositionController controller;
 
@@ -28,13 +23,13 @@ class NoteDialog extends StatelessWidget {
 
   static const Size _buttonSize = Size(150, 44);
 
+  // 💡 FIXED: Safely query out of controller.composition.notes tracking repo
   Note get currentNote {
-    return controller.notes.firstWhere(
+    return controller.composition.notes.firstWhere(
           (n) => n.id == note.id,
       orElse: () => note,
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -55,20 +50,17 @@ class NoteDialog extends StatelessWidget {
           ),
           content: SingleChildScrollView(
             child: Column(
-              mainAxisSize:
-              MainAxisSize.min,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 const Divider(height: 8, thickness: 0.5),
                 Row(
                   children: [
-
                     Expanded(
                       child: _infoRow(
                         'Measure',
                         controller.getMeasureNumber(editedNote).toString(),
                       ),
                     ),
-
                     Expanded(
                       child: _infoRow(
                         'Beat',
@@ -77,13 +69,9 @@ class NoteDialog extends StatelessWidget {
                     ),
                   ],
                 ),
-
                 const Divider(height: 8, thickness: 0.5),
-
-
                 Row(
                   children: [
-
                     Expanded(
                       child: _octaveInfo(
                         'Octave',
@@ -93,29 +81,23 @@ class NoteDialog extends StatelessWidget {
                         ),
                       ),
                     ),
-
                     const SizedBox(width: 50),
-
                     Expanded(
                       child: Align(
                         alignment: Alignment.centerRight,
                         child: _infoRow(
                           'Pitch',
-                          controller.getDegree(editedNote.row),
+                          controller.getNotePitchName(editedNote),
                         ),
                       ),
                     ),
-
                     const SizedBox(width: 8),
-
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: null,
                         foregroundColor: Colors.blue,
                         minimumSize: const Size(48, 36),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -129,32 +111,21 @@ class NoteDialog extends StatelessWidget {
                           numberOfColumns: 4,
                           labelBuilder: (a) => a.label,
                           onSelected: (accidental) {
-                            controller.setNoteAccidental(
-                              editedNote,
-                              accidental,
-                            );
+                            controller.setNoteAccidental(editedNote, accidental);
                           },
                           onClear: () {
-                            controller.setNoteAccidental(
-                              editedNote,
-                              null,
-                            );
+                            controller.setNoteAccidental(editedNote, null);
                           },
                         );
                       },
                       child: Text(
                         editedNote.accidental?.sign ?? 'None',
-                        style: const TextStyle(
-                          fontSize: 22,
-                        ),
+                        style: const TextStyle(fontSize: 22),
                       ),
                     ),
-
                   ],
                 ),
-
                 const Divider(height: 8, thickness: 0.5),
-
                 _editButton(
                   'Duration',
                   controller.durationLabel(editedNote),
@@ -165,8 +136,7 @@ class NoteDialog extends StatelessWidget {
                     );
                     noteValuesDialog<NoteDuration>(
                       context: context,
-                      currentValue:
-                      duration,
+                      currentValue: duration,
                       title: 'Set Duration',
                       values: NoteDuration.values,
                       numberOfColumns: 3,
@@ -177,42 +147,35 @@ class NoteDialog extends StatelessWidget {
                     );
                   },
                 ),
-
                 _editButton(
                   'Hand',
                   editedNote.hand.name,
                       () {
                     noteValuesDialog<Hand>(
                       context: context,
-                      currentValue:
-                      editedNote.hand,
+                      currentValue: editedNote.hand,
                       title: 'Set Hand',
                       values: Hand.values,
                       numberOfColumns: 2,
                       labelBuilder: (h) => h.name,
                       onSelected: (hand) {
-                        controller.setNoteHand(
-                          editedNote,
-                          hand,
-                        );
+                        controller.setNoteHand(editedNote, hand);
                       },
                     );
                   },
                 ),
-
                 _editButton(
                   'Finger',
                   editedNote.finger?.value.toString() ?? 'none',
                       () {
                     noteValuesDialog<Finger>(
                       context: context,
-                      currentValue:
-                      editedNote.finger,
+                      currentValue: editedNote.finger,
                       title: 'Set Finger',
                       values: Finger.values,
                       numberOfColumns: 5,
                       labelBuilder: (f) => f.value.toString(),
-                      onSelected:(finger) {
+                      onSelected: (finger) {
                         controller.setNoteFinger(editedNote, finger);
                       },
                       onClear: () {
@@ -221,7 +184,6 @@ class NoteDialog extends StatelessWidget {
                     );
                   },
                 ),
-
                 _editButton(
                   'Articulation',
                   editedNote.articulation?.label ?? 'None',
@@ -234,21 +196,14 @@ class NoteDialog extends StatelessWidget {
                       numberOfColumns: 3,
                       labelBuilder: (o) => o.label,
                       onSelected: (articulation) {
-                        controller.setNoteArticulation(
-                          editedNote,
-                          articulation,
-                        );
+                        controller.setNoteArticulation(editedNote, articulation);
                       },
                       onClear: () {
-                        controller.setNoteArticulation(
-                          editedNote,
-                          null,
-                        );
+                        controller.setNoteArticulation(editedNote, null);
                       },
                     );
                   },
                 ),
-
                 _editButton(
                   'Ornament',
                   editedNote.ornament?.label ?? 'None',
@@ -261,21 +216,14 @@ class NoteDialog extends StatelessWidget {
                       numberOfColumns: 2,
                       labelBuilder: (o) => o.label,
                       onSelected: (ornament) {
-                        controller.setNoteOrnament(
-                          editedNote,
-                          ornament,
-                        );
+                        controller.setNoteOrnament(editedNote, ornament);
                       },
                       onClear: () {
-                        controller.setNoteOrnament(
-                          editedNote,
-                          null,
-                        );
+                        controller.setNoteOrnament(editedNote, null);
                       },
                     );
                   },
                 ),
-
                 _editButton(
                   'Technique',
                   editedNote.playingTechnique?.label ?? 'None',
@@ -288,25 +236,17 @@ class NoteDialog extends StatelessWidget {
                       numberOfColumns: 3,
                       labelBuilder: (t) => t.label,
                       onSelected: (technique) {
-                        controller.setNotePlayingTechnique(
-                          editedNote,
-                          technique,
-                        );
+                        controller.setNotePlayingTechnique(editedNote, technique);
                       },
                       onClear: () {
-                        controller.setNotePlayingTechnique(
-                          editedNote,
-                          null,
-                        );
+                        controller.setNotePlayingTechnique(editedNote, null);
                       },
                     );
                   },
                 ),
-
               ],
             ),
           ),
-
           actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           actions: [
             TextButton(
@@ -315,8 +255,7 @@ class NoteDialog extends StatelessWidget {
               },
               child: const Text(
                 'Close',
-                style:
-                TextStyle(
+                style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
                   color: Colors.black,
@@ -324,28 +263,19 @@ class NoteDialog extends StatelessWidget {
               ),
             ),
           ],
-
         );
       },
     );
   }
 
-
-  Widget _infoRow(
-      String title,
-      String value,
-      ) {
+  Widget _infoRow(String title, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        vertical: 2,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
           Text(
             '$title: ',
-            style: const TextStyle(
-              fontSize: 22,
-            ),
+            style: const TextStyle(fontSize: 22),
           ),
           Text(
             value,
@@ -360,16 +290,9 @@ class NoteDialog extends StatelessWidget {
     );
   }
 
-
-  Widget _editButton(
-      String title,
-      String value,
-      VoidCallback onTap,
-      ) {
+  Widget _editButton(String title, String value, VoidCallback onTap) {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        vertical: 2,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -377,7 +300,6 @@ class NoteDialog extends StatelessWidget {
             '$title: ',
             style: const TextStyle(
               fontSize: 22,
-              // fontWeight: FontWeight.bold,
               color: Colors.black,
             ),
           ),
@@ -385,24 +307,16 @@ class NoteDialog extends StatelessWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: null,
               foregroundColor: Colors.blue,
-              // minimumSize: const Size(110, 36),
               fixedSize: _buttonSize,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 10,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            onPressed:
-            onTap,
+            onPressed: onTap,
             child: Text(
               value,
-              style: const TextStyle(
-                fontSize: 22,
-                // fontWeight: FontWeight.bold,
-                // color: Colors.blue,
-              ),
+              style: const TextStyle(fontSize: 22),
             ),
           ),
         ],
@@ -410,17 +324,9 @@ class NoteDialog extends StatelessWidget {
     );
   }
 
-
-
-  Widget _octaveInfo(
-      String title,
-      String value,
-      String subLabel,
-      ) {
+  Widget _octaveInfo(String title, String value, String subLabel) {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        vertical: 2,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -429,9 +335,7 @@ class NoteDialog extends StatelessWidget {
             children: [
               Text(
                 '$title: ',
-                style: const TextStyle(
-                  fontSize: 22,
-                ),
+                style: const TextStyle(fontSize: 22),
               ),
               Text(
                 value,
@@ -455,7 +359,4 @@ class NoteDialog extends StatelessWidget {
       ),
     );
   }
-
-
-
 }

@@ -2,93 +2,120 @@ import 'package:flutter/material.dart';
 
 import '../controllers/composition_controller.dart';
 
-void showScaleDialog(
-    BuildContext context,
-    CompositionController controller,
-    ) {
 
-  final majors = controller.availableScales
-      .where((s) => s.contains('major'))
-      .toList();
 
-  final minors = controller.availableScales
-      .where((s) => s.contains('minor'))
-      .toList();
+class ScaleDialog extends StatefulWidget {
 
-  Widget buildButtons(List<String> scales) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: scales.map((scale) {
-        final originalIndex =
-        controller.availableScales.indexOf(scale);
+  final CompositionController controller;
 
-        final isSelected =
-            controller.scaleName == scale;
 
-        return SizedBox(
-          width: 210,
-          height: 55,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              padding: EdgeInsets.zero,
-              backgroundColor: isSelected ? Colors.blue : null,
-              minimumSize: const Size(130, 48),
-              shape: RoundedRectangleBorder(
-                borderRadius:
-                BorderRadius.circular(8),
-              ),
-            ),
-            onPressed: () {
-              controller.setScale(originalIndex);
-              Navigator.pop(context);
-            },
-            child: Text(
-              scale,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 22,
-                color: isSelected ? Colors.white : Colors.blue,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
+  const ScaleDialog({
+    super.key,
+    required this.controller,
+  });
+
+
+  @override
+  State<ScaleDialog> createState() =>
+      _ScaleDialogState();
+
+}
+
+class _ScaleDialogState extends State<ScaleDialog> {
+  late String _activeScale;
+
+  @override
+  void initState() {
+    super.initState();
+
+
+    if (widget.controller.measures.isNotEmpty) {
+      _activeScale =  widget.controller.currentMeasure.scaleName;
+    } else {
+      _activeScale = 'major C';
+    }
   }
 
-  showDialog(
-    context: context,
-    builder: (_) {
-      return AlertDialog(
-        title: const Text(
-          'Select Scale',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
+
+  void _updateScale(String newScaleName) {
+    setState(() {
+      _activeScale = newScaleName;
+    });
+    widget.controller.updateCurrentMeasureScale(newScaleName);
+  }
+
+
+  @override
+  Widget build(BuildContext context) {
+
+    final currentMeasureNumber = widget.controller.selectedMeasureIndex + 1;
+    return AlertDialog(
+      title: Text(
+        'Set Scale for Measure $currentMeasureNumber',
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
         ),
-        content: SizedBox(
-          width: 900,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-
-              buildButtons(majors),
-
-              const SizedBox(
-                height: 30,
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        height: 350,
+        child: Column(
+          children: [
+            Text(
+              'Active: $_activeScale',
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w600,
+                color: Colors.blue,
               ),
-
-              buildButtons(minors),
-
-            ],
+            ),
+            const Divider(),
+            Expanded(
+              child: GridView.builder(
+                itemCount: widget.controller.availableScales.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 2.8,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                ),
+                itemBuilder: (context,index){
+                  final scaleName = widget.controller.availableScales[index];
+                  final selected = scaleName == _activeScale;
+                  return ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                     backgroundColor: selected
+                          ? Colors.blue
+                          : Colors.grey[200],
+                      foregroundColor: selected
+                          ? Colors.white
+                          : Colors.black87,
+                    ),
+                    onPressed:
+                        () => _updateScale(
+                        scaleName
+                    ),
+                   child: Text(
+                      scaleName,
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed:
+              () => Navigator.pop(context),
+          child: const Text(
+              'Done'
           ),
         ),
-      );
-    },
-  );
+      ],
+    );
+  }
 }
