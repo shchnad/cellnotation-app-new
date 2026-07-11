@@ -213,6 +213,15 @@ class CompositionController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void updateTimelineBounds() {
+    // 💡 1. If your timeline model has its own internal recalculate method, trigger it here.
+    // Otherwise, your getters below will dynamically evaluate the new elements.
+
+    // 💡 2. Broadcast the state change directly to the GridWidget so it repaints
+    // using the newly extended measure boundaries.
+    notifyListeners();
+  }
+
   // ================= TEMPO TIMELINE OPERATIONS =================
 
   List<TempoEvent> get tempoEvents => timeline.tempoEvents;

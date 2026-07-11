@@ -12,7 +12,10 @@ class Composition {
   final DateTime createdAt;
   final DateTime editedAt;
   final int numberOfOctaves;
-  final String scaleName;
+
+  // Internal backing field for your mutable scaleName parameter
+  String _scaleName;
+
   final Timeline timeline;
   final List<Note> notes;
   final List<TempoEvent> tempoEvents;
@@ -27,7 +30,7 @@ class Composition {
     DateTime? createdAt,
     DateTime? editedAt,
     required this.numberOfOctaves,
-    required this.scaleName,
+    required String scaleName, // Pass as a regular parameter to feed the initializer
     required this.timeline,
     required this.notes,
     List<TempoEvent>? tempoEvents,
@@ -35,7 +38,16 @@ class Composition {
   })  : createdAt = createdAt ?? DateTime.now(),
         editedAt = editedAt ?? DateTime.now(),
         tempoEvents = tempoEvents ?? [],
-        dynamicEvents = dynamicEvents ?? [];
+        dynamicEvents = dynamicEvents ?? [],
+        _scaleName = scaleName;
+
+  // The Explicit Getter
+  String get scaleName => _scaleName;
+
+  // The Explicit Setter
+  set scaleName(String newScale) {
+    _scaleName = newScale;
+  }
 
   Composition copyWith({
     String? title,
@@ -61,7 +73,7 @@ class Composition {
       createdAt: createdAt ?? this.createdAt,
       editedAt: editedAt ?? this.editedAt,
       numberOfOctaves: numberOfOctaves ?? this.numberOfOctaves,
-      scaleName: scaleName ?? this.scaleName,
+      scaleName: scaleName ?? this.scaleName, // Reads cleanly through your custom getter
       timeline: timeline ?? this.timeline,
       notes: notes ?? this.notes,
       tempoEvents: tempoEvents ?? this.tempoEvents,

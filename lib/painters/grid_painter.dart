@@ -6,7 +6,7 @@ class GridPainter extends CustomPainter {
   final int rows;
   final double pixelsPerBeat;
   final double cellHeight;
-  final Set<int> barLines; // Set of bar indexes (Measure numbers)
+  final Set<int> barLines; // 💡 The actual set of starting ticks for each measure
 
   GridPainter({
     required this.totalTicks,
@@ -17,20 +17,20 @@ class GridPainter extends CustomPainter {
     required this.barLines,
   });
 
-  // ================= HORIZONTAL HELPERS =================
-
   bool _isOctaveBoundary(int row) => row % 7 == 0;
-
   bool _isMiddleLine(int row) => row == (rows ~/ 2);
 
   @override
   void paint(Canvas canvas, Size size) {
+    // ================= 💡 FIX 1: FORCE WHITE BACKGROUND =================
+    final backgroundPaint = Paint()..color = Colors.white;
+    canvas.drawRect(Offset.zero & size, backgroundPaint);
+
     final double pixelsPerTick = pixelsPerBeat / ppqn;
 
     // ================= PAINTS =================
-
     final subdivisionLine = Paint()
-      ..color = Colors.grey.shade200
+      ..color = Colors.grey.shade300 // Slightly darkened so it stands out beautifully on white
       ..strokeWidth = 0.5;
 
     final beatLine = Paint()
@@ -38,8 +38,8 @@ class GridPainter extends CustomPainter {
       ..strokeWidth = 0.8;
 
     final barLine = Paint()
-      ..color = Colors.grey.shade600
-      ..strokeWidth = 1.5;
+      ..color = Colors.grey.shade700 // Crisp dark line for measure boundaries
+      ..strokeWidth = 1.8;
 
     final octaveLine = Paint()
       ..color = Colors.grey.shade500
@@ -49,11 +49,8 @@ class GridPainter extends CustomPainter {
       ..color = Colors.black87
       ..strokeWidth = 2.5;
 
-    // ================= VERTICAL LINES (DAW TIMING GRID) =================
-
-    // FL Studio Default Subdivision: 16th notes (4 steps per beat)
-    final int stepTicks = ppqn ~/ 4;
-    final int ticksPerBar = ppqn * 4; // Assuming 4/4 time signature placeholder for grid drawing
+    // ================= VERTICAL LINES (DYNAMIC MEASURE TIMING GRID) =================
+    final int stepTicks = ppqn ~/ 4; // 16th note steps
 
     for (int tick = 0; tick <= totalTicks; tick += stepTicks) {
       final double x = tick * pixelsPerTick;
@@ -61,8 +58,9 @@ class GridPainter extends CustomPainter {
 
       Paint paint;
 
-      if (tick % ticksPerBar == 0) {
-        paint = barLine; // Major Measure boundary
+      // 💡 FIX 2: Check if this tick is an authentic measure boundary from your added measures
+      if (barLines.contains(tick) || tick == 0 || tick == totalTicks) {
+        paint = barLine; // Draws the real measure line dynamically!
       } else if (tick % ppqn == 0) {
         paint = beatLine; // Individual Quarter Note Beat
       } else {
@@ -77,7 +75,6 @@ class GridPainter extends CustomPainter {
     }
 
     // ================= HORIZONTAL LINES (NOTES / OCTAVES) =================
-
     for (int row = 0; row <= rows; row++) {
       final double y = row * cellHeight;
       if (y > size.height) break;

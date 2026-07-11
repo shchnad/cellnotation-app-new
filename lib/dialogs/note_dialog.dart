@@ -12,7 +12,7 @@ import '../enums/ornament.dart';
 import '../enums/playing_technique.dart';
 import '../models/note.dart';
 
-import 'noteValues_dialog.dart';
+import 'note_values_dialog.dart';
 
 
 class NoteDialog extends StatelessWidget {

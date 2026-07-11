@@ -1,50 +1,35 @@
-import 'dart:developer';
-
 import 'package:flutter/material.dart';
-import 'package:music_composer/enums/note_duration.dart';
-
 import '../models/composition.dart';
-
 import '../controllers/composition_controller.dart';
-import '../models/measure.dart';
-import '../models/timeline.dart';
-import '../models/time_signature.dart';
+import '../dialogs/create_composition_dialog.dart';
 import 'composition_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
-  Composition _createEmptyComposition() {
-    return Composition(
-      title: "New Composition",
-      composer: "unknown",
-      style: "unknown",
-      instrument: "unknown",
-      userId: 0, // or real logged-in user id
-      createdAt: DateTime.now(),
-      editedAt: DateTime.now(),
-      numberOfOctaves: 8,
-      scaleName: "major C",
-      timeline: Timeline(measures: [
-        Measure(
-          id: 0,
-          startTick: 0,
-          timeSignature: TimeSignature(beats: 4, beatUnit: NoteDuration.quarter),
-        ),
-      ]),
-      notes: [],
-    );
-  }
+  void _handleCreateComposition(BuildContext routingContext) {
+    showDialog(
+      context: routingContext,
+      builder: (_) => CreateCompositionDialog(
+        onCompositionCreated: (newComposition) {
+          print("--- HOME SCREEN: Callback received! Starting navigation route ---");
 
-  void _openComposition(BuildContext context) {
-    final composition = _createEmptyComposition();
+          // The controller takes ownership of the composition model state
+          final controller = CompositionController(newComposition);
 
-    final controller = CompositionController(composition);
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => CompositionScreen(controller: controller),
+          Navigator.push(
+            routingContext,
+            MaterialPageRoute(
+              builder: (_) {
+                print("--- NAVIGATION: Building CompositionScreen instance ---");
+                // 💡 FIX: Removed the redundant 'composition:' argument matching the updated constructor
+                return CompositionScreen(
+                  controller: controller,
+                );
+              },
+            ),
+          );
+        },
       ),
     );
   }
@@ -53,12 +38,41 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Music Composer"),
+        title: const Text("Cellnotation editor"),
+        centerTitle: true,
       ),
       body: Center(
-        child: ElevatedButton(
-          onPressed: () => _openComposition(context),
-          child: const Text("Create Composition"),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.music_video_rounded,
+              size: 80,
+              color: Colors.blue.shade400,
+            ),
+            const SizedBox(height: 16),
+            Builder(
+                builder: (buttonContext) {
+                  return ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(220, 50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      elevation: 0,
+                    ),
+                    onPressed: () => _handleCreateComposition(buttonContext),
+                    icon: const Icon(Icons.add_circle_outline),
+                    label: const Text(
+                      "New Composition",
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                  );
+                }
+            ),
+          ],
         ),
       ),
     );
