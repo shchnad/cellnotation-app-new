@@ -38,18 +38,6 @@ class CompositionController extends ChangeNotifier {
   // Grid snapping resolution
   NoteDuration gridResolution = NoteDuration.sixteenth;
 
-  // Visual zoom only
-  double zoomX = 5.0;
-  double zoomY = 1.0;
-  double get pixelsPerTick => zoomX;
-
-  double getCellHeight(BuildContext context) {
-    final availableHeight =
-        MediaQuery.of(context).size.height
-            - kToolbarHeight;
-    return (availableHeight / 28) * zoomY;
-  }
-
 
   // =====================================================
   // CLIPBOARD
@@ -74,7 +62,6 @@ class CompositionController extends ChangeNotifier {
 
   int get maxTicks => composition.timeline.totalTicks;
 
-  int get totalRows => composition.numberOfOctaves * 7;
 
 
 
@@ -171,6 +158,37 @@ class CompositionController extends ChangeNotifier {
   // GRID / SNAP
   // =====================================================
 
+  // Visual zoom only
+  double zoomX = 10.0;
+  double zoomY = 1.0;
+
+  double get pixelsPerTick => zoomX;
+
+  int get totalRows => composition.numberOfOctaves * 7;
+
+
+  void changeCellWidth(double amount){
+    zoomX = (zoomX + amount).clamp(2, 50,);
+    notifyListeners();
+  }
+
+
+  void resetCellWidth(){
+    zoomX = 10.0;
+    notifyListeners();
+  }
+
+  void setMinimumCellWidth(){
+    zoomX = 2;
+    notifyListeners();
+  }
+
+  double getCellHeight(BuildContext context) {
+    final availableHeight =
+        MediaQuery.of(context).size.height
+            - kToolbarHeight;
+    return (availableHeight / totalRows) * zoomY;
+  }
 
   int snapTick(int rawTick){
     final step = gridResolution.ticks;
@@ -181,6 +199,8 @@ class CompositionController extends ChangeNotifier {
   }
 
 
+
+
   // =====================================================
   // NOTE CREATION
   // =====================================================
@@ -189,6 +209,9 @@ class CompositionController extends ChangeNotifier {
       int tick,
       int row,
       ){
+    if(getNoteAtPosition(tick,row) != null){
+      return;
+    }
     final note = Note(
       id: DateTime.now().millisecondsSinceEpoch,
       startTick: tick,
@@ -238,6 +261,42 @@ class CompositionController extends ChangeNotifier {
   // =====================================================
   // NOTE MOVEMENT
   // =====================================================
+
+
+  Note? getNoteAtPosition(
+      int tick,
+      int row,
+      ){
+    for(final note in notes){
+      final noteEnd = note.startTick + note.durationTicks;
+      if(row == note.row && tick >= note.startTick &&
+          tick < noteEnd
+      ){
+        return note;
+      }
+    }
+    return null;
+  }
+
+
+  void handleGridTap(
+      int tick,
+      int row,
+      ){
+    final existing = getNoteAtPosition(
+      tick,
+      row,
+    );
+    if(existing != null){
+      removeNote(existing);
+    } else {
+      addNoteAtGridPosition(
+        tick,
+        row,
+      );
+    }
+  }
+
 
   void updateNote(
       Note oldNote,
