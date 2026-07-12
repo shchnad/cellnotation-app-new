@@ -36,7 +36,7 @@ class CompositionController extends ChangeNotifier {
   NoteDuration currentDuration = NoteDuration.quarter;
 
   // Grid snapping resolution
-  NoteDuration gridResolution = NoteDuration.sixteenth;
+  NoteDuration gridResolution = NoteDuration.sixtyFourth;
 
 
   // =====================================================
@@ -158,9 +158,11 @@ class CompositionController extends ChangeNotifier {
   // GRID / SNAP
   // =====================================================
 
-  // Visual zoom only
-  double zoomX = 10.0;
-  double zoomY = 1.0;
+  static const double defaultCellWidth = 10.0;
+  static const double defaultZoomY = 1.0;
+
+  double zoomX = defaultCellWidth;
+  double zoomY = defaultZoomY;
 
   double get pixelsPerTick => zoomX;
 
@@ -173,8 +175,8 @@ class CompositionController extends ChangeNotifier {
   }
 
 
-  void resetCellWidth(){
-    zoomX = 10.0;
+  void resetCellWidth() {
+    zoomX = defaultCellWidth;
     notifyListeners();
   }
 
@@ -190,15 +192,33 @@ class CompositionController extends ChangeNotifier {
     return (availableHeight / totalRows) * zoomY;
   }
 
-  int snapTick(int rawTick){
+  int snapTick(int rawTick) {
     final step = gridResolution.ticks;
-    if(step <= 0){
+    if (step <= 1) {
       return rawTick;
     }
     return ((rawTick + step / 2) ~/ step) * step;
   }
 
+  // =====================================================
+  // ZOOM
+  // =====================================================
 
+  void setZoom(
+      double x,
+      double y,
+      ){
+    zoomX = x.clamp(20, 500);
+    zoomY = y.clamp(0.5, 3);
+    notifyListeners();
+  }
+
+  void resetZoom() {
+    zoomX = defaultCellWidth;
+    zoomY = defaultZoomY;
+    notifyListeners();
+
+  }
 
 
   // =====================================================
@@ -209,13 +229,28 @@ class CompositionController extends ChangeNotifier {
       int tick,
       int row,
       ){
-    if(getNoteAtPosition(tick,row) != null){
+    final newDuration = currentDuration.ticks;
+    // Prevent any horizontal overlap
+    final overlaps = notes.any(
+          (note) {
+        if(note.row != row){
+          return false;
+        }
+        final existingStart = note.startTick;
+        final existingEnd = note.startTick + note.durationTicks;
+        final newStart = tick;
+        final newEnd = tick + newDuration;
+        return newStart < existingEnd && newEnd > existingStart;
+      },
+    );
+    if(overlaps){
       return;
     }
     final note = Note(
       id: DateTime.now().millisecondsSinceEpoch,
       startTick: tick,
-      durationTicks: currentDuration.ticks,
+      durationTicks:
+      newDuration,
       row: row,
       hand: currentHand,
     );
@@ -268,10 +303,9 @@ class CompositionController extends ChangeNotifier {
       int row,
       ){
     for(final note in notes){
-      final noteEnd = note.startTick + note.durationTicks;
-      if(row == note.row && tick >= note.startTick &&
-          tick < noteEnd
-      ){
+      final end = note.startTick + note.durationTicks;
+      if(note.row == row && tick >= note.startTick &&
+          tick < end){
         return note;
       }
     }
@@ -280,42 +314,83 @@ class CompositionController extends ChangeNotifier {
 
 
   void handleGridTap(
-      int tick,
+      int rawTick,
       int row,
-      ){
-    final existing = getNoteAtPosition(
-      tick,
+      ) {
+    if(rawTick < 0 ||
+        rawTick >= maxTicks) {
+      return;
+    }
+    if(row < 0 ||
+        row >= totalRows) {
+      return;
+    }
+    addNoteAtGridPosition(
+      snapTick(rawTick),
       row,
     );
-    if(existing != null){
-      removeNote(existing);
-    } else {
-      addNoteAtGridPosition(
-        tick,
-        row,
-      );
-    }
   }
+
 
 
   void updateNote(
       Note oldNote,
       int newTick,
       int newRow,
-      ){
+      ) {
     final index = composition.notes.indexWhere(
-          (n)=>n.id == oldNote.id,
+          (n) => n.id == oldNote.id,
     );
-    if(index == -1){
+    if(index == -1) {
       return;
     }
-    final updated =  oldNote.copyWith(
-      startTick: newTick,
-      row: newRow,
+    // keep note inside timeline
+    newTick =
+        newTick.clamp(
+          0,
+          maxTicks - oldNote.durationTicks,
+        );
+    newRow =
+        newRow.clamp(
+          0,
+          totalRows - 1,
+        ).toInt();
+    final overlaps = notes.any(
+          (note) {
+        if(note.id == oldNote.id) {
+          return false;
+        }
+        if(note.row != newRow) {
+          return false;
+        }
+        final existingStart =
+            note.startTick;
+        final existingEnd =
+            note.startTick +
+                note.durationTicks;
+        final newStart =
+            newTick;
+        final newEnd =
+            newTick +
+                oldNote.durationTicks;
+        return newStart < existingEnd &&
+            newEnd > existingStart;
+      },
+    );
+    if(overlaps) {
+      return;
+    }
+    final updated = oldNote.copyWith(
+      startTick:
+      newTick,
+      row:
+      newRow,
     );
     composition.notes[index] = updated;
     notifyListeners();
   }
+
+
 
   void _replaceNote(Note updated) {
     final index = notes.indexWhere(
@@ -476,6 +551,36 @@ class CompositionController extends ChangeNotifier {
   // COPY / PASTE
   // =====================================================
 
+  void pasteNoteAt(
+      int tick,
+      int row,
+      ) {
+    if(copiedNote == null) {
+      return;
+    }
+    final newNote =copiedNote!.copyWith(
+      id: DateTime.now().millisecondsSinceEpoch,
+      startTick: snapTick(tick),
+      row: row,
+    );
+    final overlaps = notes.any((note) {
+        if(note.row != row) {
+          return false;
+        }
+        return newNote.startTick <
+            note.endTick &&
+            newNote.endTick >
+                note.startTick;
+      },
+    );
+    if(overlaps) {
+      return;
+    }
+    notes.add(newNote);
+    pasteMode = false;
+    notifyListeners();
+  }
+
 
   void copyNote(Note note){
     copiedNote = note.copyWith();
@@ -513,6 +618,8 @@ class CompositionController extends ChangeNotifier {
     notifyListeners();
   }
 
+
+
   void toggleHand(){
     currentHand = currentHand == Hand.right
         ? Hand.left
@@ -520,27 +627,6 @@ class CompositionController extends ChangeNotifier {
     notifyListeners();
   }
 
-
-  // =====================================================
-  // ZOOM
-  // =====================================================
-
-
-  void setZoom(
-      double x,
-      double y,
-      ){
-    zoomX = x.clamp(20, 500);
-    zoomY = y.clamp(0.5, 3);
-    notifyListeners();
-  }
-
-
-  void resetZoom(){
-    zoomX = 100;
-    zoomY = 1;
-    notifyListeners();
-  }
 
   // =====================================================
   // COMPOSITION REPLACEMENT

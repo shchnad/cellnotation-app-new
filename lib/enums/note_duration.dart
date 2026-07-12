@@ -7,7 +7,13 @@ enum NoteDuration {
   thirtySecond(2, '1/32'),
   sixtyFourth(1, '1/64');
 
-  final int ticks; //number of ticks in a beat of chosen note duration
+  // quarter   = 16 ticks
+  // eighth    = 8 ticks
+  // sixteenth = 4 ticks
+  // 1/32      = 2 ticks
+  // 1/64      = 1 tick
+
+  final int ticks;
   final String label;
 
   const NoteDuration(this.ticks, this.label);

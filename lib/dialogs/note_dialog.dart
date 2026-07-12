@@ -37,6 +37,12 @@ class NoteDialog extends StatelessWidget {
       animation: controller,
       builder: (context, _) {
         final editedNote = currentNote;
+        final measure = controller.getMeasureAtTick(
+          editedNote.startTick,
+        );
+        final timeSignature =
+            '${measure.timeSignature.beats} * '
+            '${measure.timeSignature.beatDuration.label}';
         return AlertDialog(
           contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
           title: Text(
@@ -52,23 +58,55 @@ class NoteDialog extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+
                 const Divider(height: 8, thickness: 0.5),
+
                 Row(
                   children: [
+
                     Expanded(
                       child: _infoRow(
                         'Measure',
                         controller.getMeasureNumber(editedNote).toString(),
                       ),
                     ),
+
                     Expanded(
                       child: _infoRow(
                         'Beat',
                         controller.getBeatNumber(editedNote).toString(),
                       ),
                     ),
+
                   ],
                 ),
+
+                const Divider(
+                  height: 8,
+                  thickness: 0.5,
+                ),
+
+                Row(
+                  children: [
+
+                    Expanded(
+                      child: _infoRow(
+                        'Scale',
+                        measure.scaleName,
+                      ),
+                    ),
+
+                    Expanded(
+                      child: _infoRow(
+                        'Time Signature',
+                        timeSignature,
+                      ),
+                    ),
+
+                  ],
+                ),
+
+
                 const Divider(height: 8, thickness: 0.5),
                 Row(
                   children: [
@@ -249,19 +287,47 @@ class NoteDialog extends StatelessWidget {
           ),
           actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text(
-                'Close',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
+
+            Row(
+              children: [
+
+                TextButton(
+                  onPressed: () {
+
+                    controller.removeNote(editedNote);
+
+                    Navigator.pop(context);
+
+                  },
+                  child: const Text(
+                    'Delete',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red,
+                    ),
+                  ),
                 ),
-              ),
+
+                const Spacer(),
+
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  child: const Text(
+                    'Close',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+
+              ],
             ),
+
           ],
         );
       },

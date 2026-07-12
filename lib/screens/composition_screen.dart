@@ -7,6 +7,7 @@ import '../dialogs/create_composition_dialog.dart';
 import '../dialogs/duration_dialog.dart';
 import '../dialogs/append_measures_dialog.dart';
 
+import '../dialogs/message_dialog.dart';
 import '../enums/hand.dart';
 
 import '../widgets/grid_widget.dart';
@@ -200,6 +201,7 @@ class CompositionScreen extends StatelessWidget {
                         color: Colors.white24,
                       ),
 
+
                       // GRID SIZE
                       IconButton(
                         icon: const Icon(
@@ -230,9 +232,39 @@ class CompositionScreen extends StatelessWidget {
                           ),
                           tooltip: 'Paste',
                           onPressed: () {
-                            controller.pasteMode
-                                ? controller.exitPasteMode()
-                                : controller.enterPasteMode();
+                            if (controller.pasteMode) {
+                              controller.exitPasteMode();
+                              messageDialog(context, 'Paste mode is disable');
+                            } else {
+                              showDialog(
+                                context: context,
+                                builder: (_) => AlertDialog(
+                                  title: const Text(
+                                    "Copying mode",
+                                  ),
+                                  content: const Text(
+                                    "To copy: long-tap the note and clone it where ever you wish as many times as you wish.\n\n"
+                                        "To leave copying mode, toggle this button.",
+                                  ),
+
+                                  actions: [
+
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.pop(context);
+                                      },
+                                      child: const Text(
+                                        "OK",
+                                      ),
+                                    ),
+
+                                  ],
+
+                                ),
+                              );
+
+                            }
+
                           },
                         ),
 

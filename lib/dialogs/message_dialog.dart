@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-void showCopyPasteHelpDialog(BuildContext context, String message) {
+void messageDialog(BuildContext context, String message) {
   showDialog(
     context: context,
     builder: (context) {

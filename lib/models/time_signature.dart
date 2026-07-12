@@ -5,8 +5,8 @@ class TimeSignature {
   final NoteDuration beatDuration;
 
   const TimeSignature({
-    required this.beats,
-    required this.beatDuration,
+    required this.beats, //numerator
+    required this.beatDuration, //denominator
   });
 
   int get ticksPerBeat => beatDuration.ticks;
