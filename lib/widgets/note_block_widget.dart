@@ -8,14 +8,11 @@ import '../enums/articulation.dart';
 import '../enums/hand.dart';
 import '../models/note.dart';
 
-
 class NoteBlockWidget extends StatefulWidget {
-
   final Note note;
   final double pixelsPerTick;
   final double cellHeight;
   final CompositionController controller;
-
 
   const NoteBlockWidget({
     super.key,
@@ -25,16 +22,11 @@ class NoteBlockWidget extends StatefulWidget {
     required this.controller,
   });
 
-
   @override
-  State<NoteBlockWidget> createState() =>
-      _NoteBlockWidgetState();
-
+  State<NoteBlockWidget> createState() => _NoteBlockWidgetState();
 }
 
-
 class _NoteBlockWidgetState extends State<NoteBlockWidget> {
-
   late int dragStartTick;
   late int dragStartRow;
 
@@ -46,31 +38,13 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
       case Articulation.accent:
       case Articulation.marcato:
       case Articulation.sforzando:
-        return Border.all(
-          color: Colors.red,
-          width: 3,
-        );
+        return Border.all(color: Colors.red, width: 3);
       case Articulation.legato:
-        return const Border(
-          bottom: BorderSide(
-            color: Colors.red,
-            width: 3,
-          ),
-        );
+        return const Border(bottom: BorderSide(color: Colors.red, width: 3));
       case Articulation.staccato:
-        return const Border(
-          left: BorderSide(
-            color: Colors.red,
-            width: 3,
-          ),
-        );
+        return const Border(left: BorderSide(color: Colors.red, width: 3));
       case Articulation.tenuto:
-        return const Border(
-          top: BorderSide(
-            color: Colors.red,
-            width: 3,
-          ),
-        );
+        return const Border(top: BorderSide(color: Colors.red, width: 3));
       case Articulation.fermata:
       case null:
         return null;
@@ -79,7 +53,6 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
 
   @override
   Widget build(BuildContext context) {
-
     final note = widget.note;
     final controller = widget.controller;
 
@@ -88,14 +61,11 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
 
     final left = note.startTick * widget.pixelsPerTick;
 
-    final noteWidth = max(
-      note.durationTicks * widget.pixelsPerTick,
-      8.0,
-    );
+    final noteWidth = max(note.durationTicks * widget.pixelsPerTick, 8.0);
+    final showPitch = noteWidth >= 24;
+    final showAccidental = noteWidth >= 36;
 
-    final top =  note.row * widget.cellHeight;
-
-
+    final top = note.row * widget.cellHeight;
 
     return Positioned(
       left: left,
@@ -103,117 +73,57 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
       width: noteWidth,
       height: widget.cellHeight,
 
-
       child: GestureDetector(
-
-        behavior:
-        HitTestBehavior.opaque,
-
+        behavior: HitTestBehavior.opaque,
 
         onPanStart: (details) {
+          dragStartTick = note.startTick;
 
-          dragStartTick =
-              note.startTick;
+          dragStartRow = note.row;
 
-          dragStartRow =
-              note.row;
-
-          dragStartPosition =
-              details.globalPosition;
-
+          dragStartPosition = details.globalPosition;
         },
-
 
         onPanUpdate: (details) {
+          final dx = details.globalPosition.dx - dragStartPosition.dx;
 
-          final dx =
-              details.globalPosition.dx -
-                  dragStartPosition.dx;
+          final dy = details.globalPosition.dy - dragStartPosition.dy;
 
+          final tickChange = (dx / widget.pixelsPerTick).round();
 
-          final dy =
-              details.globalPosition.dy -
-                  dragStartPosition.dy;
+          final rowChange = (dy / widget.cellHeight).round();
 
+          final newTick = controller.snapTick(dragStartTick + tickChange);
 
-          final tickChange =
-          (dx / widget.pixelsPerTick)
-              .round();
-
-
-          final rowChange =
-          (dy / widget.cellHeight)
-              .round();
-
-
-          final newTick =
-          controller.snapTick(
-            dragStartTick + tickChange,
-          );
-
-
-          final newRow =
-          (dragStartRow + rowChange)
-              .clamp(
-            0,
-            controller.totalRows - 1,
-          )
+          final newRow = (dragStartRow + rowChange)
+              .clamp(0, controller.totalRows - 1)
               .toInt();
 
-
-
-          if(newTick != note.startTick ||
-              newRow != note.row) {
-
-            controller.updateNote(
-              note,
-              newTick,
-              newRow,
-            );
-
+          if (newTick != note.startTick || newRow != note.row) {
+            controller.updateNote(note, newTick, newRow);
           }
-
         },
 
-
         onTap: () {
-
-          if(controller.pasteMode) {
+          if (controller.pasteMode) {
             return;
           }
 
-
           showDialog(
             context: context,
-            builder: (_) =>
-                NoteDialog(
-                  note: note,
-                  controller: controller,
-                ),
+            builder: (_) => NoteDialog(note: note, controller: controller),
           );
-
         },
 
-
         onLongPress: () {
-
           controller.copyNote(note);
 
           controller.enterPasteMode();
 
-
-          ScaffoldMessenger.of(context)
-              .showSnackBar(
-            const SnackBar(
-              content:
-              Text(
-                "Note copied",
-              ),
-            ),
-          );
-
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text("Note copied")));
         },
-
 
         child: Container(
           decoration: BoxDecoration(
@@ -222,55 +132,43 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
             border: _articulationBorder(),
           ),
 
-          child: Padding(
-            padding: const EdgeInsets.only(left: 5),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Text(
-                  pitch,
-                  maxLines: 1,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: widget.cellHeight * .80,
-                    fontWeight: FontWeight.bold,
-                    height: 1.0,
+          child: showPitch
+              ? Padding(
+            padding: const EdgeInsets.only(left: 3, right: 2),
+            child: FittedBox(
+              alignment: Alignment.centerLeft,
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    pitch,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: widget.cellHeight * .80,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-
-                if (accidental.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 2),
-                    child: Text(
+                  if (accidental.isNotEmpty)
+                    Text(
                       accidental,
                       style: TextStyle(
                         color: Colors.yellow,
                         fontSize: widget.cellHeight * .80,
                         fontWeight: FontWeight.bold,
-                        height: 1.0,
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
-
+          )
+              : const SizedBox(),
         ),
-
       ),
-
     );
-
   }
-
-
 
   Color _handColor(Hand hand) {
-
-    return hand == Hand.right
-        ? Colors.black
-        : Colors.blue;
-
+    return hand == Hand.right ? Colors.black : Colors.blue;
   }
-
 }

@@ -26,7 +26,6 @@ class GridWidget extends StatelessWidget {
 
     final gridWidth = controller.maxTicks * pixelsPerTick;
 
-
     return SingleChildScrollView(
       scrollDirection: Axis.vertical,
       child: SingleChildScrollView(
