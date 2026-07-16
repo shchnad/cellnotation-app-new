@@ -54,16 +54,21 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
 
   @override
   Widget build(BuildContext context) {
+
     final note = widget.note;
+
     final controller = widget.controller;
 
     final accidental = note.accidental?.sign ?? '';
+
     final pitch = controller.getNotePitchName(note);
 
     final left = note.startTick * widget.pixelsPerTick;
 
     final noteWidth = max(note.durationTicks * widget.pixelsPerTick, 8.0);
+
     final showPitch = noteWidth >= 24;
+
     final showAccidental = noteWidth >= 36;
 
     final top = note.row * widget.cellHeight;
@@ -78,36 +83,21 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
         // behavior: HitTestBehavior.opaque,
         behavior: HitTestBehavior.deferToChild,
 
-        onTapDown: (details) {
-          print("GRID TAP");
-          final row = (details.localPosition.dy / widget.cellHeight).floor();
-          final rawTick = (details.localPosition.dx / widget.pixelsPerTick).floor();
-          print("tick=$rawTick row=$row");
-        },
-
         onPanStart: (details) {
           dragStartTick = note.startTick;
-
           dragStartRow = note.row;
-
           dragStartPosition = details.globalPosition;
         },
 
         onPanUpdate: (details) {
           final dx = details.globalPosition.dx - dragStartPosition.dx;
-
           final dy = details.globalPosition.dy - dragStartPosition.dy;
-
           final tickChange = (dx / widget.pixelsPerTick).round();
-
           final rowChange = (dy / widget.cellHeight).round();
-
           final newTick = controller.snapTick(dragStartTick + tickChange);
-
           final newRow = (dragStartRow + rowChange)
               .clamp(0, controller.totalRows - 1)
               .toInt();
-
           if (newTick != note.startTick || newRow != note.row) {
             controller.updateNote(note, newTick, newRow);
           }
@@ -117,7 +107,6 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
           if (controller.pasteMode) {
             return;
           }
-
           showDialog(
             context: context,
             builder: (_) => NoteDialog(note: note, controller: controller),
@@ -133,21 +122,13 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
         },
 
         onDoubleTapDown: (details) {
-
           final rawTick = note.startTick;
-
           final measure = controller.getMeasureAtTick(rawTick,);
-
           final measureIndex = controller.measures.indexOf(measure,);
-
-
           final beatIndex =
           ((rawTick - measure.startTick) ~/
               measure.timeSignature
                   .ticksPerBeat);
-
-
-
           showMeasureBeatDialog(
             context: context,
             controller: controller,
@@ -165,7 +146,7 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
             border: _articulationBorder(),
           ),
 
-          child: showPitch
+          child: showPitch // PITCH
               ? Padding(
             padding: const EdgeInsets.only(left: 3, right: 2),
             child: FittedBox(
@@ -184,7 +165,7 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
                   ),
                   if (accidental.isNotEmpty)
                     Text(
-                      accidental,
+                      accidental, // ACCIDENTAL
                       style: TextStyle(
                         color: Colors.yellow,
                         fontSize: widget.cellHeight * .80,

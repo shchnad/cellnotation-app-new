@@ -23,7 +23,7 @@ class NoteDialog extends StatelessWidget {
 
   static const Size _buttonSize = Size(150, 44);
 
-  // 💡 FIXED: Safely query out of controller.composition.notes tracking repo
+  // Safely query out of controller.composition.notes tracking repo
   Note get currentNote {
     return controller.composition.notes.firstWhere(
           (n) => n.id == note.id,
@@ -47,19 +47,18 @@ class NoteDialog extends StatelessWidget {
           contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
           title: Text(
             textAlign: TextAlign.center,
-            'Note C${editedNote.startTick + 1} / R${editedNote.row + 1}',
+            'Note ${note.id}',
+            // 'Note C${editedNote.startTick + 1} / R${editedNote.row + 1}',
             style: const TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
-              color: Colors.black,
+              color: Colors.blue,
             ),
           ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-
-                const Divider(height: 8, thickness: 0.5),
 
                 Row(
                   children: [
@@ -75,6 +74,16 @@ class NoteDialog extends StatelessWidget {
                       child: _infoRow(
                         'Beat',
                         controller.getBeatNumber(editedNote).toString(),
+                      ),
+                    ),
+
+                    Expanded(
+                      child: _octaveInfo(
+                        'Octave',
+                        controller.getOctave(editedNote).toString(),
+                        controller.getOctaveName(
+                          controller.getOctave(editedNote),
+                        ),
                       ),
                     ),
 
@@ -110,15 +119,15 @@ class NoteDialog extends StatelessWidget {
                 const Divider(height: 8, thickness: 0.5),
                 Row(
                   children: [
-                    Expanded(
-                      child: _octaveInfo(
-                        'Octave',
-                        controller.getOctave(editedNote).toString(),
-                        controller.getOctaveName(
-                          controller.getOctave(editedNote),
-                        ),
-                      ),
-                    ),
+                    // Expanded(
+                    //   child: _octaveInfo(
+                    //     'Octave',
+                    //     controller.getOctave(editedNote).toString(),
+                    //     controller.getOctaveName(
+                    //       controller.getOctave(editedNote),
+                    //     ),
+                    //   ),
+                    // ),
                     const SizedBox(width: 50),
                     Expanded(
                       child: Align(
@@ -288,44 +297,37 @@ class NoteDialog extends StatelessWidget {
           actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           actions: [
 
-            Row(
-              children: [
+            TextButton(
+              onPressed: () {
+                controller.removeNote(editedNote);
+                Navigator.pop(context);
+              },
 
-                TextButton(
-                  onPressed: () {
-
-                    controller.removeNote(editedNote);
-
-                    Navigator.pop(context);
-
-                  },
-                  child: const Text(
-                    'Delete',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.red,
-                    ),
-                  ),
+              child: const Text(
+                'Delete',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
                 ),
+              ),
 
-                const Spacer(),
+            ),
 
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  child: const Text(
-                    'Close',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
+            const Spacer(),
+
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text(
+                'Close',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
                 ),
-
-              ],
+              ),
             ),
 
           ],
@@ -340,15 +342,15 @@ class NoteDialog extends StatelessWidget {
       child: Row(
         children: [
           Text(
-            '$title: ',
+            '$title ',
             style: const TextStyle(fontSize: 22),
           ),
           Text(
             value,
             style: const TextStyle(
               fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Colors.blue,
+              // fontWeight: FontWeight.bold,
+              color: Colors.black,
             ),
           ),
         ],
@@ -393,7 +395,7 @@ class NoteDialog extends StatelessWidget {
   Widget _octaveInfo(String title, String value, String subLabel) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -408,7 +410,7 @@ class NoteDialog extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color: Colors.blue,
+                  color: Colors.black,
                 ),
               ),
             ],
@@ -417,7 +419,7 @@ class NoteDialog extends StatelessWidget {
             subLabel.toLowerCase(),
             style: const TextStyle(
               fontSize: 12,
-              color: Colors.blue,
+              color: Colors.black,
               fontWeight: FontWeight.bold,
             ),
           ),

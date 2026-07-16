@@ -55,6 +55,7 @@ class CompositionController extends ChangeNotifier {
   // =====================================================
 
   Timeline get timeline => composition.timeline;
+
   List<Measure> get measures => timeline.measures;
 
   List<Note> get notes => composition.notes;
@@ -78,9 +79,7 @@ class CompositionController extends ChangeNotifier {
 
   int generateNoteId() {
     _noteIdCounter++;
-    return DateTime.now()
-        .microsecondsSinceEpoch +
-        _noteIdCounter;
+    return DateTime.now().microsecondsSinceEpoch + _noteIdCounter;
   }
 
   void fixDuplicateNoteIds() {
@@ -114,7 +113,10 @@ class CompositionController extends ChangeNotifier {
     );
   }
 
-  void addMeasure( TimeSignature signature, String scaleName,) {
+  void addMeasure(
+      TimeSignature signature,
+      String scaleName,
+      ) {
     timeline.addMeasure(signature, scaleName,);
     notifyListeners();
   }
@@ -197,25 +199,25 @@ class CompositionController extends ChangeNotifier {
   void removeBeatFromMeasure(
       int measureIndex,
       int beatIndex,
-      ){
-    if(!_validMeasure(measureIndex)){
+      ) {
+    if (measureIndex < 0 || measureIndex >= measures.length) {
       return;
     }
     final measure = measures[measureIndex];
-    if(measure.timeSignature.beats <= 1){
+    // If this is the last beat, delete the whole measure.
+    if (measure.timeSignature.beats == 1) {
+      deleteMeasure(measureIndex);
       return;
     }
-    final removedStart =
-        measure.startTick +
-            (measure.timeSignature.ticksPerBeat *
-                (measure.timeSignature.beats - 1));
-    final removedEnd =
-        measure.endTick;
-    // remove notes inside removed beat
+    // Remove notes that belong to the deleted beat.
+    final beatStart = measure.startTick +
+        beatIndex * measure.timeSignature.ticksPerBeat;
+    final beatEnd = beatStart +
+        measure.timeSignature.ticksPerBeat;
     notes.removeWhere(
-          (note)=>
-      note.startTick >= removedStart &&
-          note.startTick < removedEnd,
+          (note) =>
+      note.startTick >= beatStart &&
+          note.startTick < beatEnd,
     );
     measure.removeBeat();
     timeline.rebuild();
@@ -223,21 +225,18 @@ class CompositionController extends ChangeNotifier {
   }
 
 
-  void deleteMeasure(
-      int index,
-      ) {
-    if(index < 0 ||
-        index >= measures.length){
+  void deleteMeasure(int index) {
+    if (index < 0 || index >= measures.length) {
       return;
     }
-    final measure = measures[index];
-    // remove notes inside deleted measure
+    final startTick = measures[index].startTick;
+    final endTick = measures[index].endTick;
+    timeline.deleteMeasure(index);
     notes.removeWhere(
           (note) =>
-      note.startTick >= measure.startTick &&
-          note.startTick < measure.endTick,
+      note.startTick >= startTick &&
+          note.startTick < endTick,
     );
-    timeline.deleteMeasure(index);
     notifyListeners();
   }
 
@@ -445,27 +444,27 @@ class CompositionController extends ChangeNotifier {
   }
 
   int getOctave(Note note) {
-    return note.row ~/ 7 + 1;
+    return 7 - (note.row ~/ 7);
   }
 
 
   String getOctaveName(int octave) {
     switch (octave) {
-      case 1:
+      case 0:
         return 'Sub-contra';
-      case 2:
+      case 1:
         return 'Contra';
-      case 3:
+      case 2:
         return 'Great';
-      case 4:
+      case 3:
         return 'Small';
-      case 5:
+      case 4:
         return 'One-line';
-      case 6:
+      case 5:
         return 'Two-line';
-      case 7:
+      case 6:
         return 'Three-line';
-      case 8:
+      case 7:
         return 'Four-line';
       default:
         return '';

@@ -174,12 +174,9 @@ class _CreateCompositionDialogState extends State<CreateCompositionDialog> {
               timeline: Timeline(measures: <Measure>[]),
               notes: <Note>[],
             );
-
-            // 1. Close the dialog first so it is cleared off the stack
+            // Close the dialog first so it is cleared off the stack
             Navigator.pop(context);
-
-            // 2. Now pass the data and push the new screen forward safely
-            print("--- DIALOG: Triggering onCompositionCreated callback ---");
+            // ow pass the data and push the new screen forward safely
             widget.onCompositionCreated(baseComposition);
           },
           child: const Text(
