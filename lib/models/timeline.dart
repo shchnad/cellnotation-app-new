@@ -1,24 +1,27 @@
+import 'beat_event_model.dart';
 import 'measure.dart';
 import 'time_signature.dart';
 import 'tempo_event.dart';
 
 
 class Timeline {
-
   final List<Measure> measures;
-
   final List<TempoEvent> tempoEvents;
-
+  final List<BeatEvent> beatEvents;
 
   Timeline({
     required this.measures,
     List<TempoEvent>? tempoEvents,
-  }) : tempoEvents = tempoEvents ?? [] {
-
-
+    List<BeatEvent>? beatEvents,
+  }) :
+        tempoEvents = tempoEvents ?? [],
+        beatEvents = beatEvents ?? [] {
     if(this.tempoEvents.isEmpty){
       this.tempoEvents.add(
-        TempoEvent( tick: 0, bpm: 120,),
+        TempoEvent(
+          tick: 0,
+          bpm: 120,
+        ),
       );
     }
     rebuild();
@@ -64,13 +67,16 @@ class Timeline {
       TimeSignature signature,
       String scaleName,
       ){
+    final tick = index == 0
+        ? 0
+        : measures[index-1].endTick;
     measures.insert(
       index,
       Measure(
-        id: index,
-        startTick: 0,
-        timeSignature: signature,
-        scaleName: scaleName,
+        id:index,
+        startTick:tick,
+        timeSignature:signature,
+        scaleName:scaleName,
       ),
     );
     rebuild();
@@ -181,4 +187,25 @@ class Timeline {
             a.tick.compareTo(b.tick)
     );
   }
+
+  void addBeatEvent(BeatEvent event){
+    beatEvents.removeWhere(
+            (e)=>e.tick == event.tick
+    );
+    beatEvents.add(event);
+    beatEvents.sort(
+            (a,b)=>a.tick.compareTo(b.tick)
+    );
+  }
+
+
+  void removeBeatEvent(
+      int tick,
+      ){
+    beatEvents.removeWhere(
+            (e)=>e.tick == tick
+    );
+  }
+
 }
+

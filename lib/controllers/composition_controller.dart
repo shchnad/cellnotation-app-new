@@ -21,7 +21,6 @@ class CompositionController extends ChangeNotifier {
 
   Composition composition;
 
-
   CompositionController({
     required this.composition,
   });
@@ -62,9 +61,6 @@ class CompositionController extends ChangeNotifier {
 
   int get maxTicks => composition.timeline.totalTicks;
 
-
-
-
   String durationLabel(Note note) {
   final duration = NoteDuration.values.firstWhere(
           (d) => d.ticks == note.durationTicks,
@@ -77,6 +73,30 @@ class CompositionController extends ChangeNotifier {
   // =====================================================
   // TIMELINE
   // =====================================================
+
+  int _noteIdCounter = 0;
+
+  int generateNoteId() {
+    _noteIdCounter++;
+    return DateTime.now()
+        .microsecondsSinceEpoch +
+        _noteIdCounter;
+  }
+
+  void fixDuplicateNoteIds() {
+    final used = <int>{};
+    for (int i = 0; i < notes.length; i++) {
+      var note = notes[i];
+      while (used.contains(note.id)) {
+        note = note.copyWith(
+          id: generateNoteId(),
+        );
+      }
+      notes[i] = note;
+      used.add(note.id);
+    }
+  }
+
 
   int getMeasureNumber(Note note) {
     return measures.indexWhere( (m) =>
@@ -142,15 +162,173 @@ class CompositionController extends ChangeNotifier {
         1;
   }
 
+  bool _validMeasure(int index){
+    return index >= 0 &&
+        index < measures.length;
+  }
 
-  void addBeatToMeasure(int index){
-    final measure = measures[index];
-    measures[index] =
-        measure.copyWith(
-          timeSignature:
-          measure.timeSignature.addBeat(),
-        );
+  void addBeatToMeasure(int measureIndex) {
+    if(!_validMeasure(measureIndex)){
+      return;
+    }
+    final measure = measures[measureIndex];
+    measure.addBeat();
     timeline.rebuild();
+    notifyListeners();
+  }
+
+
+  int getBeatTick(
+      int measureIndex,
+      int beatIndex,
+      ) {
+    if(measureIndex < 0 ||
+        measureIndex >= measures.length){
+      return 0;
+    }
+    final measure =
+    measures[measureIndex];
+    return measure.startTick +
+        beatIndex *
+            measure.timeSignature.ticksPerBeat;
+  }
+
+
+  void removeBeatFromMeasure(
+      int measureIndex,
+      int beatIndex,
+      ){
+    if(!_validMeasure(measureIndex)){
+      return;
+    }
+    final measure = measures[measureIndex];
+    if(measure.timeSignature.beats <= 1){
+      return;
+    }
+    final removedStart =
+        measure.startTick +
+            (measure.timeSignature.ticksPerBeat *
+                (measure.timeSignature.beats - 1));
+    final removedEnd =
+        measure.endTick;
+    // remove notes inside removed beat
+    notes.removeWhere(
+          (note)=>
+      note.startTick >= removedStart &&
+          note.startTick < removedEnd,
+    );
+    measure.removeBeat();
+    timeline.rebuild();
+    notifyListeners();
+  }
+
+
+  void deleteMeasure(
+      int index,
+      ) {
+    if(index < 0 ||
+        index >= measures.length){
+      return;
+    }
+    final measure = measures[index];
+    // remove notes inside deleted measure
+    notes.removeWhere(
+          (note) =>
+      note.startTick >= measure.startTick &&
+          note.startTick < measure.endTick,
+    );
+    timeline.deleteMeasure(index);
+    notifyListeners();
+  }
+
+
+
+  void copyMeasure(
+      int index,
+      ) {
+    if(index < 0 ||
+        index >= measures.length){
+      return;
+    }
+    final original =
+    measures[index];
+    final newStart = timeline.totalTicks;
+    final copiedMeasure = original.copyWith(
+      id: measures.length,
+      startTick: newStart,
+      beatEvents:
+      original.beatEvents.map(
+            (e)=>e.copyWith(
+          tick: e.tick - original.startTick + newStart,
+        ),
+      ).toList(),
+    );
+    measures.add(copiedMeasure,);
+    // copy notes inside measure
+    final copiedNotes =
+    notes.where( (note) =>
+      note.startTick >= original.startTick &&
+          note.startTick < original.endTick,
+    )
+        .map(
+          (note) {
+        return note.copyWith(
+          id: generateNoteId(),
+          startTick:  newStart + (note.startTick - original.startTick),
+        );
+      },
+    )
+        .toList();
+    notes.addAll(
+      copiedNotes,
+    );
+    timeline.rebuild();
+    notifyListeners();
+  }
+
+
+  void copyBeat(
+      int measureIndex,
+      int beatIndex,
+      ) {
+    if(measureIndex < 0 ||
+        measureIndex >= measures.length){
+      return;
+    }
+    final measure = measures[measureIndex];
+    final beatStart = measure.startTick + beatIndex *
+                measure.timeSignature.ticksPerBeat;
+    final beatEnd = beatStart + measure.timeSignature.ticksPerBeat;
+    // Copy notes inside this beat
+    final copiedNotes = notes.where((note) => note.startTick >= beatStart &&
+          note.startTick < beatEnd,
+    )
+        .map(
+          (note) {
+        return note.copyWith(
+          id: generateNoteId(),
+          // place copied beat after original beat
+          startTick:
+          note.startTick +
+              measure.timeSignature.ticksPerBeat,
+        );
+      },
+    )
+        .toList();
+    notes.addAll(copiedNotes);
+    // Copy beat events
+    final beatEvents = measure.beatEvents.where((event)=>
+      event.tick >= beatStart && event.tick < beatEnd,
+    )
+        .map(
+          (event){
+        return event.copyWith(
+          tick: event.tick + measure.timeSignature.ticksPerBeat,
+        );
+      },
+    )
+        .toList();
+    measure.beatEvents.addAll(beatEvents);
     notifyListeners();
   }
 
@@ -247,7 +425,7 @@ class CompositionController extends ChangeNotifier {
       return;
     }
     final note = Note(
-      id: DateTime.now().millisecondsSinceEpoch,
+      id: generateNoteId(),
       startTick: tick,
       durationTicks:
       newDuration,
@@ -559,7 +737,7 @@ class CompositionController extends ChangeNotifier {
       return;
     }
     final newNote =copiedNote!.copyWith(
-      id: DateTime.now().millisecondsSinceEpoch,
+      id: generateNoteId(),
       startTick: snapTick(tick),
       row: row,
     );

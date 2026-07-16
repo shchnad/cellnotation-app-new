@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../controllers/composition_controller.dart';
+import '../dialogs/measure_beat_dialog.dart';
 import '../dialogs/note_dialog.dart';
 import '../enums/articulation.dart';
 import '../enums/hand.dart';
@@ -74,7 +75,15 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
       height: widget.cellHeight,
 
       child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+        // behavior: HitTestBehavior.opaque,
+        behavior: HitTestBehavior.deferToChild,
+
+        onTapDown: (details) {
+          print("GRID TAP");
+          final row = (details.localPosition.dy / widget.cellHeight).floor();
+          final rawTick = (details.localPosition.dx / widget.pixelsPerTick).floor();
+          print("tick=$rawTick row=$row");
+        },
 
         onPanStart: (details) {
           dragStartTick = note.startTick;
@@ -117,13 +126,37 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
 
         onLongPress: () {
           controller.copyNote(note);
-
           controller.enterPasteMode();
-
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(const SnackBar(content: Text("Note copied")));
         },
+
+        onDoubleTapDown: (details) {
+
+          final rawTick = note.startTick;
+
+          final measure = controller.getMeasureAtTick(rawTick,);
+
+          final measureIndex = controller.measures.indexOf(measure,);
+
+
+          final beatIndex =
+          ((rawTick - measure.startTick) ~/
+              measure.timeSignature
+                  .ticksPerBeat);
+
+
+
+          showMeasureBeatDialog(
+            context: context,
+            controller: controller,
+            measureIndex: measureIndex,
+            beatIndex: beatIndex,
+          );
+
+        },
+
 
         child: Container(
           decoration: BoxDecoration(

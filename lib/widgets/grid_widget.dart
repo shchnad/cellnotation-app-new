@@ -19,12 +19,15 @@ class GridWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     final pixelsPerTick = controller.pixelsPerTick;
 
     final gridHeight = controller.totalRows * cellHeight;
 
     final gridWidth = controller.maxTicks * pixelsPerTick;
+
+    return AnimatedBuilder(
+        animation: controller,
+        builder: (context, child) {
 
     return SingleChildScrollView(
       scrollDirection: Axis.vertical,
@@ -43,7 +46,6 @@ class GridWidget extends StatelessWidget {
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTapDown: (details) {
-
                     final row = (details.localPosition.dy /
                         cellHeight)
                         .floor();
@@ -53,8 +55,7 @@ class GridWidget extends StatelessWidget {
                         pixelsPerTick)
                         .floor();
 
-                    if(row >= 0 && row < controller.totalRows) {
-
+                    if (row >= 0 && row < controller.totalRows) {
                       // Do not create a note
                       // if there is already one here
 
@@ -63,9 +64,8 @@ class GridWidget extends StatelessWidget {
                         row,
                       );
 
-                      if(existing == null) {
-
-                        if(controller.pasteMode) {
+                      if (existing == null) {
+                        if (controller.pasteMode) {
                           controller.pasteNoteAt(
                             rawTick,
                             row,
@@ -82,7 +82,7 @@ class GridWidget extends StatelessWidget {
                   },
 
                   child: CustomPaint(
-                    painter:GridPainter(
+                    painter: GridPainter(
                       controller: controller,
                       cellHeight: cellHeight,
                       pixelsPerTick: pixelsPerTick,
@@ -96,24 +96,27 @@ class GridWidget extends StatelessWidget {
               ),
 
 
-
               // NOTES
               ...controller.notes.map(
 
-                    (note) => NoteBlockWidget(
+                    (note) =>
+                    NoteBlockWidget(
 
-                  key: ValueKey(note.id),
-                  note: note,
-                  pixelsPerTick: pixelsPerTick,
-                  cellHeight: cellHeight,
-                  controller: controller,
-                ),
+                      key: ValueKey(note.id),
+                      note: note,
+                      pixelsPerTick: pixelsPerTick,
+                      cellHeight: cellHeight,
+                      controller: controller,
+                    ),
               ),
             ],
           ),
         ),
       ),
     );
+  }
+  );
+
   }
 }
 
