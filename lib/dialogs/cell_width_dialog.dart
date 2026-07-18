@@ -16,6 +16,8 @@ void cellWidthDialog(
         builder: (context, _) {
 
           return AlertDialog(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.white,
 
             title: const Text(
               "Cell Width",

@@ -4,8 +4,8 @@ import '../controllers/composition_controller.dart';
 
 import '../dialogs/cell_width_dialog.dart';
 import '../dialogs/create_composition_dialog.dart';
-import '../dialogs/duration_dialog.dart';
-import '../dialogs/append_measures_dialog.dart';
+import '../dialogs/global_duration_dialog.dart';
+import '../dialogs/measures_dialog.dart';
 
 import '../dialogs/message_dialog.dart';
 import '../enums/hand.dart';
@@ -96,7 +96,7 @@ class CompositionScreen extends StatelessWidget {
 
               Container(
                 width: 70,
-                color: Colors.grey.shade900,
+                color: Colors.grey.shade300,
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
@@ -106,7 +106,7 @@ class CompositionScreen extends StatelessWidget {
                       IconButton(
                         icon: const Icon(
                           Icons.home,
-                          color: Colors.white,
+                          color: Colors.black,
                         ),
                         tooltip: 'Home',
                         onPressed: () {
@@ -118,7 +118,7 @@ class CompositionScreen extends StatelessWidget {
                       IconButton(
                         icon: const Icon(
                           Icons.note_add,
-                          color: Colors.white,
+                          color: Colors.black,
                         ),
                         tooltip: 'New Composition',
                         onPressed: () {
@@ -130,7 +130,7 @@ class CompositionScreen extends StatelessWidget {
                       IconButton(
                         icon: const Icon(
                           Icons.playlist_add,
-                          color: Colors.white,
+                          color: Colors.black,
                         ),
                         tooltip: 'Add Measures',
                         onPressed: () {
@@ -147,7 +147,7 @@ class CompositionScreen extends StatelessWidget {
                       IconButton(
                         icon: const Icon(
                           Icons.arrow_upward,
-                          color: Colors.white,
+                          color: Colors.black,
                         ),
                         tooltip: 'Raise scales',
                         onPressed:
@@ -159,7 +159,7 @@ class CompositionScreen extends StatelessWidget {
                       IconButton(
                         icon: const Icon(
                           Icons.arrow_downward,
-                          color: Colors.white,
+                          color: Colors.black,
                         ),
                         tooltip: 'Lower scales',
                         onPressed:
@@ -171,11 +171,11 @@ class CompositionScreen extends StatelessWidget {
                       IconButton(
                         icon: const Icon(
                           Icons.av_timer,
-                          color: Colors.white,
+                          color: Colors.black,
                         ),
                         tooltip: 'Note Duration',
                         onPressed: () {
-                          showDurationDialog(
+                          globalDurationDialog(
                             context,
                             controller,
                           );
@@ -188,7 +188,7 @@ class CompositionScreen extends StatelessWidget {
                         icon: Icon(
                           Icons.pan_tool,
                           color:  controller.currentHand == Hand.right
-                              ? Colors.white
+                              ? Colors.black
                               : Colors.blue,
                         ),
                         tooltip: 'Hand',
@@ -206,7 +206,7 @@ class CompositionScreen extends StatelessWidget {
                       IconButton(
                         icon: const Icon(
                           Icons.grid_on,
-                          color: Colors.white,
+                          color: Colors.black,
                         ),
                         tooltip: 'Cell Width',
                         onPressed: () {
@@ -228,7 +228,7 @@ class CompositionScreen extends StatelessWidget {
                             color:
                             controller.pasteMode
                                 ? Colors.blue
-                                : Colors.white,
+                                : Colors.black,
                           ),
                           tooltip: 'Paste',
                           onPressed: () {
@@ -277,7 +277,7 @@ class CompositionScreen extends StatelessWidget {
                       IconButton(
                         icon: const Icon(
                           Icons.zoom_in,
-                          color: Colors.white,
+                          color: Colors.black,
                         ),
                         tooltip: 'Zoom In',
                         onPressed: () {
@@ -293,7 +293,7 @@ class CompositionScreen extends StatelessWidget {
                       IconButton(
                         icon: const Icon(
                           Icons.zoom_out,
-                          color: Colors.white,
+                          color: Colors.black,
                         ),
                         tooltip: 'Zoom Out',
                         onPressed: () {
@@ -308,7 +308,7 @@ class CompositionScreen extends StatelessWidget {
                       IconButton(
                         icon: const Icon(
                           Icons.center_focus_strong,
-                          color: Colors.white,
+                          color: Colors.black,
                         ),
                         tooltip: 'Reset Zoom',
                         onPressed:
@@ -332,9 +332,22 @@ class CompositionScreen extends StatelessWidget {
                 child: !hasMeasures
                     ? Center(
                   child: ElevatedButton.icon(
-                    icon: const Icon(Icons.add),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey.shade300,
+                      foregroundColor: Colors.black,
+                    ),
+                    icon: const Icon(
+                      Icons.playlist_add,
+                      size: 22,
+                      // color: Colors.black,
+                    ),
                     label: const Text(
                       'Add Measures',
+                      style: TextStyle(
+                        fontSize: 22,
+                        // color: Colors.black,
+                        // fontWeight: FontWeight.bold,
+                      ),
                     ),
                     onPressed: () {
                       _openAppendMeasuresForm(context);

@@ -8,6 +8,7 @@ import '../models/time_signature.dart';
 
 import '../enums/note_duration.dart';
 
+import '../utils/defaultValues.dart';
 import 'note_values_dialog.dart';
 
 
@@ -31,15 +32,19 @@ class AppendMeasuresDialog extends StatefulWidget {
       _AppendMeasuresDialogState();
 }
 
-class _AppendMeasuresDialogState
-    extends State<AppendMeasuresDialog> {
+class _AppendMeasuresDialogState extends State<AppendMeasuresDialog> {
 
   final _formKey = GlobalKey<FormState>();
-  final _measuresController = TextEditingController(text: '1');
-  int _beatsPerMeasure = 4;
-  NoteDuration _selectedBeatUnit =  NoteDuration.quarter;
-  late String _selectedScale;
 
+  final _measuresController = TextEditingController(
+      text: CompositionDefaults.numberOfMeasures
+  );
+
+  int _beatsPerMeasure = CompositionDefaults.beatsPerMeasure;
+
+  NoteDuration _selectedBeatUnit = CompositionDefaults.duration;
+
+  late String _selectedScale;
 
   @override
   void initState() {
@@ -48,7 +53,7 @@ class _AppendMeasuresDialogState
     if(widget.controller.measures.isNotEmpty){
       _selectedScale =  widget.controller.measures.last.scaleName;
     } else {
-      _selectedScale = 'major C';
+      _selectedScale = CompositionDefaults.scale;
     }
   }
 
@@ -114,15 +119,19 @@ class _AppendMeasuresDialogState
 
   @override
   Widget build(BuildContext context) {
+
     final parts = _selectedScale.split(' ');
     final scaleDisplayLabel = parts.length == 2
         ? '${parts[1]} ${parts[0]}'
         : parts.length > 2
           ? '${parts.sublist(1).join(' ')} ${parts[0]}'
           : _selectedScale;
+
     return SafeArea(
       child: AlertDialog(
+        backgroundColor: Colors.white,
         alignment: Alignment.topCenter,
+
         insetPadding: const EdgeInsets.symmetric(
             horizontal: 32,
             vertical: 12
@@ -173,8 +182,7 @@ class _AppendMeasuresDialogState
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Column(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
                         'Time Signature',
@@ -206,7 +214,7 @@ class _AppendMeasuresDialogState
                                   .toList(),
                               onChanged: (value){
                                 setState((){
-                                  _beatsPerMeasure = value ?? 4;
+                                  _beatsPerMeasure = value ?? 3;
                                 });
                               },
                             ),

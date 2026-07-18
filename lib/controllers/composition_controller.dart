@@ -70,8 +70,6 @@ class CompositionController extends ChangeNotifier {
     return duration.label;
   }
 
-
-
   // =====================================================
   // TIMELINE
   // =====================================================
@@ -768,7 +766,7 @@ class CompositionController extends ChangeNotifier {
     if(copiedNote == null) {
       return;
     }
-    final newNote =copiedNote!.copyWith(
+    final newNote = copiedNote!.copyWith(
       id: generateNoteId(),
       startTick: snapTick(tick),
       row: row,
@@ -787,7 +785,7 @@ class CompositionController extends ChangeNotifier {
       return;
     }
     notes.add(newNote);
-    pasteMode = false;
+    // pasteMode = false;
     notifyListeners();
   }
 

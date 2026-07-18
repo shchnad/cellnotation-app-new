@@ -12,6 +12,9 @@ Future<void> scaleDialog({
     context: context,
     builder: (_) {
       return AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+
         title: const Text(
           "Select Scale",
           textAlign: TextAlign.center,
@@ -48,14 +51,13 @@ Future<void> scaleDialog({
                       .where((scale) => scale.startsWith("major"))
                       .map(
                         (scale) => ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                        scale == currentScale
-                            ? Colors.black
-                            : Colors.blue,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                      ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.grey.shade300,
+                            foregroundColor: scale == currentScale
+                                ? Colors.blue
+                                : Colors.black,
+                            elevation: 0,
+                          ),
                       onPressed: () {
                         onSelected(scale);
                         Navigator.pop(context);
@@ -99,11 +101,10 @@ Future<void> scaleDialog({
                       .map(
                         (scale) => ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                        scale == currentScale
-                            ? Colors.black
-                            : Colors.blue,
-                        foregroundColor: Colors.white,
+                        backgroundColor: Colors.grey.shade300,
+                        foregroundColor: scale == currentScale
+                            ? Colors.blue
+                            : Colors.black,
                         elevation: 0,
                       ),
                       onPressed: () {

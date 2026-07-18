@@ -37,6 +37,8 @@ class NoteDialog extends StatelessWidget {
             '${measure.timeSignature.beats} * '
             '${measure.timeSignature.beatDuration.label}';
         return AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.white,
           contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
           title: Text(
             textAlign: TextAlign.center,
@@ -82,7 +84,7 @@ class NoteDialog extends StatelessWidget {
                   ],
                 ),
 
-                const Divider(height: 8, thickness: 0.5),
+                // const Divider(height: 8, thickness: 0.5),
 
                 Row(
                   children: [
@@ -94,7 +96,7 @@ class NoteDialog extends StatelessWidget {
                   ],
                 ),
 
-                const Divider(height: 8, thickness: 0.5),
+                // const Divider(height: 8, thickness: 0.5),
 
                 Row(
                   children: [
@@ -127,7 +129,7 @@ class NoteDialog extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Align(
-                            alignment: Alignment.centerRight,
+                            alignment: Alignment.centerLeft,
                             child: Text(
                               '${controller.getNotePitchName(editedNote)}  ',
                               style: TextStyle(
@@ -138,37 +140,40 @@ class NoteDialog extends StatelessWidget {
                             ),
                           ),
                         ),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: Colors.blue,
-                          ),
-                          onPressed: () {
-                            noteValuesDialog<Accidental>(
-                              context: context,
-                              currentValue: editedNote.accidental,
-                              title: 'Accidental',
-                              values: Accidental.values,
-                              numberOfColumns: 2,
-                              // labelBuilder: (a) => a.label,
-                              // labelBuilder: (a) => a.sign,
-                              labelBuilder: (a) => '${a.label} (${a.sign})',
-                              onSelected: (accidental) {
-                                controller.setNoteAccidental(
-                                  editedNote,
-                                  accidental,
-                                );
-                              },
-                              onClear: () {
-                                controller.setNoteAccidental(editedNote, null);
-                              },
-                            );
-                          },
-                          child: Text(
-                            editedNote.accidental?.sign ?? 'no accidental',
-                            style: const TextStyle(
-                              fontSize: 22,
-                              color: Colors.blue,
+                        SizedBox(
+                          width: 250,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.grey.shade300,
+                              foregroundColor: Colors.blue,
+                            ),
+                            onPressed: () {
+                              noteValuesDialog<Accidental>(
+                                context: context,
+                                currentValue: editedNote.accidental,
+                                title: 'Accidental',
+                                values: Accidental.values,
+                                numberOfColumns: 2,
+                                labelBuilder: (a) => a.label,
+                                // labelBuilder: (a) => a.sign,
+                                // labelBuilder: (a) => '${a.label} (${a.sign})',
+                                onSelected: (accidental) {
+                                  controller.setNoteAccidental(
+                                    editedNote,
+                                    accidental,
+                                  );
+                                },
+                                onClear: () {
+                                  controller.setNoteAccidental(editedNote, null);
+                                },
+                              );
+                            },
+                            child: Text(
+                              editedNote.accidental?.sign ?? ' ',
+                              style: const TextStyle(
+                                fontSize: 22,
+                                color: Colors.blue,
+                              ),
                             ),
                           ),
                         ),
@@ -190,7 +195,7 @@ class NoteDialog extends StatelessWidget {
                       currentValue: duration,
                       title: 'Duration',
                       values: NoteDuration.values,
-                      numberOfColumns: 2,
+                      numberOfColumns: 3,
                       labelBuilder: (d) => d.label,
                       onSelected: (d) {
                         controller.setNoteDuration(editedNote, d);
@@ -321,7 +326,10 @@ class NoteDialog extends StatelessWidget {
                     },
                     child: const Text(
                       'Delete',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -372,6 +380,7 @@ class NoteDialog extends StatelessWidget {
     );
   }
 
+
   Widget _editButton(String title, String value, VoidCallback onTap) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
@@ -385,24 +394,29 @@ class NoteDialog extends StatelessWidget {
                 color: Colors.black,
             ),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: Colors.blue,
-          ),
-            onPressed: onTap,
-            child: Text(
-              value,
-              style: const TextStyle(
+          SizedBox(
+            width: 250,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.grey.shade300,
+                foregroundColor: Colors.blue,
+            ),
+              onPressed: onTap,
+              child: Text(
+                value,
+                style: const TextStyle(
                   fontSize: 22,
-              ),
+                  // fontWeight: FontWeight.bold,
+                ),
 
+              ),
             ),
           ),
         ],
       ),
     );
   }
+
 
   Widget _octaveInfo(String title, String value, String subLabel) {
     return Padding(

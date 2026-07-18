@@ -3,7 +3,7 @@ import '../controllers/composition_controller.dart';
 import '../enums/note_duration.dart';
 
 
-void showDurationDialog(
+void globalDurationDialog(
     BuildContext context,
     CompositionController controller,
     ) {
@@ -11,6 +11,8 @@ void showDurationDialog(
     context: context,
     builder: (_) {
       return AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
         title: const Text(
            'Select Duration',
            textAlign: TextAlign.center,
@@ -33,12 +35,12 @@ void showDurationDialog(
 
               return ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: selected ? Colors.blue : null,
+                  backgroundColor: Colors.grey.shade300,
                   minimumSize: const Size(130, 48),
-                  shape: RoundedRectangleBorder(
-                    borderRadius:
-                    BorderRadius.circular(8),
-                  ),
+                  // shape: RoundedRectangleBorder(
+                  //   borderRadius:
+                  //   BorderRadius.circular(8),
+                  // ),
                 ),
                 onPressed: () {
                   controller.setDuration(d);
@@ -48,8 +50,10 @@ void showDurationDialog(
                   d.label,
                   style: TextStyle(
                     fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: selected ? Colors.white : Colors.blue,
+                    // fontWeight: FontWeight.bold,
+                    color: selected
+                        ? Colors.blue
+                        : Colors.black,
                   ),
                 ),
               );

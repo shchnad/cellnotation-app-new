@@ -72,6 +72,8 @@ void noteValuesDialog<T>({
   showDialog(
     context: context,
     builder: (_) => AlertDialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.white,
       title: Text(
         title,
         textAlign: TextAlign.center,
@@ -105,9 +107,7 @@ Widget _button(
     ) {
   return ElevatedButton(
     style: ElevatedButton.styleFrom(
-      backgroundColor: selected
-          ? Colors.blue
-          : Colors.white,
+      backgroundColor: Colors.grey.shade300,
           // : null,
       minimumSize: Size(width, 55),
       // shape: RoundedRectangleBorder(
@@ -120,11 +120,11 @@ Widget _button(
       text,
       textAlign: TextAlign.center,
       style: TextStyle(
-        color: selected
-            ? Colors.white
-            : Colors.blue,
+        color:  selected
+            ? Colors.blue
+            : Colors.black,
         fontSize: 22,
-        fontWeight: FontWeight.bold,
+        // fontWeight: FontWeight.bold,
       ),
     ),
   );
