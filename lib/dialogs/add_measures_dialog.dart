@@ -8,19 +8,19 @@ import '../models/time_signature.dart';
 
 import '../enums/note_duration.dart';
 
-import '../utils/defaultValues.dart';
+import '../utils/default_values.dart';
 import 'note_values_dialog.dart';
 
 
 
-class AppendMeasuresDialog extends StatefulWidget {
+class AddMeasuresDialog extends StatefulWidget {
 
   final Composition targetComposition;
   final CompositionController controller;
   final VoidCallback onMeasuresAppended;
 
 
-  const AppendMeasuresDialog({
+  const AddMeasuresDialog({
     super.key,
     required this.targetComposition,
     required this.controller,
@@ -28,21 +28,21 @@ class AppendMeasuresDialog extends StatefulWidget {
   });
 
   @override
-  State<AppendMeasuresDialog> createState() =>
-      _AppendMeasuresDialogState();
+  State<AddMeasuresDialog> createState() =>
+      _AddMeasuresDialogState();
 }
 
-class _AppendMeasuresDialogState extends State<AppendMeasuresDialog> {
+class _AddMeasuresDialogState extends State<AddMeasuresDialog> {
 
   final _formKey = GlobalKey<FormState>();
 
   final _measuresController = TextEditingController(
-      text: CompositionDefaults.numberOfMeasures
+      text: DefaultValues.numberOfMeasures
   );
 
-  int _beatsPerMeasure = CompositionDefaults.beatsPerMeasure;
+  int _beatsPerMeasure = DefaultValues.beatsPerMeasure;
 
-  NoteDuration _selectedBeatUnit = CompositionDefaults.duration;
+  NoteDuration _selectedBeatUnit = DefaultValues.duration;
 
   late String _selectedScale;
 
@@ -53,7 +53,7 @@ class _AppendMeasuresDialogState extends State<AppendMeasuresDialog> {
     if(widget.controller.measures.isNotEmpty){
       _selectedScale =  widget.controller.measures.last.scaleName;
     } else {
-      _selectedScale = CompositionDefaults.scale;
+      _selectedScale = DefaultValues.scale;
     }
   }
 
@@ -62,6 +62,8 @@ class _AppendMeasuresDialogState extends State<AppendMeasuresDialog> {
     _measuresController.dispose();
     super.dispose();
   }
+
+
 
 
   Widget _buildSelectionField({
@@ -117,6 +119,7 @@ class _AppendMeasuresDialogState extends State<AppendMeasuresDialog> {
   }
 
 
+
   @override
   Widget build(BuildContext context) {
 
@@ -129,13 +132,15 @@ class _AppendMeasuresDialogState extends State<AppendMeasuresDialog> {
 
     return SafeArea(
       child: AlertDialog(
+        contentPadding: const EdgeInsets.fromLTRB(
+          DefaultValues.dialogPaddingRightLeft,
+          DefaultValues.dialogPaddingBottomTop,
+          DefaultValues.dialogPaddingRightLeft,
+          DefaultValues.dialogPaddingBottomTop,
+        ),
+        // actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
         backgroundColor: Colors.white,
         alignment: Alignment.topCenter,
-
-        insetPadding: const EdgeInsets.symmetric(
-            horizontal: 32,
-            vertical: 12
-        ),
         title: const Text(
           'Configure Measures',
           textAlign: TextAlign.center,
@@ -145,7 +150,7 @@ class _AppendMeasuresDialogState extends State<AppendMeasuresDialog> {
           ),
         ),
         content: SizedBox(
-          width: MediaQuery.of(context).size.width * .5,
+          width: MediaQuery.of(context).size.width * .35,
           child: Form(
             key: _formKey,
             child: Column(
@@ -173,8 +178,8 @@ class _AppendMeasuresDialogState extends State<AppendMeasuresDialog> {
                 const SizedBox(
                     height: 12
                 ),
+
                 Container(
-                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     border: Border.all(
                         color: Colors.grey.shade400
@@ -190,9 +195,11 @@ class _AppendMeasuresDialogState extends State<AppendMeasuresDialog> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+
                       const SizedBox(
                           height: 8
                       ),
+
                       Row(
                         children: [
                           Expanded(
@@ -214,14 +221,14 @@ class _AppendMeasuresDialogState extends State<AppendMeasuresDialog> {
                                   .toList(),
                               onChanged: (value){
                                 setState((){
-                                  _beatsPerMeasure = value ?? 3;
+                                  _beatsPerMeasure = value ?? DefaultValues.beatsPerMeasure;
                                 });
                               },
                             ),
                           ),
                           const Padding(
                             padding: EdgeInsets.symmetric(
-                                horizontal: 8
+                                horizontal: 5
                             ),
                             child: Text(
                               '*',
@@ -298,49 +305,55 @@ class _AppendMeasuresDialogState extends State<AppendMeasuresDialog> {
         actions: [
           Row(
             children: [
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                ),
-                onPressed:
-                    ()=>Navigator.pop(context),
-                child: const Text(
-                    'Cancel',
-                  style: TextStyle(fontSize: 22),
+              SizedBox(
+                width: DefaultValues.widthOfElevatedButton,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                  ),
+                  onPressed:
+                      ()=>Navigator.pop(context),
+                  child: const Text(
+                      'Cancel',
+                    style: TextStyle(fontSize: 22),
+                  ),
                 ),
               ),
               const Spacer(),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                ),
-                onPressed: (){
-                  if(!_formKey.currentState!
-                      .validate()){
-                    return;
-                  }
-                  final count = int.parse(
-                      _measuresController.text
-                  );
-                  for(int i=0;i<count;i++){
-                    widget.controller.addMeasure(
-                      TimeSignature(
-                        beats: _beatsPerMeasure,
-                        beatDuration: _selectedBeatUnit,
-                      ),
-                      _selectedScale,
+              SizedBox(
+                width: DefaultValues.widthOfElevatedButton,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                  ),
+                  onPressed: (){
+                    if(!_formKey.currentState!
+                        .validate()){
+                      return;
+                    }
+                    final count = int.parse(
+                        _measuresController.text
                     );
-                  }
-                  widget.onMeasuresAppended();
-                  Navigator.pop(context);
-                },
-                child: const Text(
-                  'Generate',
-                  style: TextStyle(fontSize: 22),
+                    for(int i=0;i<count;i++){
+                      widget.controller.addMeasure(
+                        TimeSignature(
+                          beats: _beatsPerMeasure,
+                          beatDuration: _selectedBeatUnit,
+                        ),
+                        _selectedScale,
+                      );
+                    }
+                    widget.onMeasuresAppended();
+                    Navigator.pop(context);
+                  },
+                  child: const Text(
+                    'Generate',
+                    style: TextStyle(fontSize: 22),
+                  ),
                 ),
               ),
             ],

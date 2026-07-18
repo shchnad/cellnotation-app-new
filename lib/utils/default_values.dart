@@ -2,7 +2,7 @@ import '../enums/music_style.dart';
 import '../enums/instrument.dart';
 import '../enums/note_duration.dart';
 
-class CompositionDefaults {
+class DefaultValues {
 
   static const title = '';
   static const composer = '';
@@ -16,5 +16,13 @@ class CompositionDefaults {
   static const beatsPerMeasure = 4;
 
   static const numberOfMeasures = '1';
+
+  static const widthOfElevatedButton = 220.0;
+
+  static const widthBetweenWidgets = 20.0;
+  static const heightBetweenWidgets = 8.0;
+  static const dialogPaddingRightLeft = 25.0;
+  static const dialogPaddingBottomTop = 0.0;
+
 
 }

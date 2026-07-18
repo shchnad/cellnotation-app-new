@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../controllers/composition_controller.dart';
-import '../dialogs/measure_beat_dialog.dart';
+import '../dialogs/edit_measure_beat_dialog.dart';
 import '../dialogs/note_dialog.dart';
 import '../enums/articulation.dart';
 import '../enums/hand.dart';
@@ -129,7 +129,7 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
           ((rawTick - measure.startTick) ~/
               measure.timeSignature
                   .ticksPerBeat);
-          showMeasureBeatDialog(
+          editMeasureBeatDialog(
             context: context,
             controller: controller,
             measureIndex: measureIndex,

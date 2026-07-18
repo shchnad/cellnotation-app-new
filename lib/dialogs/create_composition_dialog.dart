@@ -5,9 +5,9 @@ import '../models/measure.dart';
 import '../models/note.dart';
 import '../enums/music_style.dart';
 import '../enums/instrument.dart';
-import '../utils/defaultValues.dart';
+import '../utils/default_values.dart';
 import 'note_values_dialog.dart';
-import '../controllers/composition_controller.dart';
+
 
 class CreateCompositionDialog extends StatefulWidget {
   final Function(Composition) onCompositionCreated;
@@ -20,11 +20,11 @@ class CreateCompositionDialog extends StatefulWidget {
 
 class _CreateCompositionDialogState extends State<CreateCompositionDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController(text: CompositionDefaults.title);
-  final _composerController = TextEditingController(text: CompositionDefaults.composer);
+  final _titleController = TextEditingController(text: DefaultValues.title);
+  final _composerController = TextEditingController(text: DefaultValues.composer);
 
-  MusicStyle _selectedStyle = CompositionDefaults.style;
-  Instrument _selectedInstrument = CompositionDefaults.instrument;
+  MusicStyle _selectedStyle = DefaultValues.style;
+  Instrument _selectedInstrument = DefaultValues.instrument;
 
   @override
   void dispose() {
@@ -109,7 +109,7 @@ class _CreateCompositionDialogState extends State<CreateCompositionDialog> {
                             ? 'Required'
                             : null,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 15),
                       TextFormField(
                         controller: _composerController,
                         decoration: const InputDecoration(
@@ -183,52 +183,58 @@ class _CreateCompositionDialogState extends State<CreateCompositionDialog> {
       actions: [
         Row(
           children: [
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
-                foregroundColor: Colors.white,
-                elevation: 0,
-              ),
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(
-                    fontSize: 22,
-                    fontWeight:
-                    FontWeight.bold,
-                    // color: Colors.black,
+            SizedBox(
+              width: DefaultValues.widthOfElevatedButton,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                ),
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(
+                      fontSize: 22,
+                      fontWeight:
+                      FontWeight.bold,
+                      // color: Colors.black,
+                  ),
                 ),
               ),
             ),
             const Spacer(),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                elevation: 0,
-              ),
-              onPressed: () {
-                if (!_formKey.currentState!.validate()) return;
-
-                final baseComposition = Composition(
-                  title: _titleController.text.trim(),
-                  composer: _composerController.text.trim(),
-                  style: _selectedStyle.label,
-                  instrument: _selectedInstrument.label,
-                  userId: 1,
-                  numberOfOctaves: 8,
-                  scaleName: 'major C',
-                  timeline: Timeline(measures: <Measure>[]),
-                  notes: <Note>[],
-                );
-                // Close the dialog first so it is cleared off the stack
-                Navigator.pop(context);
-                // ow pass the data and push the new screen forward safely
-                widget.onCompositionCreated(baseComposition);
-              },
-              child: const Text(
-                'Create',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            SizedBox(
+              width: DefaultValues.widthOfElevatedButton,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                ),
+                onPressed: () {
+                  if (!_formKey.currentState!.validate()) return;
+                  final baseComposition = Composition(
+                    title: _titleController.text.trim(),
+                    composer: _composerController.text.trim(),
+                    style: _selectedStyle.label,
+                    instrument: _selectedInstrument.label,
+                    userId: 1,
+                    numberOfOctaves: 8,
+                    scaleName: DefaultValues.scale,
+                    timeline: Timeline(measures: <Measure>[]),
+                    notes: <Note>[],
+                  );
+                  Navigator.pop(context);
+                  widget.onCompositionCreated(baseComposition);
+                },
+                child: const Text(
+                  'Create',
+                  style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ),
           ],

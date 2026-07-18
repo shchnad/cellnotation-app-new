@@ -5,7 +5,7 @@ import '../controllers/composition_controller.dart';
 import '../dialogs/cell_width_dialog.dart';
 import '../dialogs/create_composition_dialog.dart';
 import '../dialogs/global_duration_dialog.dart';
-import '../dialogs/measures_dialog.dart';
+import '../dialogs/add_measures_dialog.dart';
 
 import '../dialogs/message_dialog.dart';
 import '../enums/hand.dart';
@@ -29,7 +29,7 @@ class CompositionScreen extends StatelessWidget {
 
     showDialog(
       context: context,
-      builder: (context) => AppendMeasuresDialog(
+      builder: (context) => AddMeasuresDialog(
         targetComposition: controller.composition,
         controller: controller,
         onMeasuresAppended: () {},

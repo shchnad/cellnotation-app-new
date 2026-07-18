@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../controllers/composition_controller.dart';
 
 
-void showMeasureBeatDialog({
+void editMeasureBeatDialog({
   required BuildContext context,
   required CompositionController controller,
   required int measureIndex,
@@ -13,6 +13,8 @@ void showMeasureBeatDialog({
     context: context,
     builder: (_) {
       return AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
           // title: Center(
           //   child: Text(
           //     "Measure ${measureIndex + 1}   Beat ${beatIndex + 1}",
@@ -83,7 +85,7 @@ void showMeasureBeatDialog({
             ),
 
             ListTile(
-              leading: const Icon(Icons.music_video),
+              leading: const Icon(Icons.lock_clock),
               title: const Text(
                 "Tempo",
                 style: TextStyle(
@@ -158,7 +160,7 @@ void showMeasureBeatDialog({
             ),
 
             ListTile(
-              leading: const Icon(Icons.music_note),
+              leading: const Icon(Icons.campaign_outlined),
               title: const Text(
                 "Dynamic",
                 style: TextStyle(

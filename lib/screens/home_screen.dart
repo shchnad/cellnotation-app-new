@@ -13,8 +13,6 @@ class HomeScreen extends StatelessWidget {
       context: routingContext,
       builder: (_) => CreateCompositionDialog(
         onCompositionCreated: (newComposition) {
-          print("--- HOME SCREEN: Callback received! Starting navigation route ---");
-
           // The controller takes ownership of the composition model state
           final controller = CompositionController(composition: newComposition);
 
@@ -22,8 +20,7 @@ class HomeScreen extends StatelessWidget {
             routingContext,
             MaterialPageRoute(
               builder: (_) {
-                print("--- NAVIGATION: Building CompositionScreen instance ---");
-                // 💡 FIX: Removed the redundant 'composition:' argument matching the updated constructor
+                //  Removed the redundant 'composition:' argument matching the updated constructor
                 return CompositionScreen(
                   controller: controller,
                 );
@@ -59,9 +56,9 @@ class HomeScreen extends StatelessWidget {
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
                       minimumSize: const Size(220, 50),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                      // shape: RoundedRectangleBorder(
+                      //   borderRadius: BorderRadius.circular(8),
+                      // ),
                       elevation: 0,
                     ),
                     onPressed: () => _handleCreateComposition(buttonContext),
