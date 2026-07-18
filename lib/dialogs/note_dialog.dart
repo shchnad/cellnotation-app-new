@@ -15,18 +15,13 @@ class NoteDialog extends StatelessWidget {
   final Note note;
   final CompositionController controller;
 
-  const NoteDialog({
-    super.key,
-    required this.note,
-    required this.controller,
-  });
+  const NoteDialog({super.key, required this.note, required this.controller});
 
-  static const Size _buttonSize = Size(150, 44);
 
   // Safely query out of controller.composition.notes tracking repo
   Note get currentNote {
     return controller.composition.notes.firstWhere(
-          (n) => n.id == note.id,
+      (n) => n.id == note.id,
       orElse: () => note,
     );
   }
@@ -37,9 +32,7 @@ class NoteDialog extends StatelessWidget {
       animation: controller,
       builder: (context, _) {
         final editedNote = currentNote;
-        final measure = controller.getMeasureAtTick(
-          editedNote.startTick,
-        );
+        final measure = controller.getMeasureAtTick(editedNote.startTick);
         final timeSignature =
             '${measure.timeSignature.beats} * '
             '${measure.timeSignature.beatDuration.label}';
@@ -47,22 +40,22 @@ class NoteDialog extends StatelessWidget {
           contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
           title: Text(
             textAlign: TextAlign.center,
-            'Note ${note.id}',
-            // 'Note C${editedNote.startTick + 1} / R${editedNote.row + 1}',
+            // 'Note',
+            // 'Note ${note.id}',
+            // 'Note (tick ${editedNote.startTick + 1}, row ${editedNote.row + 1})',
+            'Note (T${editedNote.startTick + 1} / R${editedNote.row + 1})',
             style: const TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
-              color: Colors.blue,
+              color: Colors.black,
             ),
           ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-
                 Row(
                   children: [
-
                     Expanded(
                       child: _infoRow(
                         'Measure',
@@ -86,107 +79,118 @@ class NoteDialog extends StatelessWidget {
                         ),
                       ),
                     ),
-
                   ],
                 ),
-
-                const Divider(
-                  height: 8,
-                  thickness: 0.5,
-                ),
-
-                Row(
-                  children: [
-
-                    Expanded(
-                      child: _infoRow(
-                        'Scale',
-                        measure.scaleName,
-                      ),
-                    ),
-
-                    Expanded(
-                      child: _infoRow(
-                        'Time Signature',
-                        timeSignature,
-                      ),
-                    ),
-
-                  ],
-                ),
-
 
                 const Divider(height: 8, thickness: 0.5),
+
                 Row(
                   children: [
-                    // Expanded(
-                    //   child: _octaveInfo(
-                    //     'Octave',
-                    //     controller.getOctave(editedNote).toString(),
-                    //     controller.getOctaveName(
-                    //       controller.getOctave(editedNote),
-                    //     ),
-                    //   ),
-                    // ),
-                    const SizedBox(width: 50),
-                    Expanded(
-                      child: Align(
-                        alignment: Alignment.centerRight,
+                      Expanded(
                         child: _infoRow(
-                          'Pitch',
-                          controller.getNotePitchName(editedNote),
+                            'Time Signature',
+                            timeSignature,
+                        )),
+                  ],
+                ),
+
+                const Divider(height: 8, thickness: 0.5),
+
+                Row(
+                  children: [
+                    Expanded(
+                        child: _infoRow(
+                          'Scale',
+                          '${measure.scaleName} (${controller.getScaleAsTextArray(measure.scaleName)})',
+                        )),
+                  ],
+                ),
+
+                const Divider(height: 8, thickness: 0.5),
+
+                Column(
+                  // mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Pitch',
+                              style: TextStyle(
+                                  fontSize: 22,
+                                  ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: null,
-                        foregroundColor: Colors.blue,
-                        minimumSize: const Size(48, 36),
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              '${controller.getNotePitchName(editedNote)}  ',
+                              style: TextStyle(
+                                  fontSize: 22,
+                                  color: Colors.blue,
+                                  fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                      onPressed: () {
-                        noteValuesDialog<Accidental>(
-                          context: context,
-                          currentValue: editedNote.accidental,
-                          title: 'Accidental',
-                          values: Accidental.values,
-                          numberOfColumns: 4,
-                          labelBuilder: (a) => a.label,
-                          onSelected: (accidental) {
-                            controller.setNoteAccidental(editedNote, accidental);
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: Colors.blue,
+                          ),
+                          onPressed: () {
+                            noteValuesDialog<Accidental>(
+                              context: context,
+                              currentValue: editedNote.accidental,
+                              title: 'Accidental',
+                              values: Accidental.values,
+                              numberOfColumns: 2,
+                              // labelBuilder: (a) => a.label,
+                              // labelBuilder: (a) => a.sign,
+                              labelBuilder: (a) => '${a.label} (${a.sign})',
+                              onSelected: (accidental) {
+                                controller.setNoteAccidental(
+                                  editedNote,
+                                  accidental,
+                                );
+                              },
+                              onClear: () {
+                                controller.setNoteAccidental(editedNote, null);
+                              },
+                            );
                           },
-                          onClear: () {
-                            controller.setNoteAccidental(editedNote, null);
-                          },
-                        );
-                      },
-                      child: Text(
-                        editedNote.accidental?.sign ?? 'None',
-                        style: const TextStyle(fontSize: 22),
-                      ),
+                          child: Text(
+                            editedNote.accidental?.sign ?? 'no accidental',
+                            style: const TextStyle(
+                              fontSize: 22,
+                              color: Colors.blue,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-                const Divider(height: 8, thickness: 0.5),
+
                 _editButton(
                   'Duration',
                   controller.durationLabel(editedNote),
-                      () {
+                  () {
                     final duration = NoteDuration.values.firstWhere(
-                          (d) => d.ticks == editedNote.durationTicks,
+                      (d) => d.ticks == editedNote.durationTicks,
                       orElse: () => NoteDuration.quarter,
                     );
                     noteValuesDialog<NoteDuration>(
                       context: context,
                       currentValue: duration,
-                      title: 'Set Duration',
+                      title: 'Duration',
                       values: NoteDuration.values,
-                      numberOfColumns: 3,
+                      numberOfColumns: 2,
                       labelBuilder: (d) => d.label,
                       onSelected: (d) {
                         controller.setNoteDuration(editedNote, d);
@@ -194,31 +198,27 @@ class NoteDialog extends StatelessWidget {
                     );
                   },
                 ),
-                _editButton(
-                  'Hand',
-                  editedNote.hand.name,
-                      () {
-                    noteValuesDialog<Hand>(
-                      context: context,
-                      currentValue: editedNote.hand,
-                      title: 'Set Hand',
-                      values: Hand.values,
-                      numberOfColumns: 2,
-                      labelBuilder: (h) => h.name,
-                      onSelected: (hand) {
-                        controller.setNoteHand(editedNote, hand);
-                      },
-                    );
-                  },
-                ),
+                _editButton('Hand', editedNote.hand.name, () {
+                  noteValuesDialog<Hand>(
+                    context: context,
+                    currentValue: editedNote.hand,
+                    title: 'Hand',
+                    values: Hand.values,
+                    numberOfColumns: 2,
+                    labelBuilder: (h) => h.name,
+                    onSelected: (hand) {
+                      controller.setNoteHand(editedNote, hand);
+                    },
+                  );
+                }),
                 _editButton(
                   'Finger',
                   editedNote.finger?.value.toString() ?? 'none',
-                      () {
+                  () {
                     noteValuesDialog<Finger>(
                       context: context,
                       currentValue: editedNote.finger,
-                      title: 'Set Finger',
+                      title: 'Finger',
                       values: Finger.values,
                       numberOfColumns: 5,
                       labelBuilder: (f) => f.value.toString(),
@@ -233,17 +233,20 @@ class NoteDialog extends StatelessWidget {
                 ),
                 _editButton(
                   'Articulation',
-                  editedNote.articulation?.label ?? 'None',
-                      () {
+                  editedNote.articulation?.label ?? 'none',
+                  () {
                     noteValuesDialog<Articulation>(
                       context: context,
                       currentValue: editedNote.articulation,
-                      title: 'Set Articulation',
+                      title: 'Articulation',
                       values: Articulation.values,
-                      numberOfColumns: 3,
+                      numberOfColumns: 2,
                       labelBuilder: (o) => o.label,
                       onSelected: (articulation) {
-                        controller.setNoteArticulation(editedNote, articulation);
+                        controller.setNoteArticulation(
+                          editedNote,
+                          articulation,
+                        );
                       },
                       onClear: () {
                         controller.setNoteArticulation(editedNote, null);
@@ -253,12 +256,12 @@ class NoteDialog extends StatelessWidget {
                 ),
                 _editButton(
                   'Ornament',
-                  editedNote.ornament?.label ?? 'None',
-                      () {
+                  editedNote.ornament?.label ?? 'none',
+                  () {
                     noteValuesDialog<Ornament>(
                       context: context,
                       currentValue: editedNote.ornament,
-                      title: 'Set Ornament',
+                      title: 'Ornament',
                       values: Ornament.values,
                       numberOfColumns: 2,
                       labelBuilder: (o) => o.label,
@@ -272,18 +275,21 @@ class NoteDialog extends StatelessWidget {
                   },
                 ),
                 _editButton(
-                  'Technique',
-                  editedNote.playingTechnique?.label ?? 'None',
-                      () {
+                  'Playing Technique',
+                  editedNote.playingTechnique?.label ?? 'none',
+                  () {
                     noteValuesDialog<PlayingTechnique>(
                       context: context,
                       currentValue: editedNote.playingTechnique,
-                      title: 'Set Technique',
+                      title: 'Playing Technique',
                       values: PlayingTechnique.values,
                       numberOfColumns: 3,
                       labelBuilder: (t) => t.label,
                       onSelected: (technique) {
-                        controller.setNotePlayingTechnique(editedNote, technique);
+                        controller.setNotePlayingTechnique(
+                          editedNote,
+                          technique,
+                        );
                       },
                       onClear: () {
                         controller.setNotePlayingTechnique(editedNote, null);
@@ -291,45 +297,56 @@ class NoteDialog extends StatelessWidget {
                     );
                   },
                 ),
+                SizedBox(width: 20),
               ],
             ),
           ),
           actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           actions: [
 
-            TextButton(
-              onPressed: () {
-                controller.removeNote(editedNote);
-                Navigator.pop(context);
-              },
-
-              child: const Text(
-                'Delete',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.red,
+            SizedBox(height: 20,),
+            Row(
+              children: [
+                Align(
+                  alignment: Alignment.bottomLeft,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                    ),
+                    onPressed: () {
+                      controller.removeNote(editedNote);
+                      Navigator.pop(context);
+                    },
+                    child: const Text(
+                      'Delete',
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    ),
+                  ),
                 ),
-              ),
-
+                const Spacer(),
+                Align(
+                  alignment: Alignment.bottomRight,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                    ),
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    child: const Text(
+                      'Close',
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
             ),
 
-            const Spacer(),
-
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text(
-                'Close',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-            ),
-
+            SizedBox(height: 8,),
           ],
         );
       },
@@ -341,10 +358,7 @@ class NoteDialog extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
-          Text(
-            '$title ',
-            style: const TextStyle(fontSize: 22),
-          ),
+          Text('$title ', style: const TextStyle(fontSize: 22)),
           Text(
             value,
             style: const TextStyle(
@@ -365,26 +379,24 @@ class NoteDialog extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            '$title: ',
+            '$title ',
             style: const TextStyle(
-              fontSize: 22,
-              color: Colors.black,
+                fontSize: 22,
+                color: Colors.black,
             ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: null,
+              backgroundColor: Colors.white,
               foregroundColor: Colors.blue,
-              fixedSize: _buttonSize,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
+          ),
             onPressed: onTap,
             child: Text(
               value,
-              style: const TextStyle(fontSize: 22),
+              style: const TextStyle(
+                  fontSize: 22,
+              ),
+
             ),
           ),
         ],
@@ -401,27 +413,16 @@ class NoteDialog extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(
-                '$title: ',
-                style: const TextStyle(fontSize: 22),
-              ),
+              Text('$title ', style: const TextStyle(fontSize: 22)),
               Text(
                 value,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
+                style: const TextStyle(fontSize: 22, color: Colors.black),
               ),
             ],
           ),
           Text(
-            subLabel.toLowerCase(),
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.black,
-              fontWeight: FontWeight.bold,
-            ),
+            ' ${subLabel.toLowerCase()}',
+            style: const TextStyle(fontSize: 12, color: Colors.black),
           ),
         ],
       ),

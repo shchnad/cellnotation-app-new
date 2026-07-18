@@ -10,12 +10,9 @@ void noteValuesDialog<T>({
   required int numberOfColumns,
   VoidCallback? onClear,
 }) {
-
   const fontSize = 22.0;
   const spacing = 8.0;
-
   final screenWidth = MediaQuery.of(context).size.width;
-
   double textWidth(String text) {
     final painter = TextPainter(
       text: TextSpan(
@@ -26,15 +23,13 @@ void noteValuesDialog<T>({
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-
-    return painter.width;
+        return painter.width;
   }
 
   final maxWidth = [
     ...values.map((v) => textWidth(labelBuilder(v))),
-    if (onClear != null) textWidth('None'),
+    if (onClear != null) textWidth('none'),
   ].reduce((a, b) => a > b ? a : b);
-
 
   final buttonWidth = maxWidth + 40;
 
@@ -45,13 +40,10 @@ void noteValuesDialog<T>({
       .toDouble() // <-- Add this right here
       .clamp(0.0, screenWidth * 0.8));
 
-
   final buttons = [
-
     ...values.map(
           (value) {
         final selected = value == currentValue;
-
         return _button(
           labelBuilder(value),
           selected,
@@ -62,13 +54,10 @@ void noteValuesDialog<T>({
           },
         );
       },
-
     ),
-
     if (onClear != null)
-
       _button(
-        'None',
+        'none',
         currentValue == null,
         buttonWidth,
         () {
@@ -78,7 +67,6 @@ void noteValuesDialog<T>({
       ),
 
   ];
-
 
 
   showDialog(
@@ -93,7 +81,6 @@ void noteValuesDialog<T>({
             color: Colors.black,
         ),
       ),
-
       content: SizedBox(
         width: dialogWidth,
         child: GridView.count(
@@ -110,41 +97,37 @@ void noteValuesDialog<T>({
 }
 
 
-
 Widget _button(
     String text,
     bool selected,
     double width,
     VoidCallback onPressed,
     ) {
-
   return ElevatedButton(
-
     style: ElevatedButton.styleFrom(
-      backgroundColor:
-      selected ? Colors.blue : null,
-
-      minimumSize:
-      Size(width, 55),
-
-      shape:
-      RoundedRectangleBorder(
-        borderRadius:
-        BorderRadius.circular(8),
-      ),
+      backgroundColor: selected
+          ? Colors.blue
+          : Colors.white,
+          // : null,
+      minimumSize: Size(width, 55),
+      // shape: RoundedRectangleBorder(
+      //   borderRadius:
+      //   BorderRadius.circular(8),
+      // ),
     ),
-
     onPressed: onPressed,
-
     child: Text(
       text,
       textAlign: TextAlign.center,
       style: TextStyle(
-        color: selected ? Colors.white : Colors.blue,
+        color: selected
+            ? Colors.white
+            : Colors.blue,
         fontSize: 22,
         fontWeight: FontWeight.bold,
       ),
     ),
-
   );
+
+
 }

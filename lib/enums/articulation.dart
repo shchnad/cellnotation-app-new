@@ -1,11 +1,11 @@
 enum Articulation {
-  staccato('Staccato'),
-  tenuto('Tenuto'),
-  legato('Legato'),
-  marcato('Marcato'),
-  accent('Accent'),
-  sforzando('Sforzando'),
-  fermata('Fermata');
+  staccato('staccato'),
+  tenuto('tenuto'),
+  legato('legato'),
+  marcato('marcato'),
+  accent('accent'),
+  sforzando('sforzando'),
+  fermata('fermata');
 
   final String label;
   const Articulation(this.label);

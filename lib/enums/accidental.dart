@@ -1,8 +1,8 @@
 enum Accidental {
-  sharp('Sharp', '+'),
-  flat('Flat','-'),
-  doubleSharp('Double Sharp', '++'),
-  doubleFlat('Double Flat', '--');
+  sharp('sharp', '+'),
+  flat('flat','-'),
+  doubleSharp('double sharp', '++'),
+  doubleFlat('double flat', '--');
 
   final String label;
   final String sign;

@@ -51,7 +51,7 @@ class _ScaleDialogState extends State<ScaleDialog> {
     final currentMeasureNumber = widget.controller.selectedMeasureIndex + 1;
     return AlertDialog(
       title: Text(
-        'Set Scale for Measure $currentMeasureNumber',
+        'Set Scale $currentMeasureNumber',
         textAlign: TextAlign.center,
         style: const TextStyle(
           fontWeight: FontWeight.bold,

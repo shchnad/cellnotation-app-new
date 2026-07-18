@@ -1,13 +1,13 @@
 enum Ornament {
-  mordent('Mordent'),
-  invertedMordent('Inverted Mordent'),
-  turn('Turn'),
-  invertedTurn('Inverted Turn'),
-  trill('Trill'),
-  tremolo('Tremolo'),
-  tuplet3('Tuplet 3'),
-  tupletFive('Tuplet 5'),
-  graceNote('Grace Note');
+  mordent('mordent'),
+  invertedMordent('inverted mordent'),
+  turn('turn'),
+  invertedTurn('inverted turn'),
+  trill('trill'),
+  tremolo('tremolo'),
+  tuplet3('tuplet 3'),
+  tupletFive('tuplet 5'),
+  graceNote('grace note');
 
   final String label;
   const Ornament(this.label);

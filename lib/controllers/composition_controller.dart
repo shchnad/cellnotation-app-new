@@ -71,6 +71,7 @@ class CompositionController extends ChangeNotifier {
   }
 
 
+
   // =====================================================
   // TIMELINE
   // =====================================================
@@ -443,6 +444,32 @@ class CompositionController extends ChangeNotifier {
     notifyListeners();
   }
 
+  int getDegree(Note note) {
+    return note.row % 7 + 1;
+  }
+
+  String getDegreeLabel(Note note) {
+    switch (getDegree(note)) {
+      case 1:
+        return 'C';
+      case 2:
+        return 'D';
+      case 3:
+        return 'E';
+      case 4:
+        return 'F';
+      case 5:
+        return 'G';
+      case 6:
+        return 'A';
+      case 7:
+        return 'B';
+      default:
+        return '';
+    }
+  }
+
+
   int getOctave(Note note) {
     return 7 - (note.row ~/ 7);
   }
@@ -701,6 +728,12 @@ class CompositionController extends ChangeNotifier {
     'minor B flat',
     'minor B',
   ];
+
+  String getScaleAsTextArray(String scale) {
+    List<String> scaleArray = ScaleResolver.getScale(scale);
+    return scaleArray.join(' ');
+  }
+
 
   void raiseAllScales(){
     for(int i = 0; i < measures.length; i++){

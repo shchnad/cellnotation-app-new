@@ -142,17 +142,17 @@ class _AppendMeasuresDialogState
               mainAxisSize: MainAxisSize.min,
               children: [
                 _buildSelectionField(
-                  label: 'Scale Key',
+                  label: 'Scale',
                   valueText: scaleDisplayLabel,
                   icon: Icons.music_note,
                   onTap: (){
                     noteValuesDialog<String>(
                       context: context,
-                      title:'Select Scale Key',
+                      title:'Select Scale',
                       currentValue: _selectedScale,
                       values: widget.controller.availableScales,
                       labelBuilder:(scale)=>scale,
-                      numberOfColumns: 2,
+                      numberOfColumns: 4,
                       onSelected: (scale){
                         setState((){
                           _selectedScale = scale;
@@ -179,8 +179,7 @@ class _AppendMeasuresDialogState
                       const Text(
                         'Time Signature',
                         style: TextStyle(
-                          fontWeight:
-                          FontWeight.bold,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(
@@ -196,6 +195,11 @@ class _AppendMeasuresDialogState
                                         value: b,
                                         child: Text(
                                           '$b',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.blue,
+                                            fontSize: 22,
+                                          ),
                                         ),
                                       )
                               )
@@ -212,7 +216,7 @@ class _AppendMeasuresDialogState
                                 horizontal: 8
                             ),
                             child: Text(
-                              '/',
+                              '*',
                               style: TextStyle(
                                   fontSize: 22
                               ),
@@ -243,8 +247,9 @@ class _AppendMeasuresDialogState
                                 child: Text(
                                   _selectedBeatUnit.label,
                                   style: const TextStyle(
-                                    color: Colors.blue,
                                     fontWeight: FontWeight.bold,
+                                    color: Colors.blue,
+                                    fontSize: 22,
                                   ),
                                 ),
                               ),
@@ -260,6 +265,11 @@ class _AppendMeasuresDialogState
                 ),
                 TextFormField(
                   controller: _measuresController,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                    fontSize: 22,
+                  ),
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
                     labelText: 'Measures to Add',
@@ -278,38 +288,56 @@ class _AppendMeasuresDialogState
           ),
         ),
         actions: [
-          TextButton(
-            onPressed:
-                ()=>Navigator.pop(context),
-            child: const Text(
-                'Cancel'
-            ),
+          Row(
+            children: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                ),
+                onPressed:
+                    ()=>Navigator.pop(context),
+                child: const Text(
+                    'Cancel',
+                  style: TextStyle(fontSize: 22),
+                ),
+              ),
+              const Spacer(),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                ),
+                onPressed: (){
+                  if(!_formKey.currentState!
+                      .validate()){
+                    return;
+                  }
+                  final count = int.parse(
+                      _measuresController.text
+                  );
+                  for(int i=0;i<count;i++){
+                    widget.controller.addMeasure(
+                      TimeSignature(
+                        beats: _beatsPerMeasure,
+                        beatDuration: _selectedBeatUnit,
+                      ),
+                      _selectedScale,
+                    );
+                  }
+                  widget.onMeasuresAppended();
+                  Navigator.pop(context);
+                },
+                child: const Text(
+                  'Generate',
+                  style: TextStyle(fontSize: 22),
+                ),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: (){
-              if(!_formKey.currentState!
-                  .validate()){
-                return;
-              }
-              final count = int.parse(
-                  _measuresController.text
-              );
-              for(int i=0;i<count;i++){
-                widget.controller.addMeasure(
-                  TimeSignature(
-                    beats: _beatsPerMeasure,
-                    beatDuration: _selectedBeatUnit,
-                  ),
-                  _selectedScale,
-                );
-              }
-              widget.onMeasuresAppended();
-              Navigator.pop(context);
-            },
-            child: const Text(
-                'Generate'
-            ),
-          ),
+
         ],
       ),
     );
