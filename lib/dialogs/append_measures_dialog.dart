@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:music_composer/dialogs/scale_dialog.dart';
 
 import '../controllers/composition_controller.dart';
 
@@ -141,26 +142,25 @@ class _AppendMeasuresDialogState
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+
                 _buildSelectionField(
                   label: 'Scale',
                   valueText: scaleDisplayLabel,
                   icon: Icons.music_note,
-                  onTap: (){
-                    noteValuesDialog<String>(
+                  onTap: () {
+                    scaleDialog(
                       context: context,
-                      title:'Select Scale',
-                      currentValue: _selectedScale,
-                      values: widget.controller.availableScales,
-                      labelBuilder:(scale)=>scale,
-                      numberOfColumns: 4,
-                      onSelected: (scale){
-                        setState((){
+                      controller: widget.controller,
+                      currentScale: _selectedScale,
+                      onSelected: (scale) {
+                        setState(() {
                           _selectedScale = scale;
                         });
                       },
                     );
                   },
                 ),
+
                 const SizedBox(
                     height: 12
                 ),
