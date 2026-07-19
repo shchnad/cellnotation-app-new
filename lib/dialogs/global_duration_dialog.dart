@@ -37,10 +37,6 @@ void globalDurationDialog(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.grey.shade300,
                   minimumSize: const Size(130, 48),
-                  // shape: RoundedRectangleBorder(
-                  //   borderRadius:
-                  //   BorderRadius.circular(8),
-                  // ),
                 ),
                 onPressed: () {
                   controller.setDuration(d);

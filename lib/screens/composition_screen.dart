@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:music_composer/utils/default_values.dart';
 
 import '../controllers/composition_controller.dart';
 
@@ -236,14 +237,16 @@ class CompositionScreen extends StatelessWidget {
                               controller.exitPasteMode();
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('Paste mode is disable'),
+                                  content: Text(
+                                      DefaultValues.snackBarMessageForCopying.toString()
+                                  ),
                                 ),
                               );
                             } else {
                               messageDialog(
                                 context,
-                                controller.titleOfMessageDialog.toString(),
-                                controller.instructionToCopy.toString(),
+                                DefaultValues.titleOfMessageForCopying.toString(),
+                                DefaultValues.messageForCopying.toString(),
                               );
                             }
 

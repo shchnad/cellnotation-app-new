@@ -182,58 +182,46 @@ class _CreateCompositionDialogState extends State<CreateCompositionDialog> {
       ),
       actions: [
         Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            SizedBox(
-              width: DefaultValues.widthOfElevatedButton,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                ),
-                onPressed: () => Navigator.pop(context),
-                child: const Text(
-                  'Cancel',
-                  style: TextStyle(
-                      fontSize: 22,
-                      fontWeight:
-                      FontWeight.bold,
-                      // color: Colors.black,
-                  ),
+
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
                 ),
               ),
             ),
-            const Spacer(),
-            SizedBox(
-              width: DefaultValues.widthOfElevatedButton,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                ),
-                onPressed: () {
-                  if (!_formKey.currentState!.validate()) return;
-                  final baseComposition = Composition(
-                    title: _titleController.text.trim(),
-                    composer: _composerController.text.trim(),
-                    style: _selectedStyle.label,
-                    instrument: _selectedInstrument.label,
-                    userId: 1,
-                    numberOfOctaves: 8,
-                    scaleName: DefaultValues.scale,
-                    timeline: Timeline(measures: <Measure>[]),
-                    notes: <Note>[],
-                  );
-                  Navigator.pop(context);
-                  widget.onCompositionCreated(baseComposition);
-                },
-                child: const Text(
-                  'Create',
-                  style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                  ),
+
+            // const Spacer(),
+
+            TextButton(
+              onPressed: () {
+                if (!_formKey.currentState!.validate()) return;
+                final baseComposition = Composition(
+                  title: _titleController.text.trim(),
+                  composer: _composerController.text.trim(),
+                  style: _selectedStyle.label,
+                  instrument: _selectedInstrument.label,
+                  userId: 1,
+                  numberOfOctaves: 8,
+                  scaleName: DefaultValues.scale,
+                  timeline: Timeline(measures: <Measure>[]),
+                  notes: <Note>[],
+                );
+                Navigator.pop(context);
+                widget.onCompositionCreated(baseComposition);
+              },
+              child: const Text(
+                'Create',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue,
                 ),
               ),
             ),

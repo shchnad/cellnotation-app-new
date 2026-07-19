@@ -18,8 +18,7 @@ class NoteDialog extends StatelessWidget {
 
   const NoteDialog({super.key, required this.note, required this.controller});
 
-
-  // Safely query out of controller.composition.notes tracking repo
+//the latest version of the note
   Note get currentNote {
     return controller.composition.notes.firstWhere(
       (n) => n.id == note.id,
@@ -111,7 +110,7 @@ class NoteDialog extends StatelessWidget {
                           width: DefaultValues.widthBetweenWidgets,
                         ),
                         Text(
-                          'Pitch: ${controller.getNotePitchName(editedNote)}${editedNote.accidental?.sign ?? ''}',
+                          'Pitch: ${controller.getNotePitchName(editedNote)} ${editedNote.accidental?.sign ?? ''}',
                           style: TextStyle(
                               fontSize: 22,
                               ),
@@ -354,6 +353,27 @@ class NoteDialog extends StatelessWidget {
 
                 TextButton(
                   onPressed: () {
+                    controller.copyNote(editedNote);
+                    controller.enterPasteMode();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Note ${controller.noteNumber(editedNote)} is copied'),
+                      ),
+                    );
+                    Navigator.pop(context);
+                  },
+                  child: const Text(
+                    'Copy',
+                    style: TextStyle(
+                      fontSize: 22,
+                      // fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+
+                TextButton(
+                  onPressed: () {
                     Navigator.pop(context);
                   },
                   child: const Text(
@@ -365,6 +385,7 @@ class NoteDialog extends StatelessWidget {
                     ),
                   ),
                 ),
+
               ],
             ),
           ],

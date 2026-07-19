@@ -9,6 +9,7 @@ import '../models/time_signature.dart';
 import '../enums/note_duration.dart';
 
 import '../utils/default_values.dart';
+import 'message_dialog.dart';
 import 'note_values_dialog.dart';
 
 
@@ -37,12 +38,12 @@ class _AddMeasuresDialogState extends State<AddMeasuresDialog> {
   final _formKey = GlobalKey<FormState>();
 
   final _measuresController = TextEditingController(
-      text: DefaultValues.numberOfMeasures
+      text: DefaultValues.defaultNumberOfMeasures
   );
 
-  int _beatsPerMeasure = DefaultValues.beatsPerMeasure;
+  int _beatsPerMeasure = DefaultValues.defaultBeatsPerMeasure;
 
-  NoteDuration _selectedBeatUnit = DefaultValues.duration;
+  NoteDuration _selectedBeatUnit = DefaultValues.defaultDuration;
 
   late String _selectedScale;
 
@@ -84,14 +85,13 @@ class _AddMeasuresDialogState extends State<AddMeasuresDialog> {
           isDense: true,
           contentPadding: const EdgeInsets.symmetric(
               horizontal: 12,
-              vertical: 10
+              vertical: 8
           ),
           border: const OutlineInputBorder(),
           prefixIcon: Icon(icon),
         ),
         child: Row(
-          mainAxisAlignment:
-          MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
 
             Expanded(
@@ -123,6 +123,7 @@ class _AddMeasuresDialogState extends State<AddMeasuresDialog> {
   @override
   Widget build(BuildContext context) {
 
+    // scale name transformation
     final parts = _selectedScale.split(' ');
     final scaleDisplayLabel = parts.length == 2
         ? '${parts[1]} ${parts[0]}'
@@ -138,11 +139,16 @@ class _AddMeasuresDialogState extends State<AddMeasuresDialog> {
           DefaultValues.dialogPaddingRightLeft,
           DefaultValues.dialogPaddingBottomTop,
         ),
-        // actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(
+          DefaultValues.dialogPaddingRightLeft,
+          DefaultValues.dialogPaddingBottomTop,
+          DefaultValues.dialogPaddingRightLeft,
+          DefaultValues.dialogPaddingBottomTop,
+        ),
         backgroundColor: Colors.white,
         alignment: Alignment.topCenter,
         title: const Text(
-          'Configure Measures',
+          'Add Measures',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 22,
@@ -176,7 +182,7 @@ class _AddMeasuresDialogState extends State<AddMeasuresDialog> {
                 ),
 
                 const SizedBox(
-                    height: 12
+                    height: DefaultValues.heightBetweenWidgets
                 ),
 
                 Container(
@@ -197,7 +203,7 @@ class _AddMeasuresDialogState extends State<AddMeasuresDialog> {
                       ),
 
                       const SizedBox(
-                          height: 8
+                          height: DefaultValues.heightBetweenWidgets
                       ),
 
                       Row(
@@ -205,44 +211,52 @@ class _AddMeasuresDialogState extends State<AddMeasuresDialog> {
                           Expanded(
                             child: DropdownButtonFormField<int>(
                               value: _beatsPerMeasure,
-                              items: [1,2,3,4,5,6,7,8,9,12]
-                                  .map( (b)=> DropdownMenuItem(
-                                        value: b,
-                                        child: Text(
-                                          '$b',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.blue,
-                                            fontSize: 22,
-                                          ),
-                                        ),
-                                      )
-                              )
-                                  .toList(),
-                              onChanged: (value){
-                                setState((){
-                                  _beatsPerMeasure = value ?? DefaultValues.beatsPerMeasure;
+                              isExpanded: true,
+
+                              selectedItemBuilder: (context) {
+                                return [1,2,3,4,5,6,7,8,9,12].map((b) {
+                                  return Center(
+                                    child: Text(
+                                      '$b',
+                                      style: const TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.blue,
+                                      ),
+                                    ),
+                                  );
+                                }).toList();
+                              },
+
+                              items: DefaultValues.possibleNumberOfBeatsInMeasure.map((b) {
+                                return DropdownMenuItem<int>(
+                                  value: b,
+                                  child: Center(
+                                    child: Text(
+                                      '$b',
+                                      style: const TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.blue,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+
+                              onChanged: (value) {
+                                setState(() {
+                                  _beatsPerMeasure = value!;
                                 });
                               },
                             ),
                           ),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 5
-                            ),
-                            child: Text(
-                              '*',
-                              style: TextStyle(
-                                  fontSize: 22
-                              ),
-                            ),
-                          ),
+
                           Expanded(
                             child: InkWell(
                               onTap: (){
                                 noteValuesDialog<NoteDuration>(
-                                  context:
-                                  context,
+                                  context: context,
                                   title: 'Beat Duration',
                                   currentValue: _selectedBeatUnit,
                                   values: NoteDuration.values,
@@ -259,12 +273,14 @@ class _AddMeasuresDialogState extends State<AddMeasuresDialog> {
                                 decoration: const InputDecoration(
                                   border: OutlineInputBorder(),
                                 ),
-                                child: Text(
-                                  _selectedBeatUnit.label,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.blue,
-                                    fontSize: 22,
+                                child: Center(
+                                  child: Text(
+                                    _selectedBeatUnit.label,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blue,
+                                      fontSize: 22,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -275,10 +291,13 @@ class _AddMeasuresDialogState extends State<AddMeasuresDialog> {
                     ],
                   ),
                 ),
+
                 const SizedBox(
-                    height: 12
+                    height: DefaultValues.heightBetweenWidgets
                 ),
+
                 TextFormField(
+                  textAlign: TextAlign.center,
                   controller: _measuresController,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
@@ -293,7 +312,7 @@ class _AddMeasuresDialogState extends State<AddMeasuresDialog> {
                   validator: (value){
                     final n = int.tryParse(value ?? '');
                     if(n == null || n <= 0){
-                      return 'Enter amount';
+                      return 'Enter number';
                     }
                     return null;
                   },
@@ -304,55 +323,61 @@ class _AddMeasuresDialogState extends State<AddMeasuresDialog> {
         ),
         actions: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(
-                width: DefaultValues.widthOfElevatedButton,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                  ),
-                  onPressed:
-                      ()=>Navigator.pop(context),
-                  child: const Text(
-                      'Cancel',
-                    style: TextStyle(fontSize: 22),
+
+              TextButton(
+                onPressed:
+                    ()=>Navigator.pop(context),
+                child: const Text(
+                    'Cancel',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
                   ),
                 ),
               ),
-              const Spacer(),
-              SizedBox(
-                width: DefaultValues.widthOfElevatedButton,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                  ),
-                  onPressed: (){
-                    if(!_formKey.currentState!
-                        .validate()){
-                      return;
-                    }
-                    final count = int.parse(
-                        _measuresController.text
+
+              // const Spacer(),
+
+              TextButton(
+                onPressed: (){
+
+                  if(!_formKey.currentState!.validate()){
+                    return;
+                  }
+
+                  final count = int.parse(
+                      _measuresController.text
+                  );
+                  if (count > DefaultValues.maxOfMeasuresToAddAtOnce) {
+                    messageDialog(
+                        context,
+                        'Invalid input',
+                        'You cannot create more than ${DefaultValues.maxOfMeasuresToAddAtOnce} measures at once.'
                     );
-                    for(int i=0;i<count;i++){
-                      widget.controller.addMeasure(
-                        TimeSignature(
-                          beats: _beatsPerMeasure,
-                          beatDuration: _selectedBeatUnit,
-                        ),
-                        _selectedScale,
-                      );
-                    }
-                    widget.onMeasuresAppended();
-                    Navigator.pop(context);
-                  },
-                  child: const Text(
-                    'Generate',
-                    style: TextStyle(fontSize: 22),
+                    return;
+                  }
+
+                  for(int i=0;i<count;i++){
+                    widget.controller.addMeasure(
+                      TimeSignature(
+                        beats: _beatsPerMeasure,
+                        beatDuration: _selectedBeatUnit,
+                      ),
+                      _selectedScale,
+                    );
+                  }
+                  widget.onMeasuresAppended();
+                  Navigator.pop(context);
+                },
+                child: const Text(
+                  'Generate',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
                   ),
                 ),
               ),

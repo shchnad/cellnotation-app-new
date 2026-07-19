@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:music_composer/enums/articulation.dart';
+import 'package:music_composer/utils/default_values.dart';
 
 import '../enums/accidental.dart';
 import '../enums/finger.dart';
@@ -32,7 +33,7 @@ class CompositionController extends ChangeNotifier {
   Hand currentHand = Hand.right;
 
   // Duration of newly created notes
-  NoteDuration currentDuration = NoteDuration.quarter;
+  NoteDuration currentDuration = DefaultValues.defaultDuration;
 
   // Grid snapping resolution
   NoteDuration gridResolution = NoteDuration.sixtyFourth;
@@ -759,17 +760,12 @@ class CompositionController extends ChangeNotifier {
   // COPY / PASTE
   // =====================================================
 
-  String titleOfMessageDialog = 'Note copying';
-
-  String instructionToCopy = 'Long-tap the note to copy it. \n\n '
-      'You can paste it then where ever you wish as many times as you wish. \n\n'
-      'To stop pasting toggle this button.';
 
   String noteNumber (Note note) {
     return '${getMeasureNumber(note).toString()} '
         '${getBeatNumber(note).toString()} '
         '${getOctave(note).toString()} '
-        '${getNotePitchName(note)}';
+        '${getDegree(note)}';
   }
 
   void pasteNoteAt(
