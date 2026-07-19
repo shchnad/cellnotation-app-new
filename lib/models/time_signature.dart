@@ -62,4 +62,21 @@ class TimeSignature {
   String toString() {
     return '$beats/${beatDuration.label}';
   }
+
+
+  // ================= JSON =================
+
+  Map<String, dynamic> toJson() {
+    return {
+      'beats': beats,
+      'beatDuration': beatDuration.name,
+    };
+  }
+
+  factory TimeSignature.fromJson(Map<String, dynamic> json) {
+    return TimeSignature(
+      beats: json['beats'] as int,
+      beatDuration: NoteDuration.values.byName(json['beatDuration'] as String),
+    );
+  }
 }

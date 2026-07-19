@@ -207,5 +207,29 @@ class Timeline {
     );
   }
 
+  // ================= JSON =================
+
+  Map<String, dynamic> toJson() {
+    return {
+      'measures': measures.map((m) => m.toJson()).toList(),
+      'tempoEvents': tempoEvents.map((t) => t.toJson()).toList(),
+      'beatEvents': beatEvents.map((e) => e.toJson()).toList(),
+    };
+  }
+
+  factory Timeline.fromJson(Map<String, dynamic> json) {
+    return Timeline(
+      measures: (json['measures'] as List<dynamic>)
+          .map((m) => Measure.fromJson(m as Map<String, dynamic>))
+          .toList(),
+      tempoEvents: (json['tempoEvents'] as List<dynamic>)
+          .map((t) => TempoEvent.fromJson(t as Map<String, dynamic>))
+          .toList(),
+      beatEvents: (json['beatEvents'] as List<dynamic>)
+          .map((e) => BeatEvent.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
 }
 

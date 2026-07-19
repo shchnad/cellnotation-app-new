@@ -88,4 +88,30 @@ class Measure {
     );
   }
 
+  // ================= JSON =================
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'startTick': startTick,
+      'timeSignature': timeSignature.toJson(),
+      'scaleName': scaleName,
+      'pitchOffsetSemitones': pitchOffsetSemitones,
+      'beatEvents': beatEvents.map((e) => e.toJson()).toList(),
+    };
+  }
+
+  factory Measure.fromJson(Map<String, dynamic> json) {
+    return Measure(
+      id: json['id'] as int,
+      startTick: json['startTick'] as int,
+      timeSignature: TimeSignature.fromJson(json['timeSignature'] as Map<String, dynamic>),
+      scaleName: json['scaleName'] as String,
+      pitchOffsetSemitones: json['pitchOffsetSemitones'] as int,
+      beatEvents: (json['beatEvents'] as List<dynamic>)
+          .map((e) => BeatEvent.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
 }

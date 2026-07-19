@@ -1,35 +1,51 @@
 import 'package:flutter/material.dart';
 import '../models/composition.dart';
-import '../models/timeline.dart';
-import '../models/measure.dart';
-import '../models/note.dart';
 import '../enums/music_style.dart';
 import '../enums/instrument.dart';
-import '../utils/default_values.dart';
 import 'note_values_dialog.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
+class EditCompositionDialog extends StatefulWidget {
+  final Composition composition;
+  final ValueChanged<Composition> onSaved;
+  final VoidCallback? onDelete;
 
-
-class NewCompositionDialog extends StatefulWidget {
-  final Function(Composition) onCompositionCreated;
-
-  const NewCompositionDialog({super.key, required this.onCompositionCreated});
+  const EditCompositionDialog({
+    super.key,
+    required this.composition,
+    required this.onSaved,
+    this.onDelete,
+  });
 
   @override
-  State<NewCompositionDialog> createState() => _NewCompositionDialogState();
+  State<EditCompositionDialog> createState() => _EditCompositionDialogState();
 }
 
-class _NewCompositionDialogState extends State<NewCompositionDialog> {
-
-  final currentUserId = FirebaseAuth.instance.currentUser!.uid;
-
+class _EditCompositionDialogState extends State<EditCompositionDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController(text: DefaultValues.title);
-  final _composerController = TextEditingController(text: DefaultValues.composer);
+  late final TextEditingController _titleController;
+  late final TextEditingController _composerController;
 
-  MusicStyle _selectedStyle = DefaultValues.style;
-  Instrument _selectedInstrument = DefaultValues.instrument;
+  late MusicStyle _selectedStyle;
+  late Instrument _selectedInstrument;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.composition.title);
+    _composerController = TextEditingController(text: widget.composition.composer);
+
+    // The composition stores style/instrument as label strings, so we
+    // resolve back to the matching enum value (falling back to "any"
+    // if the stored label doesn't match anything, just in case).
+    _selectedStyle = MusicStyle.values.firstWhere(
+          (s) => s.label == widget.composition.style,
+      orElse: () => MusicStyle.any,
+    );
+    _selectedInstrument = Instrument.values.firstWhere(
+          (i) => i.label == widget.composition.instrument,
+      orElse: () => Instrument.any,
+    );
+  }
 
   @override
   void dispose() {
@@ -69,19 +85,68 @@ class _NewCompositionDialogState extends State<NewCompositionDialog> {
     );
   }
 
+  void _confirmDelete(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        // title: const Text(
+        //   'Delete Composition?',
+        //   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        // ),
+        content: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Text(
+            'Are you sure to delete "${widget.composition.title}"? \n\n This cannot be undone.',
+            style: const TextStyle(fontSize: 22),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // close confirmation
+              Navigator.pop(context); // close edit dialog
+              widget.onDelete?.call();
+            },
+            child: const Text(
+              'Delete',
+              style: TextStyle(
+                  fontSize: 22,
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      alignment: Alignment.topCenter,//keep the dialog on top of screen
+      alignment: Alignment.topCenter,
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.white,
       title: const Text(
-        'New Composition',
+        'Edit Composition Info',
         textAlign: TextAlign.center,
         style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
+          fontSize: 22,
+          fontWeight: FontWeight.bold,
+          color: Colors.black,
         ),
       ),
       content: SingleChildScrollView(
@@ -186,18 +251,23 @@ class _NewCompositionDialogState extends State<NewCompositionDialog> {
           ),
         ),
       ),
-
-      actionsPadding: const EdgeInsets.fromLTRB(
-        DefaultValues.dialogPaddingRightLeft,
-        DefaultValues.dialogPaddingBottomTop,
-        DefaultValues.dialogPaddingRightLeft,
-        DefaultValues.dialogPaddingBottomTop,
-      ),
+      actionsPadding: const EdgeInsets.fromLTRB(24, 12, 24, 12),
       actions: [
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-
+            if (widget.onDelete != null)
+              TextButton(
+                onPressed: () => _confirmDelete(context),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                  ),
+                ),
+              ),
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: const Text(
@@ -209,28 +279,21 @@ class _NewCompositionDialogState extends State<NewCompositionDialog> {
                 ),
               ),
             ),
-
-            // const Spacer(),
-
             TextButton(
               onPressed: () {
                 if (!_formKey.currentState!.validate()) return;
-                final baseComposition = Composition(
+                final updated = widget.composition.copyWith(
                   title: _titleController.text.trim(),
                   composer: _composerController.text.trim(),
                   style: _selectedStyle.label,
                   instrument: _selectedInstrument.label,
-                  userId: currentUserId,
-                  numberOfOctaves: 8,
-                  scaleName: DefaultValues.scale,
-                  timeline: Timeline(measures: <Measure>[]),
-                  notes: <Note>[],
+                  editedAt: DateTime.now(),
                 );
                 Navigator.pop(context);
-                widget.onCompositionCreated(baseComposition);
+                widget.onSaved(updated);
               },
               child: const Text(
-                'Create',
+                'Save',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -240,7 +303,6 @@ class _NewCompositionDialogState extends State<NewCompositionDialog> {
             ),
           ],
         ),
-
       ],
     );
   }

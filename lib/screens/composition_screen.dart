@@ -9,8 +9,10 @@ import '../dialogs/global_duration_dialog.dart';
 import '../dialogs/add_measures_dialog.dart';
 
 import '../dialogs/message_dialog.dart';
+import '../dialogs/edit_composition_dialog.dart';
 import '../enums/hand.dart';
 
+import '../services/composition_service.dart';
 import '../widgets/grid_widget.dart';
 
 
@@ -51,6 +53,77 @@ class CompositionScreen extends StatelessWidget {
       ),
     );
 
+  }
+
+
+  void _showEditDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => EditCompositionDialog(
+        composition: controller.composition,
+        onSaved: (updated) {
+          controller.updateComposition(updated);
+        },
+        onDelete: () async {
+          final service = CompositionService();
+          final id = controller.composition.id;
+          if (id != null) {
+            try {
+              await service.deleteComposition(id);
+            } catch (e) {
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Delete failed: $e', style: const TextStyle(fontSize: 22)),
+                ),
+              );
+              return;
+            }
+          }
+          if (!context.mounted) return;
+          Navigator.popUntil(context, (route) => route.isFirst);
+        },
+      ),
+    );
+  }
+
+
+  Future<void> _saveComposition(BuildContext context) async {
+    final service = CompositionService();
+
+    // Show a small non-blocking indicator while saving
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Saving...', style: TextStyle(fontSize: 22)),
+        duration: Duration(seconds: 1),
+      ),
+    );
+
+    try {
+      final newId = await service.saveComposition(controller.composition);
+
+      // If this was a brand-new composition, attach the returned id
+      // so future saves update it instead of creating duplicates.
+      if (controller.composition.id == null) {
+        controller.updateComposition(
+          controller.composition.copyWith(id: newId),
+        );
+      }
+
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Composition saved', style: TextStyle(fontSize: 22)),
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Save failed: $e', style: const TextStyle(fontSize: 22)),
+        ),
+      );
+    }
   }
 
 
@@ -134,6 +207,28 @@ class CompositionScreen extends StatelessWidget {
                         tooltip: 'Add Measures',
                         onPressed: () {
                           _openAppendMeasuresForm(context);
+                        },
+                      ),
+
+                      // SAVE
+                      IconButton(
+                        icon: const Icon(Icons.save,
+                          color: Colors.black,
+                        ),
+                        tooltip: 'Save Composition',
+                        onPressed: () {
+                          _saveComposition(context);
+                        },
+                      ),
+
+                      // EDIT INFO
+                      IconButton(
+                        icon: const Icon(Icons.edit,
+                          color: Colors.black,
+                        ),
+                        tooltip: 'Edit Title / Composer / Style / Instrument',
+                        onPressed: () {
+                          _showEditDialog(context);
                         },
                       ),
 

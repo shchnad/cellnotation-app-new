@@ -7,7 +7,7 @@ enum MusicStyle {
   disco('disco'),
   folk('folk'),
   gregorian('gregorian'),
-  hiphop('hip-Hop'),
+  hiphop('hip-hop'),
   jazz('jazz'),
   latino('latino'),
   metal('metal'),

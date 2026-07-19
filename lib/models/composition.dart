@@ -4,11 +4,12 @@ import 'dynamic_event.dart';
 import 'tempo_event.dart';
 
 class Composition {
+  final String? id; // Firestore document ID — null until first save
   final String title;
   final String composer;
   final String style;
   final String instrument;
-  final int userId;
+  final String userId; // Firebase Auth UID
   final DateTime createdAt;
   final DateTime editedAt;
   final int numberOfOctaves;
@@ -22,6 +23,7 @@ class Composition {
   final List<DynamicEvent> dynamicEvents;
 
   Composition({
+    this.id,
     required this.title,
     required this.composer,
     required this.style,
@@ -30,7 +32,7 @@ class Composition {
     DateTime? createdAt,
     DateTime? editedAt,
     required this.numberOfOctaves,
-    required String scaleName, // Pass as a regular parameter to feed the initializer
+    required String scaleName,
     required this.timeline,
     required this.notes,
     List<TempoEvent>? tempoEvents,
@@ -50,11 +52,12 @@ class Composition {
   }
 
   Composition copyWith({
+    String? id,
     String? title,
     String? composer,
     String? style,
     String? instrument,
-    int? userId,
+    String? userId,
     DateTime? createdAt,
     DateTime? editedAt,
     int? numberOfOctaves,
@@ -65,6 +68,7 @@ class Composition {
     List<DynamicEvent>? dynamicEvents,
   }) {
     return Composition(
+      id: id ?? this.id,
       title: title ?? this.title,
       composer: composer ?? this.composer,
       style: style ?? this.style,
@@ -73,11 +77,56 @@ class Composition {
       createdAt: createdAt ?? this.createdAt,
       editedAt: editedAt ?? this.editedAt,
       numberOfOctaves: numberOfOctaves ?? this.numberOfOctaves,
-      scaleName: scaleName ?? this.scaleName, // Reads cleanly through your custom getter
+      scaleName: scaleName ?? this.scaleName,
       timeline: timeline ?? this.timeline,
       notes: notes ?? this.notes,
       tempoEvents: tempoEvents ?? this.tempoEvents,
       dynamicEvents: dynamicEvents ?? this.dynamicEvents,
+    );
+  }
+
+  // ================= JSON =================
+
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'composer': composer,
+      'style': style,
+      'instrument': instrument,
+      'userId': userId,
+      'createdAt': createdAt.toIso8601String(),
+      'editedAt': editedAt.toIso8601String(),
+      'numberOfOctaves': numberOfOctaves,
+      'scaleName': scaleName,
+      'timeline': timeline.toJson(),
+      'notes': notes.map((n) => n.toJson()).toList(),
+      'tempoEvents': tempoEvents.map((t) => t.toJson()).toList(),
+      'dynamicEvents': dynamicEvents.map((d) => d.toJson()).toList(),
+    };
+  }
+
+  factory Composition.fromJson(Map<String, dynamic> json, {String? id}) {
+    return Composition(
+      id: id,
+      title: json['title'] as String,
+      composer: json['composer'] as String,
+      style: json['style'] as String,
+      instrument: json['instrument'] as String,
+      userId: json['userId'] as String,
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      editedAt: DateTime.parse(json['editedAt'] as String),
+      numberOfOctaves: json['numberOfOctaves'] as int,
+      scaleName: json['scaleName'] as String,
+      timeline: Timeline.fromJson(json['timeline'] as Map<String, dynamic>),
+      notes: (json['notes'] as List<dynamic>)
+          .map((n) => Note.fromJson(n as Map<String, dynamic>))
+          .toList(),
+      tempoEvents: (json['tempoEvents'] as List<dynamic>)
+          .map((t) => TempoEvent.fromJson(t as Map<String, dynamic>))
+          .toList(),
+      dynamicEvents: (json['dynamicEvents'] as List<dynamic>)
+          .map((d) => DynamicEvent.fromJson(d as Map<String, dynamic>))
+          .toList(),
     );
   }
 }

@@ -32,5 +32,28 @@ class BeatEvent {
     );
   }
 
+  // ================= JSON =================
+
+  Map<String, dynamic> toJson() {
+    return {
+      'tick': tick,
+      if (tempo != null) 'tempo': tempo!.name,
+      if (musicalDynamic != null) 'musicalDynamic': musicalDynamic!.name,
+      if (dynamicChange != null) 'dynamicChange': dynamicChange!.name,
+    };
+  }
+
+  factory BeatEvent.fromJson(Map<String, dynamic> json) {
+    return BeatEvent(
+      tick: json['tick'] as int,
+      tempo: json['tempo'] == null ? null : Tempo.values.byName(json['tempo']),
+      musicalDynamic: json['musicalDynamic'] == null
+          ? null
+          : MusicalDynamic.values.byName(json['musicalDynamic']),
+      dynamicChange: json['dynamicChange'] == null
+          ? null
+          : DynamicChange.values.byName(json['dynamicChange']),
+    );
+  }
 
 }

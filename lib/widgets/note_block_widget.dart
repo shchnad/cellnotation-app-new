@@ -117,7 +117,10 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
           controller.enterPasteMode();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Note ${controller.noteNumber(note)} is copied'),
+              content: Text(
+                  'Note ${controller.noteNumber(note)} is copied',
+                  style: TextStyle(fontSize: 22)
+              ),
             ),
           );
         },

@@ -5,6 +5,7 @@ import '../controllers/composition_controller.dart';
 import '../dialogs/new_composition_dialog.dart';
 import 'composition_screen.dart';
 import '../features/auth/auth_service.dart';
+import 'compositions_list_screen.dart';
 // import your destination screens here, e.g.:
 // import 'compositions_screen.dart';
 // import 'cloud_library_screen.dart';
@@ -65,10 +66,11 @@ class HomeScreen extends StatelessWidget {
                   label: 'My Compositions',
                   icon: Icons.library_music,
                   onTap: () {
-                    // Navigator.push(
-                    //   context,
-                    //   MaterialPageRoute(builder: (_) => const CompositionsScreen()),
-                    // );
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder:
+                          (_) => const CompositionsListScreen()),
+                    );
                   },
                 ),
                 _MenuItem(
