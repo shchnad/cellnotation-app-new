@@ -1,9 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import '../../models/composition.dart';
-
-
+import '../models/composition.dart';
 
 class CompositionService {
   final _db = FirebaseFirestore.instance;
@@ -47,6 +45,18 @@ class CompositionService {
         .toList());
   }
 
+  /// Returns a live stream of every public composition from all users,
+  /// most recently edited first. Used for the Cloud Library screen.
+  Stream<List<Composition>> getPublicCompositions() {
+    return _collection
+        .where('isPublic', isEqualTo: true)
+        .orderBy('editedAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+        .map((doc) => Composition.fromJson(doc.data(), id: doc.id))
+        .toList());
+  }
+
   Future<Composition> loadComposition(String id) async {
     final doc = await _collection.doc(id).get();
     if (!doc.exists) throw Exception('Composition not found');
@@ -55,5 +65,24 @@ class CompositionService {
 
   Future<void> deleteComposition(String id) async {
     await _collection.doc(id).delete();
+  }
+
+  /// Copies a (typically public, someone-else's) composition into the
+  /// current user's own library as a brand-new document, so they can
+  /// edit it freely without touching the original.
+  Future<String> copyToMyLibrary(Composition source) async {
+    final uid = _uid;
+    if (uid == null) throw Exception('User not signed in');
+
+    final copy = source.copyWith(
+      id: null, // force a new document
+      userId: uid,
+      isPublic: false, // copies start private
+      createdAt: DateTime.now(),
+      editedAt: DateTime.now(),
+    );
+
+    final docRef = await _collection.add(copy.toJson());
+    return docRef.id;
   }
 }

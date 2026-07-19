@@ -13,6 +13,7 @@ class Composition {
   final DateTime createdAt;
   final DateTime editedAt;
   final int numberOfOctaves;
+  final bool isPublic;
 
   // Internal backing field for your mutable scaleName parameter
   String _scaleName;
@@ -32,6 +33,7 @@ class Composition {
     DateTime? createdAt,
     DateTime? editedAt,
     required this.numberOfOctaves,
+    this.isPublic = false,
     required String scaleName,
     required this.timeline,
     required this.notes,
@@ -61,6 +63,7 @@ class Composition {
     DateTime? createdAt,
     DateTime? editedAt,
     int? numberOfOctaves,
+    bool? isPublic,
     String? scaleName,
     Timeline? timeline,
     List<Note>? notes,
@@ -77,6 +80,7 @@ class Composition {
       createdAt: createdAt ?? this.createdAt,
       editedAt: editedAt ?? this.editedAt,
       numberOfOctaves: numberOfOctaves ?? this.numberOfOctaves,
+      isPublic: isPublic ?? this.isPublic,
       scaleName: scaleName ?? this.scaleName,
       timeline: timeline ?? this.timeline,
       notes: notes ?? this.notes,
@@ -97,6 +101,7 @@ class Composition {
       'createdAt': createdAt.toIso8601String(),
       'editedAt': editedAt.toIso8601String(),
       'numberOfOctaves': numberOfOctaves,
+      'isPublic': isPublic,
       'scaleName': scaleName,
       'timeline': timeline.toJson(),
       'notes': notes.map((n) => n.toJson()).toList(),
@@ -116,6 +121,7 @@ class Composition {
       createdAt: DateTime.parse(json['createdAt'] as String),
       editedAt: DateTime.parse(json['editedAt'] as String),
       numberOfOctaves: json['numberOfOctaves'] as int,
+      isPublic: json['isPublic'] as bool? ?? false,
       scaleName: json['scaleName'] as String,
       timeline: Timeline.fromJson(json['timeline'] as Map<String, dynamic>),
       notes: (json['notes'] as List<dynamic>)
