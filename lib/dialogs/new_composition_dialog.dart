@@ -9,16 +9,16 @@ import '../utils/default_values.dart';
 import 'note_values_dialog.dart';
 
 
-class CreateCompositionDialog extends StatefulWidget {
+class NewCompositionDialog extends StatefulWidget {
   final Function(Composition) onCompositionCreated;
 
-  const CreateCompositionDialog({super.key, required this.onCompositionCreated});
+  const NewCompositionDialog({super.key, required this.onCompositionCreated});
 
   @override
-  State<CreateCompositionDialog> createState() => _CreateCompositionDialogState();
+  State<NewCompositionDialog> createState() => _NewCompositionDialogState();
 }
 
-class _CreateCompositionDialogState extends State<CreateCompositionDialog> {
+class _NewCompositionDialogState extends State<NewCompositionDialog> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController(text: DefaultValues.title);
   final _composerController = TextEditingController(text: DefaultValues.composer);
@@ -67,6 +67,7 @@ class _CreateCompositionDialogState extends State<CreateCompositionDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      alignment: Alignment.topCenter,//keep the dialog on top of screen
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.white,
       title: const Text(
@@ -179,6 +180,13 @@ class _CreateCompositionDialogState extends State<CreateCompositionDialog> {
             ),
           ),
         ),
+      ),
+
+      actionsPadding: const EdgeInsets.fromLTRB(
+        DefaultValues.dialogPaddingRightLeft,
+        DefaultValues.dialogPaddingBottomTop,
+        DefaultValues.dialogPaddingRightLeft,
+        DefaultValues.dialogPaddingBottomTop,
       ),
       actions: [
         Row(

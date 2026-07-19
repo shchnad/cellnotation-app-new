@@ -18,10 +18,12 @@ class DefaultValues {
 
   // DESIGN VALUES
   static const double widthOfElevatedButton = 220.0;
+
   static const double widthBetweenWidgets = 20.0;
   static const double heightBetweenWidgets = 8.0;
+
   static const double dialogPaddingRightLeft = 25.0;
-  static const double dialogPaddingBottomTop = 0.0;
+  static const double dialogPaddingBottomTop = 8.0;
 
   // NOTE COPYING
   static const String titleOfMessageForCopying = 'Note copying';

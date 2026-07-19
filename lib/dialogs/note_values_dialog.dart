@@ -108,12 +108,8 @@ Widget _button(
   return ElevatedButton(
     style: ElevatedButton.styleFrom(
       backgroundColor: Colors.grey.shade300,
-          // : null,
       minimumSize: Size(width, 55),
-      // shape: RoundedRectangleBorder(
-      //   borderRadius:
-      //   BorderRadius.circular(8),
-      // ),
+
     ),
     onPressed: onPressed,
     child: Text(

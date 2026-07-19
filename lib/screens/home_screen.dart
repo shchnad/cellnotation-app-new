@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../dialogs/note_dialog.dart';
 import '../models/composition.dart';
 import '../controllers/composition_controller.dart';
-import '../dialogs/create_composition_dialog.dart';
+import '../dialogs/new_composition_dialog.dart';
 import 'composition_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -11,7 +11,7 @@ class HomeScreen extends StatelessWidget {
   void _handleCreateComposition(BuildContext routingContext) {
     showDialog(
       context: routingContext,
-      builder: (_) => CreateCompositionDialog(
+      builder: (_) => NewCompositionDialog(
         onCompositionCreated: (newComposition) {
           // The controller takes ownership of the composition model state
           final controller = CompositionController(composition: newComposition);

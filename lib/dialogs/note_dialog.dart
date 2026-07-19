@@ -331,6 +331,13 @@ class NoteDialog extends StatelessWidget {
               ],
             ),
           ),
+
+          actionsPadding: const EdgeInsets.fromLTRB(
+            DefaultValues.dialogPaddingRightLeft,
+            DefaultValues.dialogPaddingBottomTop,
+            DefaultValues.dialogPaddingRightLeft,
+            DefaultValues.dialogPaddingBottomTop,
+          ),
           actions: [
             const Divider(thickness: 1.0),
             Row(
@@ -345,7 +352,7 @@ class NoteDialog extends StatelessWidget {
                     'Delete Note',
                     style: TextStyle(
                       fontSize: 22,
-                      // fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.bold,
                       color: Colors.red,
                     ),
                   ),
@@ -363,11 +370,11 @@ class NoteDialog extends StatelessWidget {
                     Navigator.pop(context);
                   },
                   child: const Text(
-                    'Copy',
+                    'Copy Note',
                     style: TextStyle(
                       fontSize: 22,
-                      // fontWeight: FontWeight.bold,
-                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
                     ),
                   ),
                 ),
@@ -380,8 +387,8 @@ class NoteDialog extends StatelessWidget {
                     'Close',
                     style: TextStyle(
                       fontSize: 22,
-                      // fontWeight: FontWeight.bold,
-                      color: Colors.blue,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
                     ),
                   ),
                 ),

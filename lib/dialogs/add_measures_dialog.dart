@@ -207,26 +207,21 @@ class _AddMeasuresDialogState extends State<AddMeasuresDialog> {
                       ),
 
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+
                           Expanded(
                             child: DropdownButtonFormField<int>(
                               value: _beatsPerMeasure,
                               isExpanded: true,
 
-                              selectedItemBuilder: (context) {
-                                return [1,2,3,4,5,6,7,8,9,12].map((b) {
-                                  return Center(
-                                    child: Text(
-                                      '$b',
-                                      style: const TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.blue,
-                                      ),
-                                    ),
-                                  );
-                                }).toList();
-                              },
+                              decoration: const InputDecoration(
+                                border: OutlineInputBorder(),
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                              ),
 
                               items: DefaultValues.possibleNumberOfBeatsInMeasure.map((b) {
                                 return DropdownMenuItem<int>(
@@ -252,34 +247,43 @@ class _AddMeasuresDialogState extends State<AddMeasuresDialog> {
                             ),
                           ),
 
+                          const SizedBox(width: 8),
+
                           Expanded(
-                            child: InkWell(
-                              onTap: (){
-                                noteValuesDialog<NoteDuration>(
-                                  context: context,
-                                  title: 'Beat Duration',
-                                  currentValue: _selectedBeatUnit,
-                                  values: NoteDuration.values,
-                                  labelBuilder:(d)=>d.label,
-                                  numberOfColumns: 3,
-                                  onSelected: (duration){
-                                    setState((){
-                                      _selectedBeatUnit = duration;
-                                    });
-                                  },
-                                );
-                              },
-                              child: InputDecorator(
-                                decoration: const InputDecoration(
-                                  border: OutlineInputBorder(),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    _selectedBeatUnit.label,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.blue,
-                                      fontSize: 22,
+                            child: SizedBox(
+                              height: 56,
+                              child: InkWell(
+                                onTap: () {
+                                  noteValuesDialog<NoteDuration>(
+                                    context: context,
+                                    title: 'Beat Duration',
+                                    currentValue: _selectedBeatUnit,
+                                    values: NoteDuration.values,
+                                    labelBuilder: (d) => d.label,
+                                    numberOfColumns: 3,
+                                    onSelected: (duration) {
+                                      setState(() {
+                                        _selectedBeatUnit = duration;
+                                      });
+                                    },
+                                  );
+                                },
+                                child: InputDecorator(
+                                  decoration: const InputDecoration(
+                                    border: OutlineInputBorder(),
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      _selectedBeatUnit.label,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.blue,
+                                        fontSize: 22,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -287,7 +291,7 @@ class _AddMeasuresDialogState extends State<AddMeasuresDialog> {
                             ),
                           ),
                         ],
-                      ),
+                      )
                     ],
                   ),
                 ),

@@ -16,15 +16,7 @@ void editMeasureBeatDialog({
       return AlertDialog(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
-          // title: Center(
-          //   child: Text(
-          //     "Measure ${measureIndex + 1}   Beat ${beatIndex + 1}",
-          //     style: const TextStyle(
-          //       fontSize: 22,
-          //       color: Colors.blue,
-          //   ),
-          //  ),
-          // ),
+
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -43,7 +35,7 @@ void editMeasureBeatDialog({
             ListTile(
               leading: const Icon(Icons.lock_clock),
               title: const Text(
-                "Tempo",
+                "Set Tempo",
                 style: TextStyle(
                   fontSize: 22,
                   // fontWeight: FontWeight.bold,
@@ -55,27 +47,8 @@ void editMeasureBeatDialog({
               },
             ),
 
-
             ListTile(
-              leading: const Icon(Icons.copy_all),
-              title: const Text(
-                "Duplicate Measure",
-                style: TextStyle(
-                  fontSize: 22,
-                  // fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              onTap: () {
-                controller.copyMeasure(
-                  measureIndex,
-                );
-                Navigator.pop(context);
-              },
-            ),
-
-            ListTile(
-              leading: const Icon(Icons.add_box),
+              leading: const Icon(Icons.copy),
               title: const Text(
                 "Insert Measure",
                 style: TextStyle(
@@ -86,6 +59,24 @@ void editMeasureBeatDialog({
               ),
               onTap: () {
                 // open measure input dialog
+              },
+            ),
+
+            ListTile(
+              leading: const Icon(Icons.copy),
+              title: const Text(
+                "Duplicate Measure",
+                style: TextStyle(
+                  fontSize: 22,
+                  // fontWeight: FontWeight.bold,
+                  color: Colors.blue,
+                ),
+              ),
+              onTap: () {
+                controller.copyMeasure(
+                  measureIndex,
+                );
+                Navigator.pop(context);
               },
             ),
 
@@ -123,7 +114,7 @@ void editMeasureBeatDialog({
             ListTile(
               leading: const Icon(Icons.campaign_outlined),
               title: const Text(
-                "Dynamic",
+                "Set Dynamic",
                 style: TextStyle(
                   fontSize: 22,
                   // fontWeight: FontWeight.bold,
@@ -137,7 +128,7 @@ void editMeasureBeatDialog({
 
 
             ListTile(
-              leading: const Icon(Icons.add),
+              leading: const Icon(Icons.playlist_add),
               title: const Text(
                 "Insert Beat",
                 style: TextStyle(
@@ -156,13 +147,13 @@ void editMeasureBeatDialog({
 
 
             ListTile(
-              leading: const Icon(Icons.copy),
+              leading: const Icon(Icons.playlist_add),
               title: const Text(
                 "Duplicate Beat",
                 style: TextStyle(
                   fontSize: 22,
                   // fontWeight: FontWeight.bold,
-                  color: Colors.black,
+                  color: Colors.blue,
                 ),
               ),
               onTap: () {
@@ -175,7 +166,7 @@ void editMeasureBeatDialog({
             ),
 
             ListTile(
-              leading: const Icon(Icons.remove),
+              leading: const Icon(Icons.delete),
               title: const Text(
                 "Delete Beat",
                 style: TextStyle(
@@ -193,10 +184,20 @@ void editMeasureBeatDialog({
               },
             ),
 
-
             const Divider(thickness: 1.0),
 
-            TextButton(
+          ],
+        ),
+
+        actionsPadding: const EdgeInsets.fromLTRB(
+          DefaultValues.dialogPaddingRightLeft,
+          DefaultValues.dialogPaddingBottomTop,
+          DefaultValues.dialogPaddingRightLeft,
+          DefaultValues.dialogPaddingBottomTop,
+        ),
+        actions: [
+          Center(
+            child: TextButton(
               onPressed: () {
                 Navigator.pop(context);
               },
@@ -204,15 +205,13 @@ void editMeasureBeatDialog({
                 'Close',
                 style: TextStyle(
                   fontSize: 22,
-                  // fontWeight: FontWeight.bold,
-                  color: Colors.blue,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
                 ),
               ),
             ),
-
-          ],
-        ),
-
+          ),
+        ],
       );
 
     },

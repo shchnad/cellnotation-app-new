@@ -4,7 +4,7 @@ import 'package:music_composer/utils/default_values.dart';
 import '../controllers/composition_controller.dart';
 
 import '../dialogs/cell_width_dialog.dart';
-import '../dialogs/create_composition_dialog.dart';
+import '../dialogs/new_composition_dialog.dart';
 import '../dialogs/global_duration_dialog.dart';
 import '../dialogs/add_measures_dialog.dart';
 
@@ -44,7 +44,7 @@ class CompositionScreen extends StatelessWidget {
   void _showCreateDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => CreateCompositionDialog(
+      builder: (context) => NewCompositionDialog(
         onCompositionCreated: (newComp) {
           controller.updateComposition(newComp);
         },
@@ -117,8 +117,7 @@ class CompositionScreen extends StatelessWidget {
 
                       // NEW COMPOSITION
                       IconButton(
-                        icon: const Icon(
-                          Icons.note_add,
+                        icon: const Icon(Icons.library_add,
                           color: Colors.black,
                         ),
                         tooltip: 'New Composition',
@@ -129,8 +128,7 @@ class CompositionScreen extends StatelessWidget {
 
                       // ADD MEASURES
                       IconButton(
-                        icon: const Icon(
-                          Icons.playlist_add,
+                        icon: const Icon(Icons.copy,
                           color: Colors.black,
                         ),
                         tooltip: 'Add Measures',
@@ -146,8 +144,7 @@ class CompositionScreen extends StatelessWidget {
 
                       // RAISE SCALE
                       IconButton(
-                        icon: const Icon(
-                          Icons.arrow_upward,
+                        icon: const Icon(Icons.arrow_upward,
                           color: Colors.black,
                         ),
                         tooltip: 'Raise scales',
@@ -158,8 +155,7 @@ class CompositionScreen extends StatelessWidget {
 
                       // LOWER SCALE
                       IconButton(
-                        icon: const Icon(
-                          Icons.arrow_downward,
+                        icon: const Icon(Icons.arrow_downward,
                           color: Colors.black,
                         ),
                         tooltip: 'Lower scales',
@@ -170,8 +166,7 @@ class CompositionScreen extends StatelessWidget {
 
                       // DURATION
                       IconButton(
-                        icon: const Icon(
-                          Icons.av_timer,
+                        icon: const Icon(Icons.av_timer,
                           color: Colors.black,
                         ),
                         tooltip: 'Note Duration',
@@ -186,8 +181,7 @@ class CompositionScreen extends StatelessWidget {
 
                       // HAND
                       IconButton(
-                        icon: Icon(
-                          Icons.pan_tool,
+                        icon: Icon(Icons.pan_tool,
                           color:  controller.currentHand == Hand.right
                               ? Colors.black
                               : Colors.blue,
@@ -205,8 +199,7 @@ class CompositionScreen extends StatelessWidget {
 
                       // GRID SIZE
                       IconButton(
-                        icon: const Icon(
-                          Icons.grid_on,
+                        icon: const Icon(Icons.grid_on,
                           color: Colors.black,
                         ),
                         tooltip: 'Cell Width',
@@ -222,12 +215,8 @@ class CompositionScreen extends StatelessWidget {
                       // PASTE
                       if (controller.canPaste)
                         IconButton(
-                          icon: Icon(
-                            controller.pasteMode
-                                ? Icons.copy
-                                : Icons.content_paste,
-                            color:
-                            controller.pasteMode
+                          icon: Icon(Icons.control_point_duplicate,
+                            color: controller.pasteMode
                                 ? Colors.blue
                                 : Colors.black,
                           ),
