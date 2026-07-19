@@ -52,7 +52,7 @@ class NoteDialog extends StatelessWidget {
             // 'Note',
             // 'Note ${note.id}',
             // 'Note (tick ${editedNote.startTick + 1}, row ${editedNote.row + 1})',
-            'Note (T${editedNote.startTick + 1} / R${editedNote.row + 1})',
+            'Note ${controller.noteNumber(note)}',
             style: const TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
@@ -111,7 +111,7 @@ class NoteDialog extends StatelessWidget {
                           width: DefaultValues.widthBetweenWidgets,
                         ),
                         Text(
-                          'Pitch: ${controller.getNotePitchName(editedNote)}',
+                          'Pitch: ${controller.getNotePitchName(editedNote)}${editedNote.accidental?.sign ?? ''}',
                           style: TextStyle(
                               fontSize: 22,
                               ),
@@ -122,10 +122,7 @@ class NoteDialog extends StatelessWidget {
                 ),
 
 
-                const Divider(
-                  height: DefaultValues.heightBetweenWidgets,
-                  thickness: 1.0,
-                ),
+            const Divider(thickness: 1.0),
 
             ListTile(
               leading: const Icon(Icons.swap_vertical_circle_sharp),
@@ -332,63 +329,45 @@ class NoteDialog extends StatelessWidget {
             },
           ),
 
-                SizedBox(height: DefaultValues.heightBetweenWidgets),
-
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    SizedBox(
-                      width: DefaultValues.widthOfElevatedButton,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.black,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                        ),
-                        onPressed: () {
-                          controller.removeNote(editedNote);
-                          Navigator.pop(context);
-                        },
-                        child: const Text(
-                          'Delete Note',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    SizedBox(
-                        width: DefaultValues.widthBetweenWidgets,
-                    ),
-
-                    SizedBox(
-                      width: DefaultValues.widthOfElevatedButton,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                        ),
-                        onPressed: () {
-                          Navigator.pop(context);
-                        },
-                        child: const Text(
-                          'Close',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
               ],
             ),
           ),
-          actions: [],
+          actions: [
+            const Divider(thickness: 1.0),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  onPressed: () {
+                    controller.removeNote(editedNote);
+                    Navigator.pop(context);
+                  },
+                  child: const Text(
+                    'Delete Note',
+                    style: TextStyle(
+                      fontSize: 22,
+                      // fontWeight: FontWeight.bold,
+                      color: Colors.red,
+                    ),
+                  ),
+                ),
+
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  child: const Text(
+                    'Close',
+                    style: TextStyle(
+                      fontSize: 22,
+                      // fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         );
       },
     );
@@ -413,43 +392,6 @@ class NoteDialog extends StatelessWidget {
               fontSize: 22,
               // fontWeight: FontWeight.bold,
               color: Colors.black,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-
-  Widget _editButton(String title, String value, VoidCallback onTap) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            '$title ',
-            style: const TextStyle(
-                fontSize: 22,
-                color: Colors.black,
-            ),
-          ),
-          SizedBox(
-            width: DefaultValues.widthOfElevatedButton,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.grey.shade300,
-                foregroundColor: Colors.blue,
-            ),
-              onPressed: onTap,
-              child: Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 22,
-                  // fontWeight: FontWeight.bold,
-                ),
-
-              ),
             ),
           ),
         ],

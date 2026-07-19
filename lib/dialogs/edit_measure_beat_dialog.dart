@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../controllers/composition_controller.dart';
+import '../utils/default_values.dart';
 
 
 void editMeasureBeatDialog({
@@ -40,11 +41,47 @@ void editMeasureBeatDialog({
             ),
 
             ListTile(
+              leading: const Icon(Icons.lock_clock),
+              title: const Text(
+                "Tempo",
+                style: TextStyle(
+                  fontSize: 22,
+                  // fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+              onTap: () {
+                // open tempo dialog
+              },
+            ),
+
+
+            ListTile(
+              leading: const Icon(Icons.copy_all),
+              title: const Text(
+                "Duplicate Measure",
+                style: TextStyle(
+                  fontSize: 22,
+                  // fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+              onTap: () {
+                controller.copyMeasure(
+                  measureIndex,
+                );
+                Navigator.pop(context);
+              },
+            ),
+
+            ListTile(
               leading: const Icon(Icons.add_box),
               title: const Text(
                 "Insert Measure",
                 style: TextStyle(
                   fontSize: 22,
+                  // fontWeight: FontWeight.bold,
+                  color: Colors.black,
                 ),
               ),
               onTap: () {
@@ -58,6 +95,8 @@ void editMeasureBeatDialog({
                 "Delete Measure",
                 style: TextStyle(
                   fontSize: 22,
+                  // fontWeight: FontWeight.bold,
+                  color: Colors.red,
                 ),
               ),
               onTap: () {
@@ -68,53 +107,43 @@ void editMeasureBeatDialog({
               },
             ),
 
-            ListTile(
-              leading: const Icon(Icons.copy_all),
-              title: const Text(
-                "Duplicate Measure",
-                style: TextStyle(
-                  fontSize: 22,
-                ),
-              ),
-              onTap: () {
-                controller.copyMeasure(
-                  measureIndex,
-                );
-                Navigator.pop(context);
-              },
-            ),
+            const Divider(thickness: 1.0),
 
-            ListTile(
-              leading: const Icon(Icons.lock_clock),
-              title: const Text(
-                "Tempo",
-                style: TextStyle(
-                  fontSize: 22,
-                ),
-              ),
-              onTap: () {
-                // open tempo dialog
-              },
-            ),
-
-            const Divider(),
+            // Beat actions
 
             Text(
               "Beat ${beatIndex + 1}",
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 22,
-                color: Colors.black,
                 fontWeight: FontWeight.bold,
+                color: Colors.black,
               ),
             ),
 
-            // Beat actions
+            ListTile(
+              leading: const Icon(Icons.campaign_outlined),
+              title: const Text(
+                "Dynamic",
+                style: TextStyle(
+                  fontSize: 22,
+                  // fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+              onTap: () {
+                // open dynamic dialog here
+              },
+            ),
+
+
             ListTile(
               leading: const Icon(Icons.add),
               title: const Text(
                 "Insert Beat",
                 style: TextStyle(
                   fontSize: 22,
+                  // fontWeight: FontWeight.bold,
+                  color: Colors.black,
                 ),
               ),
               onTap: () {
@@ -125,22 +154,6 @@ void editMeasureBeatDialog({
               },
             ),
 
-            ListTile(
-              leading: const Icon(Icons.remove),
-              title: const Text(
-                "Delete Beat",
-                style: TextStyle(
-                  fontSize: 22,
-                ),
-              ),
-              onTap: () {
-                controller.removeBeatFromMeasure(
-                  measureIndex,
-                  beatIndex,
-                );
-                Navigator.pop(context);
-              },
-            ),
 
             ListTile(
               leading: const Icon(Icons.copy),
@@ -148,6 +161,8 @@ void editMeasureBeatDialog({
                 "Duplicate Beat",
                 style: TextStyle(
                   fontSize: 22,
+                  // fontWeight: FontWeight.bold,
+                  color: Colors.black,
                 ),
               ),
               onTap: () {
@@ -160,19 +175,26 @@ void editMeasureBeatDialog({
             ),
 
             ListTile(
-              leading: const Icon(Icons.campaign_outlined),
+              leading: const Icon(Icons.remove),
               title: const Text(
-                "Dynamic",
+                "Delete Beat",
                 style: TextStyle(
                   fontSize: 22,
+                  // fontWeight: FontWeight.bold,
+                  color: Colors.red,
                 ),
               ),
               onTap: () {
-                // open dynamic dialog here
+                controller.removeBeatFromMeasure(
+                  measureIndex,
+                  beatIndex,
+                );
+                Navigator.pop(context);
               },
             ),
 
-            const Divider(),
+
+            const Divider(thickness: 1.0),
 
             TextButton(
               onPressed: () {
@@ -182,7 +204,7 @@ void editMeasureBeatDialog({
                 'Close',
                 style: TextStyle(
                   fontSize: 22,
-                  fontWeight: FontWeight.bold,
+                  // fontWeight: FontWeight.bold,
                   color: Colors.blue,
                 ),
               ),

@@ -54,7 +54,6 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
 
   @override
   Widget build(BuildContext context) {
-
     final note = widget.note;
 
     final controller = widget.controller;
@@ -116,28 +115,27 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
         onLongPress: () {
           controller.copyNote(note);
           controller.enterPasteMode();
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text("Note copied")));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Note ${controller.noteNumber(note)} is copied'),
+            ),
+          );
         },
 
-        onDoubleTapDown: (details) {
+        onDoubleTap: () {
           final rawTick = note.startTick;
-          final measure = controller.getMeasureAtTick(rawTick,);
-          final measureIndex = controller.measures.indexOf(measure,);
+          final measure = controller.getMeasureAtTick(rawTick);
+          final measureIndex = controller.measures.indexOf(measure);
           final beatIndex =
-          ((rawTick - measure.startTick) ~/
-              measure.timeSignature
-                  .ticksPerBeat);
+              ((rawTick - measure.startTick) ~/
+              measure.timeSignature.ticksPerBeat);
           editMeasureBeatDialog(
             context: context,
             controller: controller,
             measureIndex: measureIndex,
             beatIndex: beatIndex,
           );
-
         },
-
 
         child: Container(
           decoration: BoxDecoration(
@@ -146,36 +144,37 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
             border: _articulationBorder(),
           ),
 
-          child: showPitch // PITCH
+          child:
+              showPitch // PITCH
               ? Padding(
-            padding: const EdgeInsets.only(left: 3, right: 2),
-            child: FittedBox(
-              alignment: Alignment.centerLeft,
-              fit: BoxFit.scaleDown,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    pitch,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: widget.cellHeight * .80,
-                      fontWeight: FontWeight.bold,
+                  padding: const EdgeInsets.only(left: 3, right: 2),
+                  child: FittedBox(
+                    alignment: Alignment.centerLeft,
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          pitch,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: widget.cellHeight * .80,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (accidental.isNotEmpty)
+                          Text(
+                            accidental, // ACCIDENTAL
+                            style: TextStyle(
+                              color: Colors.yellow,
+                              fontSize: widget.cellHeight * .80,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                  if (accidental.isNotEmpty)
-                    Text(
-                      accidental, // ACCIDENTAL
-                      style: TextStyle(
-                        color: Colors.yellow,
-                        fontSize: widget.cellHeight * .80,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          )
+                )
               : const SizedBox(),
         ),
       ),

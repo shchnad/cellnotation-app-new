@@ -234,35 +234,17 @@ class CompositionScreen extends StatelessWidget {
                           onPressed: () {
                             if (controller.pasteMode) {
                               controller.exitPasteMode();
-                              messageDialog(context, 'Paste mode is disable');
-                            } else {
-                              showDialog(
-                                context: context,
-                                builder: (_) => AlertDialog(
-                                  title: const Text(
-                                    "Copying mode",
-                                  ),
-                                  content: const Text(
-                                    "To copy: long-tap the note and clone it where ever you wish as many times as you wish.\n\n"
-                                        "To leave copying mode, toggle this button.",
-                                  ),
-
-                                  actions: [
-
-                                    TextButton(
-                                      onPressed: () {
-                                        Navigator.pop(context);
-                                      },
-                                      child: const Text(
-                                        "OK",
-                                      ),
-                                    ),
-
-                                  ],
-
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Paste mode is disable'),
                                 ),
                               );
-
+                            } else {
+                              messageDialog(
+                                context,
+                                controller.titleOfMessageDialog.toString(),
+                                controller.instructionToCopy.toString(),
+                              );
                             }
 
                           },

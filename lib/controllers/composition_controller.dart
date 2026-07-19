@@ -759,6 +759,19 @@ class CompositionController extends ChangeNotifier {
   // COPY / PASTE
   // =====================================================
 
+  String titleOfMessageDialog = 'Note copying';
+
+  String instructionToCopy = 'Long-tap the note to copy it. \n\n '
+      'You can paste it then where ever you wish as many times as you wish. \n\n'
+      'To stop pasting toggle this button.';
+
+  String noteNumber (Note note) {
+    return '${getMeasureNumber(note).toString()} '
+        '${getBeatNumber(note).toString()} '
+        '${getOctave(note).toString()} '
+        '${getNotePitchName(note)}';
+  }
+
   void pasteNoteAt(
       int tick,
       int row,

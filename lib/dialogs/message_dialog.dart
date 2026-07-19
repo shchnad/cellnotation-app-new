@@ -1,17 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:music_composer/utils/default_values.dart';
 
-void messageDialog(BuildContext context, String message) {
+void messageDialog(BuildContext context, String title, String message) {
   showDialog(
     context: context,
     builder: (context) {
       return AlertDialog(
-        title: const Text(
-          'Message',
-          style: TextStyle(fontSize: 22),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        title: Text(
+          title,
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
         ),
-        content: Text(
-            message,
-            style: TextStyle(fontSize: 22),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Divider(thickness: 1.0),
+            SizedBox(height: DefaultValues.heightBetweenWidgets),
+            Text(
+                message,
+              style: const TextStyle(
+                fontSize: 22,
+                // fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -19,8 +37,12 @@ void messageDialog(BuildContext context, String message) {
               Navigator.of(context).pop();
             },
             child: const Text(
-              'OK',
-               style: TextStyle(fontSize: 22),
+              'Close',
+              style: TextStyle(
+                fontSize: 22,
+                // fontWeight: FontWeight.bold,
+                color: Colors.blue,
+              ),
             ),
           ),
 
