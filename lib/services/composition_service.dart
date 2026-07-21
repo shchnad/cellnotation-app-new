@@ -16,8 +16,14 @@ class CompositionService {
     final uid = _uid;
     if (uid == null) throw Exception('User not signed in');
 
+    final user = FirebaseAuth.instance.currentUser;
+    final resolvedName = (user?.displayName != null && user!.displayName!.trim().isNotEmpty)
+        ? user.displayName!
+        : (user?.email ?? 'Unknown');
+
     final data = composition.copyWith(
       userId: uid,
+      userName: resolvedName,
       editedAt: DateTime.now(),
     ).toJson();
 
@@ -61,6 +67,25 @@ class CompositionService {
     final doc = await _collection.doc(id).get();
     if (!doc.exists) throw Exception('Composition not found');
     return Composition.fromJson(doc.data()!, id: doc.id);
+  }
+
+  /// Toggles the current user's like on a composition using an atomic
+  /// array update, so concurrent likes from different users never
+  /// overwrite each other (unlike a full-document save would).
+  Future<void> toggleLike(String compositionId, bool currentlyLiked) async {
+    final uid = _uid;
+    if (uid == null) throw Exception('User not signed in');
+
+    final ref = _collection.doc(compositionId);
+    if (currentlyLiked) {
+      await ref.update({
+        'likedBy': FieldValue.arrayRemove([uid]),
+      });
+    } else {
+      await ref.update({
+        'likedBy': FieldValue.arrayUnion([uid]),
+      });
+    }
   }
 
   Future<void> deleteComposition(String id) async {

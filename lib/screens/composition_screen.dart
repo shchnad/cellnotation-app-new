@@ -88,6 +88,57 @@ class CompositionScreen extends StatelessWidget {
   }
 
 
+  void _confirmSaveAndExit(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        title: const Text(
+          'Save changes?',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          'Do you want to save this composition?',
+          style: TextStyle(fontSize: 22),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext), // Cancel — stay here
+            child: const Text(
+              'Cancel',
+              style: TextStyle(fontSize: 22, color: Colors.black),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext); // close confirmation
+              Navigator.pop(context); // go home without saving
+            },
+            child: const Text(
+              "Don't Save",
+              style: TextStyle(fontSize: 22, color: Colors.red),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext); // close confirmation
+              await _saveComposition(context);
+              if (context.mounted) {
+                Navigator.pop(context); // go home after saving
+              }
+            },
+            child: const Text(
+              'Save',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blue),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
   Future<void> _saveComposition(BuildContext context) async {
     final service = CompositionService();
 
@@ -179,12 +230,23 @@ class CompositionScreen extends StatelessWidget {
                       // HOME
                       IconButton(
                         icon: const Icon(
-                          Icons.home,
+                          Icons.arrow_back,
                           color: Colors.black,
                         ),
                         tooltip: 'Home',
                         onPressed: () {
-                          Navigator.pop(context);
+                          _confirmSaveAndExit(context);
+                        },
+                      ),
+
+                      // SAVE
+                      IconButton(
+                        icon: const Icon(Icons.save,
+                          color: Colors.black,
+                        ),
+                        tooltip: 'Save Composition',
+                        onPressed: () {
+                          _saveComposition(context);
                         },
                       ),
 
@@ -210,16 +272,6 @@ class CompositionScreen extends StatelessWidget {
                         },
                       ),
 
-                      // SAVE
-                      IconButton(
-                        icon: const Icon(Icons.save,
-                          color: Colors.black,
-                        ),
-                        tooltip: 'Save Composition',
-                        onPressed: () {
-                          _saveComposition(context);
-                        },
-                      ),
 
                       // EDIT INFO
                       IconButton(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:music_composer/screens/profile_screen.dart';
 import '../dialogs/note_dialog.dart';
 import '../models/composition.dart';
 import '../controllers/composition_controller.dart';
@@ -84,10 +85,10 @@ class HomeScreen extends StatelessWidget {
                   label: 'Profile',
                   icon: Icons.person,
                   onTap: () {
-                    // Navigator.push(
-                    //   context,
-                    //   MaterialPageRoute(builder: (_) => const ProfileScreen()),
-                    // );
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                    );
                   },
                 ),
               ],

@@ -10,10 +10,12 @@ class Composition {
   final String style;
   final String instrument;
   final String userId; // Firebase Auth UID
+  final String userName;
   final DateTime createdAt;
   final DateTime editedAt;
   final int numberOfOctaves;
   final bool isPublic;
+  final List<String> likedBy;
 
   // Internal backing field for your mutable scaleName parameter
   String _scaleName;
@@ -30,10 +32,12 @@ class Composition {
     required this.style,
     required this.instrument,
     required this.userId,
+    this.userName = 'Unknown',
     DateTime? createdAt,
     DateTime? editedAt,
     required this.numberOfOctaves,
     this.isPublic = false,
+    List<String>? likedBy,
     required String scaleName,
     required this.timeline,
     required this.notes,
@@ -43,6 +47,7 @@ class Composition {
         editedAt = editedAt ?? DateTime.now(),
         tempoEvents = tempoEvents ?? [],
         dynamicEvents = dynamicEvents ?? [],
+        likedBy = likedBy ?? [],
         _scaleName = scaleName;
 
   // The Explicit Getter
@@ -53,6 +58,11 @@ class Composition {
     _scaleName = newScale;
   }
 
+  int get likeCount => likedBy.length;
+
+  bool isLikedBy(String? userId) =>
+      userId != null && likedBy.contains(userId);
+
   Composition copyWith({
     String? id,
     String? title,
@@ -60,10 +70,12 @@ class Composition {
     String? style,
     String? instrument,
     String? userId,
+    String? userName,
     DateTime? createdAt,
     DateTime? editedAt,
     int? numberOfOctaves,
     bool? isPublic,
+    List<String>? likedBy,
     String? scaleName,
     Timeline? timeline,
     List<Note>? notes,
@@ -77,10 +89,12 @@ class Composition {
       style: style ?? this.style,
       instrument: instrument ?? this.instrument,
       userId: userId ?? this.userId,
+      userName: userName ?? this.userName,
       createdAt: createdAt ?? this.createdAt,
       editedAt: editedAt ?? this.editedAt,
       numberOfOctaves: numberOfOctaves ?? this.numberOfOctaves,
       isPublic: isPublic ?? this.isPublic,
+      likedBy: likedBy ?? this.likedBy,
       scaleName: scaleName ?? this.scaleName,
       timeline: timeline ?? this.timeline,
       notes: notes ?? this.notes,
@@ -98,10 +112,12 @@ class Composition {
       'style': style,
       'instrument': instrument,
       'userId': userId,
+      'userName': userName,
       'createdAt': createdAt.toIso8601String(),
       'editedAt': editedAt.toIso8601String(),
       'numberOfOctaves': numberOfOctaves,
       'isPublic': isPublic,
+      'likedBy': likedBy,
       'scaleName': scaleName,
       'timeline': timeline.toJson(),
       'notes': notes.map((n) => n.toJson()).toList(),
@@ -118,10 +134,12 @@ class Composition {
       style: json['style'] as String,
       instrument: json['instrument'] as String,
       userId: json['userId'] as String,
+      userName: json['userName'] as String? ?? 'Unknown',
       createdAt: DateTime.parse(json['createdAt'] as String),
       editedAt: DateTime.parse(json['editedAt'] as String),
       numberOfOctaves: json['numberOfOctaves'] as int,
       isPublic: json['isPublic'] as bool? ?? false,
+      likedBy: (json['likedBy'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [],
       scaleName: json['scaleName'] as String,
       timeline: Timeline.fromJson(json['timeline'] as Map<String, dynamic>),
       notes: (json['notes'] as List<dynamic>)

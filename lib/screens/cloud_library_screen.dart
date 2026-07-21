@@ -23,6 +23,7 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
   MusicStyle _styleFilter = MusicStyle.any;
   Instrument _instrumentFilter = Instrument.any;
   String _searchQuery = '';
+  bool _sortByLikes = false;
 
   String? get _myUid => FirebaseAuth.instance.currentUser?.uid;
 
@@ -150,6 +151,19 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
                     );
                   },
                 ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: Icon(
+                    _sortByLikes ? Icons.favorite : Icons.access_time,
+                    color: _sortByLikes ? Colors.red : Colors.black,
+                  ),
+                  tooltip: _sortByLikes
+                      ? 'Sorted by most liked (tap for most recent)'
+                      : 'Sorted by most recent (tap for most liked)',
+                  onPressed: () {
+                    setState(() => _sortByLikes = !_sortByLikes);
+                  },
+                ),
               ],
             ),
           ),
@@ -169,13 +183,21 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
                 ),
                 Expanded(
                   flex: 2,
+                  child: Text('Shared by', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                ),
+                Expanded(
+                  flex: 2,
                   child: Text('Style', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                 ),
                 Expanded(
                   flex: 2,
                   child: Text('Instrument', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                 ),
-                SizedBox(width: 44),
+                SizedBox(
+                  width: 110,
+                  child: Text('Likes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                ),
+                SizedBox(width: 40),
               ],
             ),
           ),
@@ -216,6 +238,13 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
                       c.composer.toLowerCase().contains(query))
                       .toList();
                 }
+
+                if (_sortByLikes) {
+                  compositions = [...compositions]
+                    ..sort((a, b) => b.likeCount.compareTo(a.likeCount));
+                }
+                // else: keep the order already provided by Firestore
+                // (most recently edited first).
 
                 if (compositions.isEmpty) {
                   return const Center(
@@ -270,6 +299,14 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
                             Expanded(
                               flex: 2,
                               child: Text(
+                                comp.userName,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 16, color: Colors.blueGrey),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 2,
+                              child: Text(
                                 comp.style,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(fontSize: 16, color: Colors.grey),
@@ -288,6 +325,32 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
                                 padding: EdgeInsets.only(right: 8),
                                 child: Text('(yours)', style: TextStyle(fontSize: 12, color: Colors.blue)),
                               ),
+                            IconButton(
+                              icon: Icon(
+                                comp.isLikedBy(_myUid) ? Icons.favorite : Icons.favorite_border,
+                                size: 20,
+                                color: comp.isLikedBy(_myUid) ? Colors.red : Colors.grey,
+                              ),
+                              tooltip: comp.isLikedBy(_myUid) ? 'Unlike' : 'Like',
+                              onPressed: () async {
+                                if (comp.id == null) return;
+                                try {
+                                  await _service.toggleLike(comp.id!, comp.isLikedBy(_myUid));
+                                } catch (e) {
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Failed: $e', style: const TextStyle(fontSize: 18))),
+                                  );
+                                }
+                              },
+                            ),
+                            SizedBox(
+                              width: 24,
+                              child: Text(
+                                '${comp.likeCount}',
+                                style: const TextStyle(fontSize: 14, color: Colors.grey),
+                              ),
+                            ),
                             IconButton(
                               icon: const Icon(Icons.download, size: 20),
                               tooltip: 'Copy to My Compositions',
