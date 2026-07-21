@@ -32,11 +32,9 @@ void globalDurationDialog(
             childAspectRatio: 2.2,
             children: NoteDuration.values.map((d) {
               final selected = controller.currentDuration == d;
-
               return ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.grey.shade300,
-                  minimumSize: const Size(130, 48),
                 ),
                 onPressed: () {
                   controller.setDuration(d);

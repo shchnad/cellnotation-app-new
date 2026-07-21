@@ -349,7 +349,7 @@ class NoteDialog extends StatelessWidget {
                     Navigator.pop(context);
                   },
                   child: const Text(
-                    'Delete Note',
+                    'Delete',
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
@@ -370,7 +370,7 @@ class NoteDialog extends StatelessWidget {
                     Navigator.pop(context);
                   },
                   child: const Text(
-                    'Copy Note',
+                    'Copy',
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,

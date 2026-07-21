@@ -266,7 +266,7 @@ class GridPainter extends CustomPainter {
         // TEMPO NAME
         final textPainter = TextPainter(
           text: TextSpan(
-            text: tempoEvent.tempo.label,
+            text: '${tempoEvent.tempo.label} = ${tempoEvent.tempo.value}',
             style: const TextStyle(
               color: Colors.blue,
               fontSize: 18,

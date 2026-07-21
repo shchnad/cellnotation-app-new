@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-
 import '../controllers/composition_controller.dart';
 import '../enums/tempo.dart';
+import '../models/tempo_event.dart';
 
 
 void tempoDialog(
@@ -10,23 +10,26 @@ void tempoDialog(
     int tick,
     ) {
 
-  final screenSize = MediaQuery.of(context).size;
-
-  final dialogWidth = screenSize.width * 0.75;
-  final dialogHeight = screenSize.height * 0.75;
-
-  final canDelete = tick != 0;
-
-
   showDialog(
     context: context,
     builder: (_) {
+
+      final screen = MediaQuery.of(context).size;
+
+      TempoEvent? currentEvent;
+
+      for(final event in controller.timeline.tempoEvents){
+        if(event.tick == tick){
+          currentEvent = event;
+          break;
+        }
+      }
+
 
       return AlertDialog(
 
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
-
 
         title: const Text(
           "Select Tempo",
@@ -38,89 +41,101 @@ void tempoDialog(
           ),
         ),
 
+
         content: SizedBox(
-          width: dialogWidth,
-          height: dialogHeight,
-          child: Column(
-            children: [
-              Expanded(
-                child: GridView.count(
-                  crossAxisCount: 6,
-                  mainAxisSpacing: 8,
-                  crossAxisSpacing: 8,
-                  children: Tempo.values.map(
-                        (tempo) {
-                      return ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(130, 48),
-                          backgroundColor:
-                          Colors.grey.shade300,
-                        ),
-                        onPressed: () {
+          width: screen.width * 0.75,
+          // height: screen.height * 0.65,
 
-                          controller.updateTempoEvent(
-                            tick,
-                            tempo,
-                          );
+          child: GridView.count(
+            crossAxisCount: 4,
+            shrinkWrap: true,
+            mainAxisSpacing: 6,
+            crossAxisSpacing: 6,
+            childAspectRatio: 3.2,
+            children: Tempo.values.map(
+                    (tempo) {
 
-                          Navigator.pop(context);
-                        },
-
-                        child: Text(
-                          tempo.label,
-
-                          style: const TextStyle(
-                            fontSize: 22,
-                            color: Colors.black,
-                          ),
-
-                        ),
-
-                      );
-
-                    },
-                  ).toList(),
-
-                ),
-
-              ),
+                  final selected =
+                      currentEvent?.tempo == tempo;
 
 
-              const SizedBox(height: 12),
-
-
-              SizedBox(
-                width: double.infinity,
-                child: TextButton(
-                  onPressed: canDelete
-                      ? () {
-                    controller.deleteTempoEvent(
-                      tick,
-                    );
-                    Navigator.pop(context);
-                  }
-                      : null,
-                  child: Text(
-                    "Delete Tempo",
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: canDelete
-                          ? Colors.red
-                          : Colors.grey,
+                  return ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey.shade300,
+                      minimumSize: const Size(0, 36),
+                      padding: EdgeInsets.zero,
                     ),
+                    onPressed: () {
+                      controller.updateTempoEvent(
+                        tick,
+                        tempo,
+                      );
+                      Navigator.pop(context);
+                    },
+                    child: Text(
+                      tempo.label,
+                      style: TextStyle(
+                        fontSize: 22,
+                        color: selected
+                            ? Colors.blue
+                            : Colors.black,
+                      ),
+                    ),
+
+                  );
+                }
+            ).toList(),
+
+          ),
+        ),
+
+
+        actions: [
+
+          // DELETE BUTTON
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton(
+                onPressed: currentEvent == null
+                    ? null
+                    : () {
+                  controller.deleteTempoEvent(
+                    tick,
+                  );
+                  Navigator.pop(context);
+                },
+                child: const Text(
+                  "Delete",
+                  style: TextStyle(
+                    fontSize: 22,
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
 
+              // CANCEL BUTTON
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                child: const Text(
+                  "Close",
+                  style: TextStyle(
+                    fontSize: 22,
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
             ],
-
           ),
 
-        ),
+
+        ],
 
       );
-
     },
-
   );
 }
