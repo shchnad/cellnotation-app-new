@@ -7,7 +7,7 @@ enum Tempo {
   lantamente(52, 'Lantamente'),
   larghetto(54, 'Larghetto'),
   andante(58, 'Andante'),
-  moderato(80, 'mederato'),
+  moderato(80, 'Moderato'),
   alegretto(92, 'Alegretto'),
   animato(100, 'Animato'),
   di_marcia(112, 'Di Marcia'),

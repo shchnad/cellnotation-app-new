@@ -425,6 +425,16 @@ class CompositionController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void deleteTempoEvent(int tick) {
+    timeline.removeTempoEvent(
+      TempoEvent(
+        tick: tick,
+        tempo: Tempo.moderato, // value does not matter, only tick is used
+      ),
+    );
+    notifyListeners();
+  }
+
   // =====================================================
   // GRID / SNAP
   // =====================================================
