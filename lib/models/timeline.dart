@@ -1,26 +1,31 @@
+import '../enums/tempo.dart';
 import 'beat_event_model.dart';
+import 'dynamic_event.dart';
 import 'measure.dart';
 import 'time_signature.dart';
 import 'tempo_event.dart';
 
 
 class Timeline {
-  final List<Measure> measures;
-  final List<TempoEvent> tempoEvents;
-  final List<BeatEvent> beatEvents;
+final List<Measure> measures;
+final List<TempoEvent> tempoEvents;
+final List<DynamicEvent> dynamicEvents;
+final List<BeatEvent> beatEvents;
 
   Timeline({
     required this.measures,
     List<TempoEvent>? tempoEvents,
+    List<DynamicEvent>? dynamicEvents,
     List<BeatEvent>? beatEvents,
   }) :
-        tempoEvents = tempoEvents ?? [],
-        beatEvents = beatEvents ?? [] {
+tempoEvents = tempoEvents ?? [],
+dynamicEvents = dynamicEvents ?? [],
+beatEvents = beatEvents ?? [] {
     if(this.tempoEvents.isEmpty){
       this.tempoEvents.add(
         TempoEvent(
           tick: 0,
-          bpm: 120,
+          tempo: Tempo.moderato,
         ),
       );
     }
@@ -40,6 +45,37 @@ class Timeline {
     return measures.last.endTick;
   }
 
+// =====================================================
+// DYNAMICS
+// =====================================================
+
+  void addDynamicEvent(
+      DynamicEvent event,
+      ) {
+    dynamicEvents.removeWhere(
+          (e) => e.tick == event.tick,
+    );
+
+    dynamicEvents.add(event);
+
+    _sortDynamicEvents();
+  }
+
+
+  void removeDynamicEvent(
+      int tick,
+      ) {
+    dynamicEvents.removeWhere(
+          (e) => e.tick == tick,
+    );
+  }
+
+
+  void _sortDynamicEvents() {
+    dynamicEvents.sort(
+          (a, b) => a.tick.compareTo(b.tick),
+    );
+  }
 
   // =====================================================
   // MEASURE MANAGEMENT
@@ -209,13 +245,20 @@ class Timeline {
 
   // ================= JSON =================
 
-  Map<String, dynamic> toJson() {
-    return {
-      'measures': measures.map((m) => m.toJson()).toList(),
-      'tempoEvents': tempoEvents.map((t) => t.toJson()).toList(),
-      'beatEvents': beatEvents.map((e) => e.toJson()).toList(),
-    };
-  }
+Map<String, dynamic> toJson() {
+  return {
+    'measures': measures.map((m) => m.toJson()).toList(),
+
+    'tempoEvents':
+    tempoEvents.map((t)=>t.toJson()).toList(),
+
+    'dynamicEvents':
+    dynamicEvents.map((d)=>d.toJson()).toList(),
+
+    'beatEvents':
+    beatEvents.map((e)=>e.toJson()).toList(),
+  };
+}
 
   factory Timeline.fromJson(Map<String, dynamic> json) {
     return Timeline(
@@ -227,6 +270,14 @@ class Timeline {
           .toList(),
       beatEvents: (json['beatEvents'] as List<dynamic>)
           .map((e) => BeatEvent.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      dynamicEvents:
+      (json['dynamicEvents'] as List<dynamic>? ?? [])
+          .map(
+            (d)=>DynamicEvent.fromJson(
+          d as Map<String,dynamic>,
+        ),
+      )
           .toList(),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../controllers/composition_controller.dart';
+import '../dialogs/tempo_dialog.dart';
 import 'note_block_widget.dart';
 
 
@@ -81,27 +82,36 @@ class GridWidget extends StatelessWidget {
                     }
                   },
 
-                  child: CustomPaint(
-                    painter: GridPainter(
-                      controller: controller,
-                      cellHeight: cellHeight,
-                      pixelsPerTick: pixelsPerTick,
-
+                  child: GestureDetector(
+                    onTapDown: (details){
+                      final tick = (details.localPosition.dx /
+                          pixelsPerTick)
+                          .round();
+                      final tempoEvent =
+                      controller.getTempoAtTick(tick);
+                      if(tempoEvent != null){
+                        tempoDialog(
+                          context,
+                          controller,
+                          tempoEvent.tick,
+                        );
+                      }
+                    },
+                    child: CustomPaint(
+                      painter: GridPainter(
+                        controller: controller,
+                        cellHeight: cellHeight,
+                        pixelsPerTick: pixelsPerTick,
+                      ),
                     ),
-
                   ),
-
                 ),
-
               ),
-
 
               // NOTES
               ...controller.notes.map(
-
                     (note) =>
                     NoteBlockWidget(
-
                       key: ValueKey(note.id),
                       note: note,
                       pixelsPerTick: pixelsPerTick,
@@ -116,7 +126,6 @@ class GridWidget extends StatelessWidget {
     );
   }
   );
-
   }
 }
 
@@ -230,8 +239,59 @@ class GridPainter extends CustomPainter {
           beatPaint,
         );
       }
+
+
+      // =====================================================
+      // TEMPO EVENTS
+      // =====================================================
+
+      final tempoLinePaint = Paint()
+        ..color = Colors.blue
+        ..strokeWidth = 2;
+
+
+      for (final tempoEvent in controller.timeline.tempoEvents) {
+
+        final x = tempoEvent.tick * pixelsPerTick;
+
+
+        // RED VERTICAL LINE
+        canvas.drawLine(
+          Offset(x, 0),
+          Offset(x, size.height),
+          tempoLinePaint,
+        );
+
+
+        // TEMPO NAME
+        final textPainter = TextPainter(
+          text: TextSpan(
+            text: tempoEvent.tempo.label,
+            style: const TextStyle(
+              color: Colors.blue,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        );
+
+
+        textPainter.layout();
+
+
+        textPainter.paint(
+          canvas,
+          Offset(
+            x + 5,
+            5,
+          ),
+        );
+      }
+
     }
   }
+
 
 
   @override

@@ -1,18 +1,42 @@
+import '../enums/tempo.dart';
+
 class TempoEvent {
-  int tick;
-  int bpm;
+
+  final int tick;
+  final Tempo tempo;
 
   TempoEvent({
     required this.tick,
-    required this.bpm,
+    required this.tempo,
   });
 
-  Map<String, dynamic> toJson() => {'tick': tick, 'bpm': bpm};
 
-  factory TempoEvent.fromJson(Map<String, dynamic> json) {
+  TempoEvent copyWith({
+    int? tick,
+    Tempo? tempo,
+  }) {
     return TempoEvent(
-      tick: json['tick'] as int,
-      bpm: json['bpm'] as int,
+      tick: tick ?? this.tick,
+      tempo: tempo ?? this.tempo,
     );
   }
+
+
+  Map<String,dynamic> toJson(){
+    return {
+      'tick': tick,
+      'tempo': tempo.name,
+    };
+  }
+
+
+  factory TempoEvent.fromJson(Map<String,dynamic> json){
+    return TempoEvent(
+      tick: json['tick'],
+      tempo: Tempo.values.firstWhere(
+            (e)=>e.name == json['tempo'],
+      ),
+    );
+  }
+
 }

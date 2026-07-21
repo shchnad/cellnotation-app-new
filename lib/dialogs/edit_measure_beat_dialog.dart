@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:music_composer/dialogs/tempo_dialog.dart';
 
 import '../controllers/composition_controller.dart';
 import '../utils/default_values.dart';
@@ -43,7 +44,15 @@ void editMeasureBeatDialog({
                 ),
               ),
               onTap: () {
-                // open tempo dialog
+                  Navigator.pop(context);
+                  tempoDialog(
+                    context,
+                    controller,
+                    controller.getBeatTick(
+                      measureIndex,
+                      beatIndex,
+                    ),
+                  );
               },
             ),
 

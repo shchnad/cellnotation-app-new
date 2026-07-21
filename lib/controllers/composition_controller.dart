@@ -6,11 +6,17 @@ import '../enums/accidental.dart';
 import '../enums/finger.dart';
 import '../enums/ornament.dart';
 import '../enums/playing_technique.dart';
+import '../enums/tempo.dart';
 import '../models/composition.dart';
+import '../models/dynamic_event.dart';
 import '../models/note.dart';
 import '../models/measure.dart';
+import '../models/tempo_event.dart';
 import '../models/time_signature.dart';
 import '../models/timeline.dart';
+
+import '../models/dynamic_change_event.dart';
+
 
 import '../enums/hand.dart';
 import '../enums/note_duration.dart';
@@ -328,6 +334,94 @@ class CompositionController extends ChangeNotifier {
     )
         .toList();
     measure.beatEvents.addAll(beatEvents);
+    notifyListeners();
+  }
+
+  // =====================================================
+// TEMPO
+// =====================================================
+
+  void setTempoAtBeat(
+      int measureIndex,
+      int beatIndex,
+      Tempo tempo,
+      ) {
+    final tick = getBeatTick(
+      measureIndex,
+      beatIndex,
+    );
+    timeline.addTempoEvent(
+      TempoEvent(
+        tick: tick,
+        tempo: tempo,
+      ),
+    );
+    notifyListeners();
+  }
+
+
+  void removeTempoAtBeat(
+      int measureIndex,
+      int beatIndex,
+      ) {
+    final tick = getBeatTick(
+      measureIndex,
+      beatIndex,
+    );
+    timeline.removeTempoEvent(
+      TempoEvent(
+        tick: tick,
+        tempo: Tempo.moderato,
+      ),
+    );
+    notifyListeners();
+  }
+
+
+  void setTempoAtTick(
+      int tick,
+      Tempo tempo,
+      ) {
+    timeline.addTempoEvent(
+      TempoEvent(
+        tick: tick,
+        tempo: tempo,
+      ),
+    );
+    notifyListeners();
+  }
+  TempoEvent? getTempoAtTick(int tick) {
+    try {
+      return timeline.tempoEvents.firstWhere(
+            (e) => e.tick == tick,
+      );
+    }
+    catch(e) {
+      return null;
+    }
+  }
+
+
+  void updateTempoEvent(
+      int tick,
+      Tempo tempo,
+      ) {
+    final index = timeline.tempoEvents.indexWhere(
+          (e) => e.tick == tick,
+    );
+    if (index >= 0) {
+      timeline.tempoEvents[index] =
+          timeline.tempoEvents[index].copyWith(
+            tempo: tempo,
+          );
+    } else {
+      timeline.addTempoEvent(
+        TempoEvent(
+          tick: tick,
+          tempo: tempo,
+        ),
+      );
+    }
     notifyListeners();
   }
 
