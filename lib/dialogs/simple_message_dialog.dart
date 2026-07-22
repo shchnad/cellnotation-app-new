@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:music_composer/utils/default_values.dart';
 
-void messageDialog(BuildContext context, String title, String message) {
+void simpleMessageDialog(BuildContext context, String title, String message) {
   showDialog(
     context: context,
     builder: (context) {

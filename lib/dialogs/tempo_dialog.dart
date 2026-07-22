@@ -106,10 +106,10 @@ void tempoDialog(
                   Navigator.pop(context);
                 },
                 child: const Text(
-                  "Delete Tempo",
+                  "Delete",
                   style: TextStyle(
                     fontSize: 22,
-                    color: Colors.red,
+                    color: Colors.green,
                     fontWeight: FontWeight.bold,
                   ),
                 ),

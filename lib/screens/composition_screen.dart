@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:music_composer/dialogs/save_exit_dialog.dart';
 import 'package:music_composer/utils/default_values.dart';
 
 import '../controllers/composition_controller.dart';
@@ -8,7 +9,7 @@ import '../dialogs/new_composition_dialog.dart';
 import '../dialogs/global_duration_dialog.dart';
 import '../dialogs/add_measures_dialog.dart';
 
-import '../dialogs/message_dialog.dart';
+import '../dialogs/simple_message_dialog.dart';
 import '../dialogs/edit_composition_dialog.dart';
 import '../enums/hand.dart';
 
@@ -86,76 +87,6 @@ class CompositionScreen extends StatelessWidget {
     );
   }
 
-
-  void _confirmSaveAndExit(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        title: const Text(
-          '',
-          style: TextStyle(
-              fontSize: 22,
-              color: Colors.black,
-              // fontWeight: FontWeight.bold,
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-            'Save changes?',
-            style: TextStyle(fontSize: 22),
-          ),
-        ]
-        ),
-        actions: [
-          const Divider(thickness: 1.0),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(
-                  fontSize: 22,
-                  color: Colors.black,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              Navigator.pop(context);
-            },
-            child: const Text(
-              "No",
-              style: TextStyle(
-                  fontSize: 22,
-                  color: Colors.red,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              await _saveComposition(context);
-              if (context.mounted) {
-                Navigator.pop(context);
-              }
-            },
-            child: const Text(
-              'Yes',
-              style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
 
   Future<void> _saveComposition(BuildContext context) async {
@@ -254,7 +185,10 @@ class CompositionScreen extends StatelessWidget {
                         ),
                         tooltip: 'Home',
                         onPressed: () {
-                          _confirmSaveAndExit(context);
+                          saveExitDialog(
+                            context,
+                            onSave: () => _saveComposition(context),
+                          );
                         },
                       ),
 
@@ -398,7 +332,7 @@ class CompositionScreen extends StatelessWidget {
                                 ),
                               );
                             } else {
-                              messageDialog(
+                              simpleMessageDialog(
                                 context,
                                 DefaultValues.titleOfMessageForCopying.toString(),
                                 DefaultValues.messageForCopying.toString(),

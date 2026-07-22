@@ -9,7 +9,7 @@ import '../models/time_signature.dart';
 import '../enums/note_duration.dart';
 
 import '../utils/default_values.dart';
-import 'message_dialog.dart';
+import 'simple_message_dialog.dart';
 import 'note_values_dialog.dart';
 
 
@@ -356,7 +356,7 @@ class _AddMeasuresDialogState extends State<AddMeasuresDialog> {
                       _measuresController.text
                   );
                   if (count > DefaultValues.maxOfMeasuresToAddAtOnce) {
-                    messageDialog(
+                    simpleMessageDialog(
                         context,
                         'Invalid input',
                         'You cannot create more than ${DefaultValues.maxOfMeasuresToAddAtOnce} measures at once.'

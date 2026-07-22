@@ -41,7 +41,7 @@ void dynamicDialog(
         ),
 
         content: SizedBox(
-          width: screen.width * 0.75,
+          width: 320,
 
           child: GridView.count(
             // crossAxisCount: 3,
@@ -107,7 +107,7 @@ void dynamicDialog(
                   "Delete",
                   style: TextStyle(
                     fontSize: 22,
-                    color: Colors.red,
+                    color: Colors.green,
                     fontWeight: FontWeight.bold,
                   ),
                 ),

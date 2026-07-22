@@ -19,8 +19,8 @@ const _dynamicLabelStyle = TextStyle(
 );
 
 const double _labelOffsetX = 5;
-const double _dynamicLabelOffsetY = 5; // top of grid
-const double _tempoLabelBottomMargin = 5; // distance from bottom of grid
+const double _bottomMargin = 5; // distance from bottom of grid to tempo label
+const double _labelGap = 4; // gap between tempo label and dynamic label above it
 
 class _LabelHit {
   final int tick;
@@ -50,8 +50,9 @@ TextPainter _dynamicTextPainter(dynamic dynamicEvent) {
 }
 
 /// Computes tap-target rects for both tempo and dynamic labels.
-/// Tempo labels sit at the bottom of the grid, dynamic labels at the top —
-/// [gridHeight] is needed to place the tempo rects correctly.
+/// Both sit at the bottom of the grid: tempo on the very bottom row,
+/// dynamic stacked directly above it. [gridHeight] is needed to place
+/// them correctly.
 List<_LabelHit> _computeLabelHits(
     CompositionController controller,
     double pixelsPerTick,
@@ -62,7 +63,7 @@ List<_LabelHit> _computeLabelHits(
   for (final tempoEvent in controller.timeline.tempoEvents) {
     final x = tempoEvent.tick * pixelsPerTick;
     final tp = _tempoTextPainter(tempoEvent);
-    final y = gridHeight - tp.height - _tempoLabelBottomMargin;
+    final y = gridHeight - tp.height - _bottomMargin;
     hits.add(
       _LabelHit(
         tempoEvent.tick,
@@ -74,17 +75,36 @@ List<_LabelHit> _computeLabelHits(
 
   for (final dynamicEvent in controller.timeline.dynamicEvents) {
     final x = dynamicEvent.tick * pixelsPerTick;
-    final tp = _dynamicTextPainter(dynamicEvent);
+    final dynamicTp = _dynamicTextPainter(dynamicEvent);
+
+    // Position above the tempo label's height at the bottom, regardless
+    // of whether a tempo event exists at this exact tick, so dynamic
+    // labels always sit at a consistent height.
+    final tempoLineHeight = _tempoTextPainter(
+      controller.getTempoAtTick(tempoEventFallbackTick(controller, dynamicEvent.tick)) ??
+          controller.timeline.tempoEvents.first,
+    ).height;
+
+    final y = gridHeight - tempoLineHeight - _bottomMargin - _labelGap - dynamicTp.height;
+
     hits.add(
       _LabelHit(
         dynamicEvent.tick,
-        Rect.fromLTWH(x + _labelOffsetX, _dynamicLabelOffsetY, tp.width, tp.height),
+        Rect.fromLTWH(x + _labelOffsetX, y, dynamicTp.width, dynamicTp.height),
         false,
       ),
     );
   }
 
   return hits;
+}
+
+/// Helper used only for consistent row height — returns the tick to look
+/// up for sizing purposes (falls back to any existing tempo event if none
+/// exists at this exact tick, since we just need a representative height).
+int tempoEventFallbackTick(CompositionController controller, int tick) {
+  final exists = controller.getTempoAtTick(tick);
+  return exists != null ? tick : controller.timeline.tempoEvents.first.tick;
 }
 
 class GridWidget extends StatelessWidget {
@@ -276,18 +296,30 @@ class GridPainter extends CustomPainter {
       );
 
       final textPainter = _tempoTextPainter(tempoEvent);
-      final y = size.height - textPainter.height - _tempoLabelBottomMargin;
+      final y = size.height - textPainter.height - _bottomMargin;
       textPainter.paint(canvas, Offset(x + _labelOffsetX, y));
     }
 
     // =====================================================
-    // DYNAMIC EVENTS — no line, label only, top of grid
+    // DYNAMIC EVENTS — no line, label stacked above tempo label
     // =====================================================
+    // Use a representative tempo label height so dynamic labels sit at a
+    // consistent row regardless of which tick they're on.
+    final referenceTempoHeight = controller.timeline.tempoEvents.isNotEmpty
+        ? _tempoTextPainter(controller.timeline.tempoEvents.first).height
+        : 0.0;
+
     for (final dynamicEvent in controller.timeline.dynamicEvents) {
       final x = dynamicEvent.tick * pixelsPerTick;
-
       final textPainter = _dynamicTextPainter(dynamicEvent);
-      textPainter.paint(canvas, Offset(x + _labelOffsetX, _dynamicLabelOffsetY));
+
+      final y = size.height -
+          referenceTempoHeight -
+          _bottomMargin -
+          _labelGap -
+          textPainter.height;
+
+      textPainter.paint(canvas, Offset(x + _labelOffsetX, y));
     }
   }
 

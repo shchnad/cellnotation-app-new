@@ -36,7 +36,7 @@ void editMeasureBeatDialog({
 
 
             ListTile(
-              leading: const Icon(Icons.copy),
+              leading: const Icon(Icons.playlist_add),
               title: const Text(
                 "Insert Measure",
                 style: TextStyle(
@@ -57,7 +57,7 @@ void editMeasureBeatDialog({
                 style: TextStyle(
                   fontSize: 22,
                   // fontWeight: FontWeight.bold,
-                  color: Colors.blue,
+                  color: Colors.black,
                 ),
               ),
               onTap: () {
@@ -69,13 +69,13 @@ void editMeasureBeatDialog({
             ),
 
             ListTile(
-              leading: const Icon(Icons.delete),
+              leading: const Icon(Icons.delete_outline),
               title: const Text(
                 "Delete Measure",
                 style: TextStyle(
                   fontSize: 22,
                   // fontWeight: FontWeight.bold,
-                  color: Colors.red,
+                  color: Colors.green,
                 ),
               ),
               onTap: () {
@@ -120,13 +120,13 @@ void editMeasureBeatDialog({
 
 
             ListTile(
-              leading: const Icon(Icons.playlist_add),
+              leading: const Icon(Icons.copy),
               title: const Text(
                 "Duplicate Beat",
                 style: TextStyle(
                   fontSize: 22,
                   // fontWeight: FontWeight.bold,
-                  color: Colors.blue,
+                  color: Colors.black,
                 ),
               ),
               onTap: () {
@@ -139,13 +139,13 @@ void editMeasureBeatDialog({
             ),
 
             ListTile(
-              leading: const Icon(Icons.delete),
+              leading: const Icon(Icons.delete_outline),
               title: const Text(
                 "Delete Beat",
                 style: TextStyle(
                   fontSize: 22,
                   // fontWeight: FontWeight.bold,
-                  color: Colors.red,
+                  color: Colors.green,
                 ),
               ),
               onTap: () {
@@ -166,7 +166,7 @@ void editMeasureBeatDialog({
                 style: TextStyle(
                   fontSize: 22,
                   // fontWeight: FontWeight.bold,
-                  color: Colors.black,
+                  color: Colors.blue,
                 ),
               ),
               onTap: () {
@@ -189,7 +189,7 @@ void editMeasureBeatDialog({
                 style: TextStyle(
                   fontSize: 22,
                   // fontWeight: FontWeight.bold,
-                  color: Colors.black,
+                  color: Colors.red,
                 ),
               ),
               onTap: () {
@@ -221,7 +221,7 @@ void editMeasureBeatDialog({
                 Navigator.pop(context);
               },
               child: const Text(
-                'Cancel',
+                'Close',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,

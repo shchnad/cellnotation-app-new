@@ -130,7 +130,7 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
                   'Delete',
                   style: TextStyle(
                     fontSize: 22,
-                    color: Colors.red,
+                    color: Colors.green,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -292,11 +292,11 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
               TextButton(
                 onPressed: () => _confirmDelete(context),
                 child: const Text(
-                  'Delete Composition',
+                  'Delete',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    color: Colors.red,
+                    color: Colors.green,
                   ),
                 ),
               ),
@@ -315,7 +315,7 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
                 widget.onSaved(updated);
               },
               child: const Text(
-                'Save Changes',
+                'Save',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -326,7 +326,7 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: const Text(
-                'Cancel',
+                'Close',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
