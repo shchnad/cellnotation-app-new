@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../controllers/composition_controller.dart';
 import '../enums/note_duration.dart';
+import '../utils/default_values.dart';
 
 
 void globalDurationDialog(
@@ -54,6 +55,30 @@ void globalDurationDialog(
             }).toList(),
           ),
         ),
+        // actionsPadding: const EdgeInsets.fromLTRB(
+          // DefaultValues.dialogPaddingRightLeft,
+          // DefaultValues.dialogPaddingBottomTop,
+          // DefaultValues.dialogPaddingRightLeft,
+          // DefaultValues.dialogPaddingBottomTop,
+        // ),
+        actions: [
+          const Divider(thickness: 1.0),
+          Center(
+            child: TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text(
+                'Close',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+          ),
+        ],
       );
     },
   );

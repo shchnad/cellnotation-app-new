@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../controllers/composition_controller.dart';
-import '../enums/tempo.dart';
-import '../models/tempo_event.dart';
+import '../enums/musical_dynamic.dart';
+import '../models/dynamic_event.dart';
 
 
-void tempoDialog(
+void dynamicDialog(
     BuildContext context,
     CompositionController controller,
     int tick,
@@ -16,15 +16,14 @@ void tempoDialog(
 
       final screen = MediaQuery.of(context).size;
 
-      TempoEvent? currentEvent;
+      DynamicEvent? currentEvent;
 
-      for(final event in controller.timeline.tempoEvents){
-        if(event.tick == tick){
+      for (final event in controller.timeline.dynamicEvents) {
+        if (event.tick == tick) {
           currentEvent = event;
           break;
         }
       }
-
 
       return AlertDialog(
 
@@ -32,7 +31,7 @@ void tempoDialog(
         surfaceTintColor: Colors.white,
 
         title: const Text(
-          "Select Tempo",
+          "Select Dynamic",
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 22,
@@ -41,23 +40,25 @@ void tempoDialog(
           ),
         ),
 
-
         content: SizedBox(
           width: screen.width * 0.75,
-          // height: screen.height * 0.65,
 
           child: GridView.count(
-            crossAxisCount: 4,
+            // crossAxisCount: 3,
+            // shrinkWrap: true,
+            // mainAxisSpacing: 6,
+            // crossAxisSpacing: 6,
+            // childAspectRatio: 3.2,
+            crossAxisCount: 3, // number of columns
             shrinkWrap: true,
-            mainAxisSpacing: 6,
-            crossAxisSpacing: 6,
-            childAspectRatio: 3.2,
-            children: Tempo.values.map(
-                    (tempo) {
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 2.2,
+            children: MusicalDynamic.values.map(
+                    (dynamic) {
 
                   final selected =
-                      currentEvent?.tempo == tempo;
-
+                      currentEvent?.musical_dynamic == dynamic;
 
                   return ElevatedButton(
                     style: ElevatedButton.styleFrom(
@@ -66,14 +67,14 @@ void tempoDialog(
                       padding: EdgeInsets.zero,
                     ),
                     onPressed: () {
-                      controller.updateTempoEvent(
+                      controller.updateDynamicEvent(
                         tick,
-                        tempo,
+                        dynamic,
                       );
                       Navigator.pop(context);
                     },
                     child: Text(
-                      tempo.label,
+                      dynamic.abbreviation,
                       style: TextStyle(
                         fontSize: 22,
                         color: selected
@@ -81,32 +82,29 @@ void tempoDialog(
                             : Colors.black,
                       ),
                     ),
-
                   );
                 }
             ).toList(),
-
           ),
         ),
 
-
         actions: [
-          const Divider(thickness: 1.0),
-          // DELETE BUTTON
+
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // DELETE BUTTON
               TextButton(
                 onPressed: currentEvent == null
                     ? null
                     : () {
-                  controller.deleteTempoEvent(
+                  controller.deleteDynamicEvent(
                     tick,
                   );
                   Navigator.pop(context);
                 },
                 child: const Text(
-                  "Delete Tempo",
+                  "Delete",
                   style: TextStyle(
                     fontSize: 22,
                     color: Colors.red,
@@ -131,10 +129,7 @@ void tempoDialog(
               ),
             ],
           ),
-
-
         ],
-
       );
     },
   );

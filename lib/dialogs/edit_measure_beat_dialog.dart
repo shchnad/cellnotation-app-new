@@ -3,6 +3,7 @@ import 'package:music_composer/dialogs/tempo_dialog.dart';
 
 import '../controllers/composition_controller.dart';
 import '../utils/default_values.dart';
+import 'dynamic_dialog.dart';
 
 
 void editMeasureBeatDialog({
@@ -33,28 +34,6 @@ void editMeasureBeatDialog({
               ),
             ),
 
-            ListTile(
-              leading: const Icon(Icons.lock_clock),
-              title: const Text(
-                "Set Tempo",
-                style: TextStyle(
-                  fontSize: 22,
-                  // fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              onTap: () {
-                  Navigator.pop(context);
-                  tempoDialog(
-                    context,
-                    controller,
-                    controller.getBeatTick(
-                      measureIndex,
-                      beatIndex,
-                    ),
-                  );
-              },
-            ),
 
             ListTile(
               leading: const Icon(Icons.copy),
@@ -120,21 +99,6 @@ void editMeasureBeatDialog({
               ),
             ),
 
-            ListTile(
-              leading: const Icon(Icons.campaign_outlined),
-              title: const Text(
-                "Set Dynamic",
-                style: TextStyle(
-                  fontSize: 22,
-                  // fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              onTap: () {
-                // open dynamic dialog here
-              },
-            ),
-
 
             ListTile(
               leading: const Icon(Icons.playlist_add),
@@ -195,6 +159,51 @@ void editMeasureBeatDialog({
 
             const Divider(thickness: 1.0),
 
+            ListTile(
+              leading: const Icon(Icons.lock_clock),
+              title: const Text(
+                "Set Tempo",
+                style: TextStyle(
+                  fontSize: 22,
+                  // fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                tempoDialog(
+                  context,
+                  controller,
+                  controller.getBeatTick(
+                    measureIndex,
+                    beatIndex,
+                  ),
+                );
+              },
+            ),
+
+            ListTile(
+              leading: const Icon(Icons.campaign_outlined),
+              title: const Text(
+                "Set Dynamic",
+                style: TextStyle(
+                  fontSize: 22,
+                  // fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                dynamicDialog(
+                  context,
+                  controller,
+                  controller.getBeatTick(
+                    measureIndex,
+                    beatIndex,
+                  ),
+                );
+              },
+            ),
           ],
         ),
 
@@ -205,13 +214,14 @@ void editMeasureBeatDialog({
           DefaultValues.dialogPaddingBottomTop,
         ),
         actions: [
+          const Divider(thickness: 1.0),
           Center(
             child: TextButton(
               onPressed: () {
                 Navigator.pop(context);
               },
               child: const Text(
-                'Close',
+                'Cancel',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,

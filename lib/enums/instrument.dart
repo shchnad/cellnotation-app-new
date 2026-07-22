@@ -14,7 +14,7 @@ enum Instrument {
   ukelele('ukelele'),
   balalaika('balalaika'),
   banjo('banjo)'),
-  harp('Harp'),
+  harp('harp'),
   clarinet('clarinet'),
   cornet('cornet'),
   flute('flute'),

@@ -128,7 +128,11 @@ class NoteDialog extends StatelessWidget {
               // leading: const Icon(Icons.open_in_full_sharp),
               title: Text(
                 'Accidental: ${editedNote.accidental?.sign ?? 'none'}',
-                style: const TextStyle(fontSize: 22),
+                style: const TextStyle(
+                  fontSize: 22,
+                  color: Colors.blue,
+                  // fontWeight: FontWeight.bold,
+                ),
               ),
               onTap: () {
                 noteValuesDialog<Accidental>(
@@ -161,7 +165,7 @@ class NoteDialog extends StatelessWidget {
                 'Duration: ${controller.durationLabel(editedNote)}',
                   style: const TextStyle(
                     fontSize: 22,
-                    color: Colors.black,
+                    color: Colors.blue,
                     // fontWeight: FontWeight.bold,
                   ),
               ),
@@ -191,7 +195,7 @@ class NoteDialog extends StatelessWidget {
               'Hand: ${editedNote.hand.name}',
               style: const TextStyle(
                 fontSize: 22,
-                color: Colors.black,
+                color: Colors.blue,
                 // fontWeight: FontWeight.bold,
               ),
             ),
@@ -216,7 +220,7 @@ class NoteDialog extends StatelessWidget {
               'Finger: ${ editedNote.finger?.value.toString() ?? 'none'}',
               style: const TextStyle(
                 fontSize: 22,
-                color: Colors.black,
+                color: Colors.blue,
                 // fontWeight: FontWeight.bold,
               ),
             ),
@@ -244,7 +248,7 @@ class NoteDialog extends StatelessWidget {
               'Articulation: ${editedNote.articulation?.label ?? 'none'}',
               style: const TextStyle(
                 fontSize: 22,
-                color: Colors.black,
+                color: Colors.blue,
                 // fontWeight: FontWeight.bold,
               ),
             ),
@@ -275,7 +279,7 @@ class NoteDialog extends StatelessWidget {
               'Ornament: ${editedNote.ornament?.label ?? 'none'}',
               style: const TextStyle(
                 fontSize: 22,
-                color: Colors.black,
+                color: Colors.blue,
                 // fontWeight: FontWeight.bold,
               ),
             ),
@@ -303,7 +307,7 @@ class NoteDialog extends StatelessWidget {
               'Playing Technique: ${editedNote.playingTechnique?.label ?? 'none'}',
               style: const TextStyle(
                 fontSize: 22,
-                color: Colors.black,
+                color: Colors.blue,
                 // fontWeight: FontWeight.bold,
               ),
             ),
@@ -349,7 +353,7 @@ class NoteDialog extends StatelessWidget {
                     Navigator.pop(context);
                   },
                   child: const Text(
-                    'Delete',
+                    'Delete Note',
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
@@ -370,7 +374,7 @@ class NoteDialog extends StatelessWidget {
                     Navigator.pop(context);
                   },
                   child: const Text(
-                    'Copy',
+                    'Copy Note',
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,

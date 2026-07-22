@@ -51,7 +51,7 @@ class _NewCompositionDialogState extends State<NewCompositionDialog> {
       style: const TextStyle(
         fontSize: 22,
         color: Colors.blue,
-        fontWeight: FontWeight.bold,
+        // fontWeight: FontWeight.bold,
       ),
       decoration: InputDecoration(
         labelText: label,
@@ -112,7 +112,7 @@ class _NewCompositionDialogState extends State<NewCompositionDialog> {
                             style: const TextStyle(
                               fontSize: 22,
                               color: Colors.blue,
-                              fontWeight: FontWeight.bold,
+                              // fontWeight: FontWeight.bold,
                             ),
                             validator: (value) =>
                             value == null || value.trim().isEmpty
@@ -131,7 +131,7 @@ class _NewCompositionDialogState extends State<NewCompositionDialog> {
                             style: const TextStyle(
                               fontSize: 22,
                               color: Colors.blue,
-                              fontWeight: FontWeight.bold,
+                              // fontWeight: FontWeight.bold,
                             ),
                             validator: (value) =>
                             value == null || value.trim().isEmpty
@@ -194,7 +194,7 @@ class _NewCompositionDialogState extends State<NewCompositionDialog> {
                     const SizedBox(width: 8),
                     const Expanded(
                       child: Text(
-                        'Public — visible to all users in Cloud Library',
+                        'Visible to all users in Cloud Library',
                         style: TextStyle(
                             fontSize: 22,
                             color: Colors.black
@@ -220,6 +220,7 @@ class _NewCompositionDialogState extends State<NewCompositionDialog> {
         DefaultValues.dialogPaddingBottomTop,
       ),
       actions: [
+        const Divider(thickness: 1.0),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -227,7 +228,7 @@ class _NewCompositionDialogState extends State<NewCompositionDialog> {
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: const Text(
-                'Cancel',
+                'Close',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,

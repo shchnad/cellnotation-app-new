@@ -68,7 +68,7 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
       style: const TextStyle(
         fontSize: 22,
         color: Colors.blue,
-        fontWeight: FontWeight.bold,
+        // fontWeight: FontWeight.bold,
       ),
       decoration: InputDecoration(
         labelText: label,
@@ -95,31 +95,49 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
         surfaceTintColor: Colors.white,
         title: const Text(
           'Delete Composition?',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+          ),
         ),
         content: Text(
           'This will permanently delete "${widget.composition.title}". This cannot be undone.',
-          style: const TextStyle(fontSize: 18),
+          style: const TextStyle(fontSize: 22),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(fontSize: 18, color: Colors.black),
-            ),
+          const Divider(thickness: 1.0),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(
+                      fontSize: 22,
+                      color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context); // close confirmation
+                  Navigator.pop(context); // close edit dialog
+                  widget.onDelete?.call();
+                },
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(
+                    fontSize: 22,
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context); // close confirmation
-              Navigator.pop(context); // close edit dialog
-              widget.onDelete?.call();
-            },
-            child: const Text(
-              'Delete',
-              style: TextStyle(fontSize: 18, color: Colors.red, fontWeight: FontWeight.bold),
-            ),
-          ),
+
         ],
       ),
     );
@@ -132,7 +150,7 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.white,
       title: const Text(
-        'Edit Composition Info',
+        'Edit Composition Data',
         textAlign: TextAlign.center,
         style: TextStyle(
           fontSize: 22,
@@ -167,7 +185,7 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
                             style: const TextStyle(
                               fontSize: 22,
                               color: Colors.blue,
-                              fontWeight: FontWeight.bold,
+                              // fontWeight: FontWeight.bold,
                             ),
                             validator: (value) =>
                             value == null || value.trim().isEmpty
@@ -186,7 +204,7 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
                             style: const TextStyle(
                               fontSize: 22,
                               color: Colors.blue,
-                              fontWeight: FontWeight.bold,
+                              // fontWeight: FontWeight.bold,
                             ),
                             validator: (value) =>
                             value == null || value.trim().isEmpty
@@ -249,8 +267,8 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
                     const SizedBox(width: 8),
                     const Expanded(
                       child: Text(
-                        'Public — visible to all users in Cloud Library',
-                        style: TextStyle(fontSize: 16),
+                        'Visible to all users in Cloud Library',
+                        style: TextStyle(fontSize: 22),
                       ),
                     ),
                     Switch(
@@ -266,6 +284,7 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
       ),
       actionsPadding: const EdgeInsets.fromLTRB(24, 12, 24, 12),
       actions: [
+        const Divider(thickness: 1.0),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -273,7 +292,7 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
               TextButton(
                 onPressed: () => _confirmDelete(context),
                 child: const Text(
-                  'Delete',
+                  'Delete Composition',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -281,17 +300,6 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
                   ),
                 ),
               ),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-            ),
             TextButton(
               onPressed: () {
                 if (!_formKey.currentState!.validate()) return;
@@ -307,11 +315,22 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
                 widget.onSaved(updated);
               },
               child: const Text(
-                'Save',
+                'Save Changes',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
                   color: Colors.blue,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
                 ),
               ),
             ),

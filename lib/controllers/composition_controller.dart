@@ -4,6 +4,7 @@ import 'package:music_composer/utils/default_values.dart';
 
 import '../enums/accidental.dart';
 import '../enums/finger.dart';
+import '../enums/musical_dynamic.dart';
 import '../enums/ornament.dart';
 import '../enums/playing_technique.dart';
 import '../enums/tempo.dart';
@@ -432,6 +433,47 @@ class CompositionController extends ChangeNotifier {
         tempo: Tempo.moderato, // value does not matter, only tick is used
       ),
     );
+    notifyListeners();
+  }
+
+
+  // =====================================================
+  // DYNAMICS
+  // =====================================================
+
+  DynamicEvent? getDynamicAtTick(int tick) {
+    try {
+      return timeline.dynamicEvents.firstWhere(
+            (e) => e.tick == tick,
+      );
+    }
+    catch (e) {
+      return null;
+    }
+  }
+
+  void updateDynamicEvent(
+      int tick,
+      MusicalDynamic dynamic,
+      ) {
+    final index = timeline.dynamicEvents.indexWhere(
+          (e) => e.tick == tick,
+    );
+    if (index >= 0) {
+      timeline.dynamicEvents[index].musical_dynamic = dynamic;
+    } else {
+      timeline.addDynamicEvent(
+        DynamicEvent(
+          tick: tick,
+          musical_dynamic: dynamic,
+        ),
+      );
+    }
+    notifyListeners();
+  }
+
+  void deleteDynamicEvent(int tick) {
+    timeline.removeDynamicEvent(tick);
     notifyListeners();
   }
 

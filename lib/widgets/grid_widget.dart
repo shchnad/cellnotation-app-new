@@ -2,44 +2,88 @@ import 'package:flutter/material.dart';
 
 import '../controllers/composition_controller.dart';
 import '../dialogs/tempo_dialog.dart';
+import '../dialogs/dynamic_dialog.dart';
 import 'note_block_widget.dart';
 
-/// Shared text style so the widget's hit-testing and the painter's
-/// drawing always agree on the label's size.
+/// Shared text styles so hit-testing and painting always agree on size.
 const _tempoLabelStyle = TextStyle(
   color: Colors.blue,
   fontSize: 18,
   fontWeight: FontWeight.bold,
 );
 
-class _TempoLabelHit {
-  final dynamic tempoEvent;
+const _dynamicLabelStyle = TextStyle(
+  color: Colors.deepOrange,
+  fontSize: 18,
+  fontWeight: FontWeight.bold,
+);
+
+const double _labelOffsetX = 5;
+const double _dynamicLabelOffsetY = 5; // top of grid
+const double _tempoLabelBottomMargin = 5; // distance from bottom of grid
+
+class _LabelHit {
+  final int tick;
   final Rect rect;
-  _TempoLabelHit(this.tempoEvent, this.rect);
+  final bool isTempo; // true = tempo, false = dynamic
+  _LabelHit(this.tick, this.rect, this.isTempo);
 }
 
-List<_TempoLabelHit> _computeTempoLabelRects(
+TextPainter _tempoTextPainter(dynamic tempoEvent) {
+  return TextPainter(
+    text: TextSpan(
+      text: '${tempoEvent.tempo.label} = ${tempoEvent.tempo.value}',
+      style: _tempoLabelStyle,
+    ),
+    textDirection: TextDirection.ltr,
+  )..layout();
+}
+
+TextPainter _dynamicTextPainter(dynamic dynamicEvent) {
+  return TextPainter(
+    text: TextSpan(
+      text: dynamicEvent.musical_dynamic.abbreviation,
+      style: _dynamicLabelStyle,
+    ),
+    textDirection: TextDirection.ltr,
+  )..layout();
+}
+
+/// Computes tap-target rects for both tempo and dynamic labels.
+/// Tempo labels sit at the bottom of the grid, dynamic labels at the top —
+/// [gridHeight] is needed to place the tempo rects correctly.
+List<_LabelHit> _computeLabelHits(
     CompositionController controller,
     double pixelsPerTick,
+    double gridHeight,
     ) {
-  final hits = <_TempoLabelHit>[];
+  final hits = <_LabelHit>[];
+
   for (final tempoEvent in controller.timeline.tempoEvents) {
     final x = tempoEvent.tick * pixelsPerTick;
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: '${tempoEvent.tempo.label} = ${tempoEvent.tempo.value}',
-        style: _tempoLabelStyle,
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-
+    final tp = _tempoTextPainter(tempoEvent);
+    final y = gridHeight - tp.height - _tempoLabelBottomMargin;
     hits.add(
-      _TempoLabelHit(
-        tempoEvent,
-        Rect.fromLTWH(x + 5, 5, textPainter.width, textPainter.height),
+      _LabelHit(
+        tempoEvent.tick,
+        Rect.fromLTWH(x + _labelOffsetX, y, tp.width, tp.height),
+        true,
       ),
     );
   }
+
+  for (final dynamicEvent in controller.timeline.dynamicEvents) {
+    final x = dynamicEvent.tick * pixelsPerTick;
+    final tp = _dynamicTextPainter(dynamicEvent);
+    hits.add(
+      _LabelHit(
+        dynamicEvent.tick,
+        Rect.fromLTWH(x + _labelOffsetX, _dynamicLabelOffsetY, tp.width, tp.height),
+        false,
+      ),
+    );
+  }
+
   return hits;
 }
 
@@ -76,20 +120,22 @@ class GridWidget extends StatelessWidget {
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTapDown: (details) {
-                        // 1. Check tempo labels first — tapping a label
-                        //    should edit tempo, not create a note.
-                        final tempoHits = _computeTempoLabelRects(
+                        // 1. Check tempo/dynamic labels first — tapping a
+                        //    label should open its edit dialog, not create
+                        //    a note.
+                        final labelHits = _computeLabelHits(
                           controller,
                           pixelsPerTick,
+                          gridHeight,
                         );
 
-                        for (final hit in tempoHits) {
+                        for (final hit in labelHits) {
                           if (hit.rect.contains(details.localPosition)) {
-                            tempoDialog(
-                              context,
-                              controller,
-                              hit.tempoEvent.tick,
-                            );
+                            if (hit.isTempo) {
+                              tempoDialog(context, controller, hit.tick);
+                            } else {
+                              dynamicDialog(context, controller, hit.tick);
+                            }
                             return; // don't fall through to note creation
                           }
                         }
@@ -214,7 +260,7 @@ class GridPainter extends CustomPainter {
     }
 
     // =====================================================
-    // TEMPO EVENTS — drawn once, not per measure
+    // TEMPO EVENTS — line full height, label at bottom of grid
     // =====================================================
     final tempoLinePaint = Paint()
       ..color = Colors.blue
@@ -223,23 +269,25 @@ class GridPainter extends CustomPainter {
     for (final tempoEvent in controller.timeline.tempoEvents) {
       final x = tempoEvent.tick * pixelsPerTick;
 
-      // Vertical line
       canvas.drawLine(
         Offset(x, 0),
         Offset(x, size.height),
         tempoLinePaint,
       );
 
-      // Label
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: '${tempoEvent.tempo.label} = ${tempoEvent.tempo.value}',
-          style: _tempoLabelStyle,
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
+      final textPainter = _tempoTextPainter(tempoEvent);
+      final y = size.height - textPainter.height - _tempoLabelBottomMargin;
+      textPainter.paint(canvas, Offset(x + _labelOffsetX, y));
+    }
 
-      textPainter.paint(canvas, Offset(x + 5, 5));
+    // =====================================================
+    // DYNAMIC EVENTS — no line, label only, top of grid
+    // =====================================================
+    for (final dynamicEvent in controller.timeline.dynamicEvents) {
+      final x = dynamicEvent.tick * pixelsPerTick;
+
+      final textPainter = _dynamicTextPainter(dynamicEvent);
+      textPainter.paint(canvas, Offset(x + _labelOffsetX, _dynamicLabelOffsetY));
     }
   }
 

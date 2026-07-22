@@ -19,10 +19,14 @@ void cellWidthDialog(
             backgroundColor: Colors.white,
             surfaceTintColor: Colors.white,
 
-            title: const Text(
-              "Cell Width",
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
+            title: Center(
+              child: const Text(
+                "Set Cell Width",
+                style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
 
@@ -33,7 +37,8 @@ void cellWidthDialog(
                 Text(
                   "${controller.pixelsPerTick.toStringAsFixed(0)} px",
                   style: const TextStyle(
-                    fontSize: 24,
+                    fontSize: 22,
+                    color: Colors.blue,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -48,6 +53,7 @@ void cellWidthDialog(
                     IconButton(
                       icon: const Icon(
                         Icons.remove,
+                        color: Colors.blue,
                         size: 35,
                       ),
                       onPressed: (){
@@ -60,6 +66,7 @@ void cellWidthDialog(
                     IconButton(
                       icon: const Icon(
                         Icons.add,
+                        color: Colors.blue,
                         size: 35,
                       ),
                       onPressed: (){
@@ -74,44 +81,55 @@ void cellWidthDialog(
             ),
 
             actions: [
+              const Divider(thickness: 1.0),
 
-              TextButton(
-                onPressed: (){
-                  controller.setMinimumCellWidth();
-                },
-                child: const Text(
-                  "Min",
-                  style: TextStyle(
-                    fontSize: 20,
+              Row(
+                children: [
+                  TextButton(
+                    onPressed: (){
+                      controller.setMinimumCellWidth();
+                    },
+                    child: const Text(
+                      "Min",
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
-                ),
+
+                  TextButton(
+                    onPressed: (){
+                      controller.resetCellWidth();
+                    },
+                    child: const Text(
+                      "Reset",
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+
+
+                  TextButton(
+                    onPressed: (){
+                      Navigator.pop(context);
+                    },
+                    child: const Text(
+                      "Close",
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
 
-
-              TextButton(
-                onPressed: (){
-                  controller.resetCellWidth();
-                },
-                child: const Text(
-                  "Reset",
-                  style: TextStyle(
-                    fontSize: 20,
-                  ),
-                ),
-              ),
-
-
-              TextButton(
-                onPressed: (){
-                  Navigator.pop(context);
-                },
-                child: const Text(
-                  "Close",
-                  style: TextStyle(
-                    fontSize: 20,
-                  ),
-                ),
-              ),
 
             ],
 

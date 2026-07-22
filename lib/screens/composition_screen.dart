@@ -29,7 +29,6 @@ class CompositionScreen extends StatelessWidget {
 
 
   void _openAppendMeasuresForm(BuildContext context) {
-
     showDialog(
       context: context,
       builder: (context) => AddMeasuresDialog(
@@ -95,42 +94,62 @@ class CompositionScreen extends StatelessWidget {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         title: const Text(
-          'Save changes?',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          '',
+          style: TextStyle(
+              fontSize: 22,
+              color: Colors.black,
+              // fontWeight: FontWeight.bold,
+          ),
         ),
-        content: const Text(
-          'Do you want to save this composition?',
-          style: TextStyle(fontSize: 22),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+            'Save changes?',
+            style: TextStyle(fontSize: 22),
+          ),
+        ]
         ),
         actions: [
+          const Divider(thickness: 1.0),
           TextButton(
-            onPressed: () => Navigator.pop(dialogContext), // Cancel — stay here
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text(
               'Cancel',
-              style: TextStyle(fontSize: 22, color: Colors.black),
+              style: TextStyle(
+                  fontSize: 22,
+                  color: Colors.black,
+              ),
             ),
           ),
           TextButton(
             onPressed: () {
-              Navigator.pop(dialogContext); // close confirmation
-              Navigator.pop(context); // go home without saving
+              Navigator.pop(dialogContext);
+              Navigator.pop(context);
             },
             child: const Text(
-              "Don't Save",
-              style: TextStyle(fontSize: 22, color: Colors.red),
+              "No",
+              style: TextStyle(
+                  fontSize: 22,
+                  color: Colors.red,
+              ),
             ),
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(dialogContext); // close confirmation
+              Navigator.pop(dialogContext);
               await _saveComposition(context);
               if (context.mounted) {
-                Navigator.pop(context); // go home after saving
+                Navigator.pop(context);
               }
             },
             child: const Text(
-              'Save',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blue),
+              'Yes',
+              style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue,
+              ),
             ),
           ),
         ],

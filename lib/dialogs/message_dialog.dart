@@ -41,7 +41,7 @@ void messageDialog(BuildContext context, String title, String message) {
               style: TextStyle(
                 fontSize: 22,
                 // fontWeight: FontWeight.bold,
-                color: Colors.blue,
+                color: Colors.black,
               ),
             ),
           ),
