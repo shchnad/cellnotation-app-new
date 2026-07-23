@@ -29,7 +29,7 @@ void saveExitDialog(
         TextButton(
           onPressed: () => Navigator.pop(dialogContext),
           child: const Text(
-            'Cancel',
+            'Close',
             style: TextStyle(
               fontSize: 22,
               color: Colors.black,

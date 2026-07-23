@@ -1,8 +1,10 @@
 enum DynamicChange {
-  crescendo('<'),
-  diminuendo('>');
+  crescendoStart('crescendo begins'),
+  crescendoFinish('crescendo ends'),
+  diminuendoStart('diminuendo begins'),
+  diminuendoFinish('diminuendo ends');
 
-  final String symbol;
+  final String label;
 
-  const DynamicChange(this.symbol);
+  const DynamicChange(this.label);
 }

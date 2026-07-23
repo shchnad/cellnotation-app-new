@@ -124,14 +124,14 @@ class NoteDialog extends StatelessWidget {
             const Divider(thickness: 1.0),
 
             ListTile(
-              leading: const Icon(Icons.swap_vertical_circle_sharp),
-              // leading: const Icon(Icons.open_in_full_sharp),
+              // leading: const Icon(Icons.swap_vertical_circle_sharp),
+              leading: const Icon(Icons.open_in_full_sharp),
               title: Text(
                 'Accidental: ${editedNote.accidental?.sign ?? 'none'}',
                 style: const TextStyle(
                   fontSize: 22,
                   color: Colors.blue,
-                  // fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
               onTap: () {
@@ -166,7 +166,7 @@ class NoteDialog extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 22,
                     color: Colors.blue,
-                    // fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.bold,
                   ),
               ),
               onTap: () {
@@ -196,7 +196,7 @@ class NoteDialog extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 22,
                 color: Colors.blue,
-                // fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.bold,
               ),
             ),
             onTap: () {
@@ -221,7 +221,7 @@ class NoteDialog extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 22,
                 color: Colors.blue,
-                // fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.bold,
               ),
             ),
             onTap: () {
@@ -249,7 +249,7 @@ class NoteDialog extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 22,
                 color: Colors.blue,
-                // fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.bold,
               ),
             ),
             onTap: () {
@@ -280,7 +280,7 @@ class NoteDialog extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 22,
                 color: Colors.blue,
-                // fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.bold,
               ),
             ),
             onTap: () {
@@ -308,7 +308,7 @@ class NoteDialog extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 22,
                 color: Colors.blue,
-                // fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.bold,
               ),
             ),
             onTap: () {
@@ -357,7 +357,7 @@ class NoteDialog extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
-                      color: Colors.green,
+                      color: Colors.red,
                     ),
                   ),
                 ),
@@ -378,7 +378,7 @@ class NoteDialog extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
-                      color: Colors.blue,
+                      color: Colors.black,
                     ),
                   ),
                 ),

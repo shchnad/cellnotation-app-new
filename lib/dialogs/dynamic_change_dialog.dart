@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:music_composer/enums/dynamic_change.dart';
 import '../controllers/composition_controller.dart';
 import '../enums/musical_dynamic.dart';
+import '../models/dynamic_change_event.dart';
 import '../models/dynamic_event.dart';
 
 
-void dynamicDialog(
+void dynamicChangeDialog(
     BuildContext context,
     CompositionController controller,
     int tick,
@@ -16,9 +18,9 @@ void dynamicDialog(
 
       final screen = MediaQuery.of(context).size;
 
-      DynamicEvent? currentEvent;
+      DynamicChangeEvent? currentEvent;
 
-      for (final event in controller.timeline.dynamicEvents) {
+      for (final event in controller.timeline.dynamicChangeEvents) {
         if (event.tick == tick) {
           currentEvent = event;
           break;
@@ -31,7 +33,7 @@ void dynamicDialog(
         surfaceTintColor: Colors.white,
 
         title: const Text(
-          "Select Dynamic",
+          "Select Dynamic Change",
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 22,
@@ -44,21 +46,16 @@ void dynamicDialog(
           width: 320,
 
           child: GridView.count(
-            // crossAxisCount: 3,
-            // shrinkWrap: true,
-            // mainAxisSpacing: 6,
-            // crossAxisSpacing: 6,
-            // childAspectRatio: 3.2,
-            crossAxisCount: 3, // number of columns
+            crossAxisCount: 2, // number of columns
             shrinkWrap: true,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            childAspectRatio: 2.2,
-            children: MusicalDynamic.values.map(
-                    (dynamic) {
+            mainAxisSpacing: 6,
+            crossAxisSpacing: 6,
+            childAspectRatio: 2,
+            children: DynamicChange.values.map(
+                    (dChange) {
 
                   final selected =
-                      currentEvent?.musical_dynamic == dynamic;
+                      currentEvent?.dynamic_change == dChange;
 
                   return ElevatedButton(
                     style: ElevatedButton.styleFrom(
@@ -67,19 +64,24 @@ void dynamicDialog(
                       padding: EdgeInsets.zero,
                     ),
                     onPressed: () {
-                      controller.updateDynamicEvent(
+                      controller.updateDynamicChangeEvent(
                         tick,
-                        dynamic,
+                        dChange,
                       );
                       Navigator.pop(context);
                     },
-                    child: Text(
-                      dynamic.abbreviation,
-                      style: TextStyle(
-                        fontSize: 22,
-                        color: selected
-                            ? Colors.blue
-                            : Colors.black,
+                    child: SizedBox.expand(
+                      child: Center(
+                        child: Text(
+                          dChange.label,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 22,
+                            color: selected
+                                ? Colors.blue
+                                : Colors.black,
+                          ),
+                        ),
                       ),
                     ),
                   );
@@ -93,12 +95,12 @@ void dynamicDialog(
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // DELETE BUTTON
+
               TextButton(
                 onPressed: currentEvent == null
                     ? null
                     : () {
-                  controller.deleteDynamicEvent(
+                  controller.deleteDynamicChangeEvent(
                     tick,
                   );
                   Navigator.pop(context);
@@ -113,7 +115,6 @@ void dynamicDialog(
                 ),
               ),
 
-              // CANCEL BUTTON
               TextButton(
                 onPressed: () {
                   Navigator.pop(context);

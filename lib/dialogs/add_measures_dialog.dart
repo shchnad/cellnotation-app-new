@@ -334,7 +334,7 @@ class _AddMeasuresDialogState extends State<AddMeasuresDialog> {
                 onPressed:
                     ()=>Navigator.pop(context),
                 child: const Text(
-                    'Cancel',
+                    'Close',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -377,7 +377,7 @@ class _AddMeasuresDialogState extends State<AddMeasuresDialog> {
                   Navigator.pop(context);
                 },
                 child: const Text(
-                  'Generate',
+                  'Add',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,

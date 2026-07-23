@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:music_composer/dialogs/tempo_dialog.dart';
 
 import '../controllers/composition_controller.dart';
-import '../utils/default_values.dart';
+import 'dynamic_change_dialog.dart';
 import 'dynamic_dialog.dart';
 
 
@@ -19,200 +19,267 @@ void editMeasureBeatDialog({
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
 
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        content: SizedBox(
+          // width: MediaQuery.of(context).size.width * 0.75,
+          height: MediaQuery.of(context).size.height * 0.55,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
 
-            // Measure actions
+              // LEFT COLUMN
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
 
-            Text(
-              "Measure ${measureIndex + 1}",
-              style: const TextStyle(
-                fontSize: 22,
-                color: Colors.black,
-                fontWeight: FontWeight.bold
-              ),
-            ),
+                      Text(
+                        "Measure ${measureIndex + 1}",
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
 
+                      ListTile(
+                        leading: const Icon(Icons.playlist_add),
+                        title: const Text(
+                          "Insert Measure",
+                          style: TextStyle(fontSize: 22),
+                        ),
+                        onTap: () {},
+                      ),
 
-            ListTile(
-              leading: const Icon(Icons.playlist_add),
-              title: const Text(
-                "Insert Measure",
-                style: TextStyle(
-                  fontSize: 22,
-                  // fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              onTap: () {
-                // open measure input dialog
-              },
-            ),
+                      ListTile(
+                        leading: const Icon(Icons.copy),
+                        title: const Text(
+                          "Duplicate Measure",
+                          style: TextStyle(fontSize: 22),
+                        ),
+                        onTap: () {
+                          controller.copyMeasure(measureIndex);
+                          Navigator.pop(context);
+                        },
+                      ),
 
-            ListTile(
-              leading: const Icon(Icons.copy),
-              title: const Text(
-                "Duplicate Measure",
-                style: TextStyle(
-                  fontSize: 22,
-                  // fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              onTap: () {
-                controller.copyMeasure(
-                  measureIndex,
-                );
-                Navigator.pop(context);
-              },
-            ),
+                      ListTile(
+                        leading: const Icon(Icons.delete_outline),
+                        title: const Text(
+                          "Delete Measure",
+                          style: TextStyle(
+                            fontSize: 22,
+                            color: Colors.red,
+                          ),
+                        ),
+                        onTap: () {
+                          controller.deleteMeasure(measureIndex);
+                          Navigator.pop(context);
+                        },
+                      ),
 
-            ListTile(
-              leading: const Icon(Icons.delete_outline),
-              title: const Text(
-                "Delete Measure",
-                style: TextStyle(
-                  fontSize: 22,
-                  // fontWeight: FontWeight.bold,
-                  color: Colors.green,
-                ),
-              ),
-              onTap: () {
-                controller.deleteMeasure(
-                  measureIndex,
-                );
-                Navigator.pop(context);
-              },
-            ),
+                      const Divider(),
 
-            const Divider(thickness: 1.0),
+                      Text(
+                        "Beat ${beatIndex + 1}",
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
 
-            // Beat actions
+                      ListTile(
+                        leading: const Icon(Icons.playlist_add),
+                        title: const Text(
+                          "Insert Beat",
+                          style: TextStyle(fontSize: 22),
+                        ),
+                        onTap: () {
+                          controller.addBeatToMeasure(measureIndex);
+                          Navigator.pop(context);
+                        },
+                      ),
 
-            Text(
-              "Beat ${beatIndex + 1}",
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
-              ),
-            ),
+                      ListTile(
+                        leading: const Icon(Icons.copy),
+                        title: const Text(
+                          "Duplicate Beat",
+                          style: TextStyle(fontSize: 22),
+                        ),
+                        onTap: () {
+                          controller.copyBeat(measureIndex, beatIndex);
+                          Navigator.pop(context);
+                        },
+                      ),
 
-
-            ListTile(
-              leading: const Icon(Icons.playlist_add),
-              title: const Text(
-                "Insert Beat",
-                style: TextStyle(
-                  fontSize: 22,
-                  // fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              onTap: () {
-                controller.addBeatToMeasure(
-                  measureIndex,
-                );
-                Navigator.pop(context);
-              },
-            ),
-
-
-            ListTile(
-              leading: const Icon(Icons.copy),
-              title: const Text(
-                "Duplicate Beat",
-                style: TextStyle(
-                  fontSize: 22,
-                  // fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              onTap: () {
-                controller.copyBeat(
-                  measureIndex,
-                  beatIndex,
-                );
-                Navigator.pop(context);
-              },
-            ),
-
-            ListTile(
-              leading: const Icon(Icons.delete_outline),
-              title: const Text(
-                "Delete Beat",
-                style: TextStyle(
-                  fontSize: 22,
-                  // fontWeight: FontWeight.bold,
-                  color: Colors.green,
-                ),
-              ),
-              onTap: () {
-                controller.removeBeatFromMeasure(
-                  measureIndex,
-                  beatIndex,
-                );
-                Navigator.pop(context);
-              },
-            ),
-
-            const Divider(thickness: 1.0),
-
-            ListTile(
-              leading: const Icon(Icons.lock_clock),
-              title: const Text(
-                "Set Tempo",
-                style: TextStyle(
-                  fontSize: 22,
-                  // fontWeight: FontWeight.bold,
-                  color: Colors.blue,
-                ),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                tempoDialog(
-                  context,
-                  controller,
-                  controller.getBeatTick(
-                    measureIndex,
-                    beatIndex,
+                      ListTile(
+                        leading: const Icon(Icons.delete_outline),
+                        title: const Text(
+                          "Delete Beat",
+                          style: TextStyle(
+                            fontSize: 22,
+                            color: Colors.red,
+                          ),
+                        ),
+                        onTap: () {
+                          controller.removeBeatFromMeasure(
+                            measureIndex,
+                            beatIndex,
+                          );
+                          Navigator.pop(context);
+                        },
+                      ),
+                    ],
                   ),
-                );
-              },
-            ),
-
-            ListTile(
-              leading: const Icon(Icons.campaign_outlined),
-              title: const Text(
-                "Set Dynamic",
-                style: TextStyle(
-                  fontSize: 22,
-                  // fontWeight: FontWeight.bold,
-                  color: Colors.red,
                 ),
               ),
-              onTap: () {
-                Navigator.pop(context);
-                dynamicDialog(
-                  context,
-                  controller,
-                  controller.getBeatTick(
-                    measureIndex,
-                    beatIndex,
+
+              const VerticalDivider(thickness: 1),
+
+              // RIGHT COLUMN
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+
+                      // const Text(
+                      //   "Musical Markings",
+                      //   textAlign: TextAlign.center,
+                      //   style: TextStyle(
+                      //     fontSize: 22,
+                      //     fontWeight: FontWeight.bold,
+                      //   ),
+                      // ),
+
+                      ListTile(
+                        leading: const Icon(Icons.lock_clock),
+                        title: const Text(
+                          "Set Tempo",
+                          style: TextStyle(
+                            fontSize: 22,
+                            color: Colors.blue,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        onTap: () {
+                          Navigator.pop(context);
+                          tempoDialog(
+                            context,
+                            controller,
+                            controller.getBeatTick(
+                              measureIndex,
+                              beatIndex,
+                            ),
+                          );
+                        },
+                      ),
+
+                      const Divider(),
+
+                      ListTile(
+                        leading: const Icon(Icons.campaign_outlined),
+                        title: const Text(
+                          "Set Dynamic",
+                          style: TextStyle(
+                            fontSize: 22,
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        onTap: () {
+                          Navigator.pop(context);
+                          dynamicDialog(
+                            context,
+                            controller,
+                            controller.getBeatTick(
+                              measureIndex,
+                              beatIndex,
+                            ),
+                          );
+                        },
+                      ),
+
+
+                      ListTile(
+                        leading: const Icon(Icons.trending_up),
+                        title: const Text(
+                          "Set Dynamic Change",
+                          style: TextStyle(
+                            fontSize: 22,
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        onTap: () {
+                          Navigator.pop(context);
+                          dynamicChangeDialog(
+                            context,
+                            controller,
+                            controller.getBeatTick(
+                              measureIndex,
+                              beatIndex,
+                            ),
+                          );
+                        },
+                      ),
+
+                      // ListTile(
+                      //   leading: const Icon(Icons.trending_up),
+                      //   title: const Text(
+                      //     "End Crescendo",
+                      //     style: TextStyle(
+                      //       fontSize: 22,
+                      //       color: Colors.green,
+                      //       fontWeight: FontWeight.bold,
+                      //     ),
+                      //   ),
+                      //   onTap: () {},
+                      // ),
+
+                      // const Divider(),
+                      //
+                      // ListTile(
+                      //   leading: const Icon(Icons.trending_down),
+                      //   title: const Text(
+                      //     "Begin Diminuendo",
+                      //     style: TextStyle(
+                      //       fontSize: 22,
+                      //       color: Colors.green,
+                      //       fontWeight: FontWeight.bold,
+                      //     ),
+                      //   ),
+                      //   onTap: () {},
+                      // ),
+
+                      // ListTile(
+                      //   leading: const Icon(Icons.trending_down),
+                      //   title: const Text(
+                      //     "End Diminuendo",
+                      //     style: TextStyle(
+                      //       fontSize: 22,
+                      //       color: Colors.green,
+                      //       fontWeight: FontWeight.bold,
+                      //     ),
+                      //   ),
+                      //   onTap: () {},
+                      // ),
+
+                    ],
                   ),
-                );
-              },
-            ),
-          ],
+                ),
+              ),
+            ],
+          ),
         ),
 
-        actionsPadding: const EdgeInsets.fromLTRB(
-          DefaultValues.dialogPaddingRightLeft,
-          DefaultValues.dialogPaddingBottomTop,
-          DefaultValues.dialogPaddingRightLeft,
-          DefaultValues.dialogPaddingBottomTop,
-        ),
+        // actionsPadding: const EdgeInsets.fromLTRB(
+          // DefaultValues.dialogPaddingRightLeft,
+          // DefaultValues.dialogPaddingBottomTop,
+          // DefaultValues.dialogPaddingRightLeft,
+          // DefaultValues.dialogPaddingBottomTop,
+        // ),
         actions: [
           const Divider(thickness: 1.0),
           Center(

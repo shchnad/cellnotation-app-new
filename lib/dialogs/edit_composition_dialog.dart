@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import '../models/composition.dart';
 import '../enums/music_style.dart';
 import '../enums/instrument.dart';
+import 'confirm_delete_dialog.dart';
 import 'note_values_dialog.dart';
+
 
 class EditCompositionDialog extends StatefulWidget {
   final Composition composition;
@@ -68,7 +70,7 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
       style: const TextStyle(
         fontSize: 22,
         color: Colors.blue,
-        // fontWeight: FontWeight.bold,
+        fontWeight: FontWeight.bold,
       ),
       decoration: InputDecoration(
         labelText: label,
@@ -87,61 +89,6 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
     );
   }
 
-  void _confirmDelete(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        title: const Text(
-          'Delete Composition?',
-          style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-          ),
-        ),
-        content: Text(
-          'This will permanently delete "${widget.composition.title}". This cannot be undone.',
-          style: const TextStyle(fontSize: 22),
-        ),
-        actions: [
-          const Divider(thickness: 1.0),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text(
-                  'Cancel',
-                  style: TextStyle(
-                      fontSize: 22,
-                      color: Colors.black,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context); // close confirmation
-                  Navigator.pop(context); // close edit dialog
-                  widget.onDelete?.call();
-                },
-                child: const Text(
-                  'Delete',
-                  style: TextStyle(
-                    fontSize: 22,
-                    color: Colors.green,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-        ],
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -185,7 +132,7 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
                             style: const TextStyle(
                               fontSize: 22,
                               color: Colors.blue,
-                              // fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.bold,
                             ),
                             validator: (value) =>
                             value == null || value.trim().isEmpty
@@ -204,7 +151,7 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
                             style: const TextStyle(
                               fontSize: 22,
                               color: Colors.blue,
-                              // fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.bold,
                             ),
                             validator: (value) =>
                             value == null || value.trim().isEmpty
@@ -288,18 +235,39 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Close',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+
             if (widget.onDelete != null)
               TextButton(
-                onPressed: () => _confirmDelete(context),
+                onPressed: () => confirmDeleteCompositionDialog(
+                  context,
+                  title: widget.composition.title,
+                  onDelete: () {
+                    Navigator.pop(context);
+                    widget.onDelete?.call();
+                  }
+                ),
                 child: const Text(
                   'Delete',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    color: Colors.green,
+                    color: Colors.red,
                   ),
                 ),
               ),
+
+
             TextButton(
               onPressed: () {
                 if (!_formKey.currentState!.validate()) return;
@@ -320,17 +288,6 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
                   color: Colors.blue,
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Close',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
                 ),
               ),
             ),

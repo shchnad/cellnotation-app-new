@@ -9,7 +9,10 @@ class DynamicEvent {
     required this.musical_dynamic,
   });
 
-  Map<String, dynamic> toJson() => {'tick': tick, 'dynamic': musical_dynamic.name};
+  Map<String, dynamic> toJson() => {
+    'tick': tick,
+    'dynamic': musical_dynamic.name
+  };
 
   factory DynamicEvent.fromJson(Map<String, dynamic> json) {
     return DynamicEvent(

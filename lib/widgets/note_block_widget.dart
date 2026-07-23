@@ -169,7 +169,7 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
                           Text(
                             accidental, // ACCIDENTAL
                             style: TextStyle(
-                              color: Colors.yellow,
+                              color: Colors.white,
                               fontSize: widget.cellHeight * .80,
                               fontWeight: FontWeight.bold,
                             ),

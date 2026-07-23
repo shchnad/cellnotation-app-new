@@ -51,7 +51,7 @@ class _NewCompositionDialogState extends State<NewCompositionDialog> {
       style: const TextStyle(
         fontSize: 22,
         color: Colors.blue,
-        // fontWeight: FontWeight.bold,
+        fontWeight: FontWeight.bold,
       ),
       decoration: InputDecoration(
         labelText: label,
@@ -112,7 +112,7 @@ class _NewCompositionDialogState extends State<NewCompositionDialog> {
                             style: const TextStyle(
                               fontSize: 22,
                               color: Colors.blue,
-                              // fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.bold,
                             ),
                             validator: (value) =>
                             value == null || value.trim().isEmpty
@@ -131,7 +131,7 @@ class _NewCompositionDialogState extends State<NewCompositionDialog> {
                             style: const TextStyle(
                               fontSize: 22,
                               color: Colors.blue,
-                              // fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.bold,
                             ),
                             validator: (value) =>
                             value == null || value.trim().isEmpty

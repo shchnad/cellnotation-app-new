@@ -5,16 +5,17 @@ import '../dialogs/tempo_dialog.dart';
 import '../dialogs/dynamic_dialog.dart';
 import 'note_block_widget.dart';
 
-/// Shared text styles so hit-testing and painting always agree on size.
+/// tempo
 const _tempoLabelStyle = TextStyle(
   color: Colors.blue,
-  fontSize: 18,
+  fontSize: 22,
   fontWeight: FontWeight.bold,
 );
 
+/// dynamic
 const _dynamicLabelStyle = TextStyle(
-  color: Colors.deepOrange,
-  fontSize: 18,
+  color: Colors.green,
+  fontSize: 22,
   fontWeight: FontWeight.bold,
 );
 

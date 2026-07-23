@@ -3,11 +3,16 @@ import 'package:music_composer/enums/articulation.dart';
 import 'package:music_composer/utils/default_values.dart';
 
 import '../enums/accidental.dart';
+import '../enums/dynamic_change.dart';
 import '../enums/finger.dart';
 import '../enums/musical_dynamic.dart';
 import '../enums/ornament.dart';
 import '../enums/playing_technique.dart';
 import '../enums/tempo.dart';
+import '../enums/dynamic_change.dart';
+import '../enums/hand.dart';
+import '../enums/note_duration.dart';
+
 import '../models/composition.dart';
 import '../models/dynamic_event.dart';
 import '../models/note.dart';
@@ -15,12 +20,8 @@ import '../models/measure.dart';
 import '../models/tempo_event.dart';
 import '../models/time_signature.dart';
 import '../models/timeline.dart';
-
 import '../models/dynamic_change_event.dart';
 
-
-import '../enums/hand.dart';
-import '../enums/note_duration.dart';
 
 import '../utils/scale_resolver.dart';
 
@@ -477,6 +478,46 @@ class CompositionController extends ChangeNotifier {
     notifyListeners();
   }
 
+// =====================================================
+  // DYNAMIC CHANGES (crescendo / diminuendo)
+  // =====================================================
+
+  DynamicChangeEvent? getDynamicChangeAtTick(int tick) {
+    try {
+      return timeline.dynamicChangeEvents.firstWhere(
+            (e) => e.tick == tick,
+      );
+    }
+    catch (e) {
+      return null;
+    }
+  }
+
+  void updateDynamicChangeEvent(
+      int tick,
+      DynamicChange dChange,
+      ) {
+    final index = timeline.dynamicChangeEvents.indexWhere(
+          (e) => e.tick == tick,
+    );
+    if (index >= 0) {
+      timeline.dynamicChangeEvents[index].dynamic_change = dChange;
+    } else {
+      timeline.addDynamicChangeEvent(
+        DynamicChangeEvent(
+          tick: tick,
+          dynamic_change: dChange,
+        ),
+      );
+    }
+    notifyListeners();
+  }
+
+  void deleteDynamicChangeEvent(int tick) {
+    timeline.removeDynamicChangeEvent(tick);
+    notifyListeners();
+  }
+  
   // =====================================================
   // GRID / SNAP
   // =====================================================
@@ -873,6 +914,8 @@ class CompositionController extends ChangeNotifier {
     'minor B flat',
     'minor B',
   ];
+
+  get dynamicChangeEvents => null;
 
   String getScaleAsTextArray(String scale) {
     List<String> scaleArray = ScaleResolver.getScale(scale);
