@@ -130,7 +130,7 @@ class NoteDialog extends StatelessWidget {
                 'Accidental: ${editedNote.accidental?.sign ?? 'none'}',
                 style: const TextStyle(
                   fontSize: 22,
-                  color: Colors.blue,
+                  color: Colors.black,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -165,7 +165,7 @@ class NoteDialog extends StatelessWidget {
                 'Duration: ${controller.durationLabel(editedNote)}',
                   style: const TextStyle(
                     fontSize: 22,
-                    color: Colors.blue,
+                    color: Colors.black,
                     fontWeight: FontWeight.bold,
                   ),
               ),
@@ -195,7 +195,7 @@ class NoteDialog extends StatelessWidget {
               'Hand: ${editedNote.hand.name}',
               style: const TextStyle(
                 fontSize: 22,
-                color: Colors.blue,
+                color: Colors.black,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -220,7 +220,7 @@ class NoteDialog extends StatelessWidget {
               'Finger: ${ editedNote.finger?.value.toString() ?? 'none'}',
               style: const TextStyle(
                 fontSize: 22,
-                color: Colors.blue,
+                color: Colors.black,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -248,7 +248,7 @@ class NoteDialog extends StatelessWidget {
               'Articulation: ${editedNote.articulation?.label ?? 'none'}',
               style: const TextStyle(
                 fontSize: 22,
-                color: Colors.blue,
+                color: Colors.black,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -279,7 +279,7 @@ class NoteDialog extends StatelessWidget {
               'Ornament: ${editedNote.ornament?.label ?? 'none'}',
               style: const TextStyle(
                 fontSize: 22,
-                color: Colors.blue,
+                color: Colors.black,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -307,7 +307,7 @@ class NoteDialog extends StatelessWidget {
               'Playing Technique: ${editedNote.playingTechnique?.label ?? 'none'}',
               style: const TextStyle(
                 fontSize: 22,
-                color: Colors.blue,
+                color: Colors.black,
                 fontWeight: FontWeight.bold,
               ),
             ),

@@ -9,6 +9,24 @@ import '../enums/articulation.dart';
 import '../enums/hand.dart';
 import '../models/note.dart';
 
+// Height of the strip reserved above each note for drawing staccato /
+// tenuto / marcato / accent marks.
+const double _articulationMarkHeight = 12.0;
+
+// Articulations that get a drawn symbol above the note (as opposed to
+// the border-based treatment used for legato / sforzando).
+bool _hasDrawnMark(Articulation? articulation) {
+  switch (articulation) {
+    case Articulation.staccato:
+    case Articulation.tenuto:
+    case Articulation.marcato:
+    case Articulation.accent:
+      return true;
+    default:
+      return false;
+  }
+}
+
 class NoteBlockWidget extends StatefulWidget {
   final Note note;
   final double pixelsPerTick;
@@ -33,19 +51,25 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
 
   late Offset dragStartPosition;
 
-  //Articulation borders
+  //Articulation borders — only for articulations that don't have their
+  //own drawn mark above the note.
   Border? _articulationBorder() {
     switch (widget.note.articulation) {
-      case Articulation.accent:
-      case Articulation.marcato:
       case Articulation.sforzando:
-        return Border.all(color: Colors.red, width: 3);
+        return Border.all(
+            color: Colors.green,
+            width: 3
+        );
       case Articulation.legato:
-        return const Border(bottom: BorderSide(color: Colors.red, width: 3));
+        return const Border(bottom: BorderSide(
+            color: Colors.red,
+            width: 3
+        )
+      );
       case Articulation.staccato:
-        return const Border(left: BorderSide(color: Colors.red, width: 3));
       case Articulation.tenuto:
-        return const Border(top: BorderSide(color: Colors.red, width: 3));
+      case Articulation.marcato:
+      case Articulation.accent:
       case Articulation.fermata:
       case null:
         return null;
@@ -72,84 +96,110 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
 
     final top = note.row * widget.cellHeight;
 
+    final drawMark = _hasDrawnMark(note.articulation);
+
+    // Reserve extra room above the note box for the mark, so the note's
+    // own position/size (and drag math below) stays untouched.
+    final markSpace = drawMark ? _articulationMarkHeight : 0.0;
+
     return Positioned(
       left: left,
-      top: top,
+      top: top - markSpace,
       width: noteWidth,
-      height: widget.cellHeight,
-
-      child: GestureDetector(
-        // behavior: HitTestBehavior.opaque,
-        behavior: HitTestBehavior.deferToChild,
-
-        onPanStart: (details) {
-          dragStartTick = note.startTick;
-          dragStartRow = note.row;
-          dragStartPosition = details.globalPosition;
-        },
-
-        onPanUpdate: (details) {
-          final dx = details.globalPosition.dx - dragStartPosition.dx;
-          final dy = details.globalPosition.dy - dragStartPosition.dy;
-          final tickChange = (dx / widget.pixelsPerTick).round();
-          final rowChange = (dy / widget.cellHeight).round();
-          final newTick = controller.snapTick(dragStartTick + tickChange);
-          final newRow = (dragStartRow + rowChange)
-              .clamp(0, controller.totalRows - 1)
-              .toInt();
-          if (newTick != note.startTick || newRow != note.row) {
-            controller.updateNote(note, newTick, newRow);
-          }
-        },
-
-        onTap: () {
-          if (controller.pasteMode) {
-            return;
-          }
-          showDialog(
-            context: context,
-            builder: (_) => NoteDialog(note: note, controller: controller),
-          );
-        },
-
-        onLongPress: () {
-          controller.copyNote(note);
-          controller.enterPasteMode();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                  'Note ${controller.noteNumber(note)} is copied',
-                  style: TextStyle(fontSize: 22)
+      height: widget.cellHeight + markSpace,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          if (drawMark)
+            Positioned(
+              left: 0,
+              top: 0,
+              width: noteWidth,
+              height: _articulationMarkHeight,
+              child: CustomPaint(
+                painter: _ArticulationMarkPainter(note.articulation!),
               ),
             ),
-          );
-        },
 
-        onDoubleTap: () {
-          final rawTick = note.startTick;
-          final measure = controller.getMeasureAtTick(rawTick);
-          final measureIndex = controller.measures.indexOf(measure);
-          final beatIndex =
-              ((rawTick - measure.startTick) ~/
-              measure.timeSignature.ticksPerBeat);
-          editMeasureBeatDialog(
-            context: context,
-            controller: controller,
-            measureIndex: measureIndex,
-            beatIndex: beatIndex,
-          );
-        },
+          Positioned(
+            left: 0,
+            top: markSpace,
+            width: noteWidth,
+            height: widget.cellHeight,
+            child: GestureDetector(
+              // behavior: HitTestBehavior.opaque,
+              behavior: HitTestBehavior.deferToChild,
 
-        child: Container(
-          decoration: BoxDecoration(
-            color: _handColor(note.hand),
-            borderRadius: BorderRadius.circular(4),
-            border: _articulationBorder(),
-          ),
+              onPanStart: (details) {
+                dragStartTick = note.startTick;
+                dragStartRow = note.row;
+                dragStartPosition = details.globalPosition;
+              },
 
-          child:
-              showPitch // PITCH
-              ? Padding(
+              onPanUpdate: (details) {
+                final dx = details.globalPosition.dx - dragStartPosition.dx;
+                final dy = details.globalPosition.dy - dragStartPosition.dy;
+                final tickChange = (dx / widget.pixelsPerTick).round();
+                final rowChange = (dy / widget.cellHeight).round();
+                final newTick =
+                controller.snapTick(dragStartTick + tickChange);
+                final newRow = (dragStartRow + rowChange)
+                    .clamp(0, controller.totalRows - 1)
+                    .toInt();
+                if (newTick != note.startTick || newRow != note.row) {
+                  controller.updateNote(note, newTick, newRow);
+                }
+              },
+
+              onTap: () {
+                if (controller.pasteMode) {
+                  return;
+                }
+                showDialog(
+                  context: context,
+                  builder: (_) =>
+                      NoteDialog(note: note, controller: controller),
+                );
+              },
+
+              onLongPress: () {
+                controller.copyNote(note);
+                controller.enterPasteMode();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                        'Note ${controller.noteNumber(note)} is copied',
+                        style: TextStyle(fontSize: 22)
+                    ),
+                  ),
+                );
+              },
+
+              onDoubleTap: () {
+                final rawTick = note.startTick;
+                final measure = controller.getMeasureAtTick(rawTick);
+                final measureIndex = controller.measures.indexOf(measure);
+                final beatIndex =
+                ((rawTick - measure.startTick) ~/
+                    measure.timeSignature.ticksPerBeat);
+                editMeasureBeatDialog(
+                  context: context,
+                  controller: controller,
+                  measureIndex: measureIndex,
+                  beatIndex: beatIndex,
+                );
+              },
+
+              child: Container(
+                decoration: BoxDecoration(
+                  color: _handColor(note.hand),
+                  borderRadius: BorderRadius.circular(4),
+                  border: _articulationBorder(),
+                ),
+
+                child:
+                showPitch // PITCH
+                    ? Padding(
                   padding: const EdgeInsets.only(left: 3, right: 2),
                   child: FittedBox(
                     alignment: Alignment.centerLeft,
@@ -178,13 +228,82 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
                     ),
                   ),
                 )
-              : const SizedBox(),
-        ),
+                    : const SizedBox(),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Color _handColor(Hand hand) {
     return hand == Hand.right ? Colors.black : Colors.blue;
+  }
+}
+
+/// Draws the small articulation symbol in the strip directly above a
+/// note: staccato = short vertical line, tenuto = short horizontal
+/// line, marcato = an upward wedge/accent mark, accent = a ">" sign.
+class _ArticulationMarkPainter extends CustomPainter {
+  final Articulation articulation;
+
+  const _ArticulationMarkPainter(this.articulation);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.red // color of articulation signs
+      ..strokeWidth = 3 // width of articulation signs
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final cx = size.width / 2;
+    final top = size.height * 0.15;
+    final bottom = size.height * 0.85;
+    final halfWidth = min(size.width * 0.25, 5.0);
+
+    switch (articulation) {
+      case Articulation.staccato:
+      // Short vertical line, centered under the note's tick.
+        canvas.drawLine(Offset(cx, top), Offset(cx, bottom), paint);
+        break;
+
+      case Articulation.tenuto:
+      // Short horizontal line.
+        final y = size.height / 2;
+        canvas.drawLine(
+          Offset(cx - halfWidth, y),
+          Offset(cx + halfWidth, y),
+          paint,
+        );
+        break;
+
+      case Articulation.marcato:
+      // Upward-pointing wedge/accent (^).
+        final path = Path()
+          ..moveTo(cx - halfWidth, bottom)
+          ..lineTo(cx, top)
+          ..lineTo(cx + halfWidth, bottom);
+        canvas.drawPath(path, paint..style = PaintingStyle.stroke);
+        break;
+
+      case Articulation.accent:
+      // ">" sign.
+        final path = Path()
+          ..moveTo(cx - halfWidth, top)
+          ..lineTo(cx + halfWidth, size.height / 2)
+          ..lineTo(cx - halfWidth, bottom);
+        canvas.drawPath(path, paint);
+        break;
+
+      default:
+        break;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ArticulationMarkPainter oldDelegate) {
+    return oldDelegate.articulation != articulation;
   }
 }

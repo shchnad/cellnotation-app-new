@@ -105,6 +105,43 @@ void editMeasureBeatDialog({
 
                       const Divider(),
 
+                      ListTile(
+                        leading: const Icon(Icons.lock_clock),
+                        title: const Text(
+                          "Set Tempo",
+                          style: TextStyle(
+                            fontSize: 22,
+                            color: Colors.blue,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        onTap: () {
+                          Navigator.pop(context);
+                          tempoDialog(
+                            context,
+                            controller,
+                            controller.getBeatTick(
+                              measureIndex,
+                              beatIndex,
+                            ),
+                          );
+                        },
+                      ),
+
+                    ],
+                  ),
+                ),
+              ),
+
+              const VerticalDivider(thickness: 1),
+
+              // RIGHT COLUMN
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+
                       Text(
                         "Beat ${beatIndex + 1}",
                         textAlign: TextAlign.center,
@@ -180,42 +217,7 @@ void editMeasureBeatDialog({
                           Navigator.pop(context);
                         },
                       ),
-                    ],
-                  ),
-                ),
-              ),
 
-              const VerticalDivider(thickness: 1),
-
-              // RIGHT COLUMN
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-
-                      ListTile(
-                        leading: const Icon(Icons.lock_clock),
-                        title: const Text(
-                          "Set Tempo",
-                          style: TextStyle(
-                            fontSize: 22,
-                            color: Colors.blue,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        onTap: () {
-                          Navigator.pop(context);
-                          tempoDialog(
-                            context,
-                            controller,
-                            controller.getBeatTick(
-                              measureIndex,
-                              beatIndex,
-                            ),
-                          );
-                        },
-                      ),
 
                       const Divider(),
 
@@ -266,46 +268,6 @@ void editMeasureBeatDialog({
                         },
                       ),
 
-                      // ListTile(
-                      //   leading: const Icon(Icons.trending_up),
-                      //   title: const Text(
-                      //     "End Crescendo",
-                      //     style: TextStyle(
-                      //       fontSize: 22,
-                      //       color: Colors.green,
-                      //       fontWeight: FontWeight.bold,
-                      //     ),
-                      //   ),
-                      //   onTap: () {},
-                      // ),
-
-                      // const Divider(),
-                      //
-                      // ListTile(
-                      //   leading: const Icon(Icons.trending_down),
-                      //   title: const Text(
-                      //     "Begin Diminuendo",
-                      //     style: TextStyle(
-                      //       fontSize: 22,
-                      //       color: Colors.green,
-                      //       fontWeight: FontWeight.bold,
-                      //     ),
-                      //   ),
-                      //   onTap: () {},
-                      // ),
-
-                      // ListTile(
-                      //   leading: const Icon(Icons.trending_down),
-                      //   title: const Text(
-                      //     "End Diminuendo",
-                      //     style: TextStyle(
-                      //       fontSize: 22,
-                      //       color: Colors.green,
-                      //       fontWeight: FontWeight.bold,
-                      //     ),
-                      //   ),
-                      //   onTap: () {},
-                      // ),
 
                     ],
                   ),
