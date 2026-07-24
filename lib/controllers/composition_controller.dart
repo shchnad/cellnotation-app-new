@@ -136,7 +136,11 @@ class CompositionController extends ChangeNotifier {
     if (measures.isEmpty) {
       throw Exception("No measures initialized.");
     }
-    return measures[selectedMeasureIndex];
+    // selectedMeasureIndex can go stale after measures are removed or a
+    // whole new composition is loaded — clamp defensively so this never
+    // throws a RangeError (e.g. crashing the pitch column mid-build).
+    final safeIndex = selectedMeasureIndex.clamp(0, measures.length - 1);
+    return measures[safeIndex];
   }
 
   /// Selects whichever measure contains [tick] as the "current" measure
@@ -306,6 +310,15 @@ class CompositionController extends ChangeNotifier {
       note.startTick >= startTick &&
           note.startTick < endTick,
     );
+    // Keep selectedMeasureIndex valid — it may have been pointing at the
+    // measure we just deleted (or one after it), which would otherwise
+    // leave it out of range and crash the next read of currentMeasure
+    // (used by the pitch column).
+    if (measures.isEmpty) {
+      selectedMeasureIndex = 0;
+    } else if (selectedMeasureIndex >= measures.length) {
+      selectedMeasureIndex = measures.length - 1;
+    }
     notifyListeners();
   }
 
@@ -1123,6 +1136,7 @@ class CompositionController extends ChangeNotifier {
       Composition newComposition,
       ){
     composition = newComposition;
+    selectedMeasureIndex = 0;
     notifyListeners();
   }
 

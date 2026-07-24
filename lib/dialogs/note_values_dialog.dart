@@ -51,7 +51,6 @@ void noteValuesDialog<T>({
           () {
             onSelected(value);
             Navigator.pop(context);
-            Navigator.pop(context);// will close also note dialog
           },
         );
       },
