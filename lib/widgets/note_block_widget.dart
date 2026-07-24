@@ -13,6 +13,26 @@ import '../models/note.dart';
 // tenuto / marcato / accent marks.
 const double _articulationMarkHeight = 12.0;
 
+// Height of the strip reserved above each note for the finger number.
+const double _fingerHeight = 14.0;
+
+// Height of the strip reserved below each note for the playing
+// technique abbreviation.
+const double _techniqueHeight = 14.0;
+
+const _fingerTextStyle = TextStyle(
+  color: Colors.red,
+  fontSize: 11,
+  fontWeight: FontWeight.bold,
+);
+
+const _techniqueTextStyle = TextStyle(
+  color: Colors.red,
+  fontSize: 11,
+  fontWeight: FontWeight.bold,
+  // fontStyle: FontStyle.italic,
+);
+
 // Articulations that get a drawn symbol above the note (as opposed to
 // the border-based treatment used for legato / sforzando).
 bool _hasDrawnMark(Articulation? articulation) {
@@ -56,21 +76,13 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
   Border? _articulationBorder() {
     switch (widget.note.articulation) {
       case Articulation.sforzando:
-        return Border.all(
-            color: Colors.green,
-            width: 3
-        );
+        return Border.all(color: Colors.green, width: 3);
       case Articulation.legato:
-        return const Border(bottom: BorderSide(
-            color: Colors.red,
-            width: 3
-        )
-      );
+        return const Border(bottom: BorderSide(color: Colors.red, width: 3));
       case Articulation.staccato:
       case Articulation.tenuto:
       case Articulation.marcato:
       case Articulation.accent:
-      case Articulation.fermata:
       case null:
         return null;
     }
@@ -97,23 +109,46 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
     final top = note.row * widget.cellHeight;
 
     final drawMark = _hasDrawnMark(note.articulation);
+    final hasFinger = note.finger != null;
+    final hasTechnique = note.playingTechnique != null;
 
-    // Reserve extra room above the note box for the mark, so the note's
-    // own position/size (and drag math below) stays untouched.
+    // Reserve extra room above the note box: finger number on top,
+    // articulation mark just above the note. Reserve extra room below
+    // for the playing technique abbreviation. The note's own
+    // position/size (and drag math below) stays untouched — it's simply
+    // offset within this taller Positioned/Stack.
+    final fingerSpace = hasFinger ? _fingerHeight : 0.0;
     final markSpace = drawMark ? _articulationMarkHeight : 0.0;
+    final topExtra = fingerSpace + markSpace;
+
+    final techniqueSpace = hasTechnique ? _techniqueHeight : 0.0;
 
     return Positioned(
       left: left,
-      top: top - markSpace,
+      top: top - topExtra,
       width: noteWidth,
-      height: widget.cellHeight + markSpace,
+      height: widget.cellHeight + topExtra + techniqueSpace,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          if (drawMark)
+          if (hasFinger)
             Positioned(
               left: 0,
               top: 0,
+              width: noteWidth,
+              height: _fingerHeight,
+              child: Center(
+                child: Text(
+                  note.finger!.value.toString(),
+                  style: _fingerTextStyle,
+                ),
+              ),
+            ),
+
+          if (drawMark)
+            Positioned(
+              left: 0,
+              top: fingerSpace,
               width: noteWidth,
               height: _articulationMarkHeight,
               child: CustomPaint(
@@ -123,7 +158,7 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
 
           Positioned(
             left: 0,
-            top: markSpace,
+            top: topExtra,
             width: noteWidth,
             height: widget.cellHeight,
             child: GestureDetector(
@@ -232,6 +267,20 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
               ),
             ),
           ),
+
+          if (hasTechnique)
+            Positioned(
+              left: 0,
+              top: topExtra + widget.cellHeight,
+              width: noteWidth,
+              height: _techniqueHeight,
+              child: Center(
+                child: Text(
+                  note.playingTechnique!.abbreviation,
+                  style: _techniqueTextStyle,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -253,7 +302,7 @@ class _ArticulationMarkPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.red // color of articulation signs
+      ..color = Colors.red
       ..strokeWidth = 3 // width of articulation signs
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
