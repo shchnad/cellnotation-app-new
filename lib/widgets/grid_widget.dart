@@ -299,6 +299,32 @@ class GridPainter extends CustomPainter {
     required this.pixelsPerTick,
   });
 
+  // Draws [count] parallel vertical lines, [spacing] pixels apart.
+  // By default they're centered on [x] (used at measure boundaries);
+  // pass alignRight: true to have the rightmost line sit exactly at
+  // [x] instead (used for the grid's final edge, so nothing gets
+  // clipped off-canvas).
+  void _drawMultiVerticalLine(
+      Canvas canvas,
+      double x,
+      double height,
+      Paint paint,
+      int count, {
+        bool alignRight = false,
+        double spacing = 3.0,
+      }) {
+    if (count <= 1) {
+      canvas.drawLine(Offset(x, 0), Offset(x, height), paint);
+      return;
+    }
+    final totalWidth = spacing * (count - 1);
+    final startX = alignRight ? x - totalWidth : x - totalWidth / 2;
+    for (int i = 0; i < count; i++) {
+      final lineX = startX + spacing * i;
+      canvas.drawLine(Offset(lineX, 0), Offset(lineX, height), paint);
+    }
+  }
+
   void _drawCrescendo(
       Canvas canvas,
       Paint paint,
@@ -472,13 +498,26 @@ class GridPainter extends CustomPainter {
     }
 
     // VERTICAL MEASURE / BEAT LINES
-    for (final measure in controller.measures) {
+    final measuresList = controller.measures;
+    for (int i = 0; i < measuresList.length; i++) {
+      final measure = measuresList[i];
       final measureX = measure.startTick * pixelsPerTick;
-      canvas.drawLine(
-        Offset(measureX, 0),
-        Offset(measureX, size.height),
-        measurePaint,
-      );
+
+      // A measure boundary gets a double line when this measure's scale
+      // differs from the previous measure's — the very first measure has
+      // no "previous" to compare against, so it always gets a single line.
+      final scaleChanged = i > 0 &&
+          measuresList[i - 1].scaleName != measure.scaleName;
+
+      if (scaleChanged) {
+        _drawMultiVerticalLine(canvas, measureX, size.height, measurePaint, 2);
+      } else {
+        canvas.drawLine(
+          Offset(measureX, 0),
+          Offset(measureX, size.height),
+          measurePaint,
+        );
+      }
 
       final beatTicks = measure.timeSignature.beatDuration.ticks;
       for (
@@ -489,6 +528,15 @@ class GridPainter extends CustomPainter {
         final x = tick * pixelsPerTick;
         canvas.drawLine(Offset(x, 0), Offset(x, size.height), beatPaint);
       }
+    }
+
+    // TRIPLE LINE — marks the very last column of the grid (end of the
+    // last measure).
+    if (measuresList.isNotEmpty) {
+      _drawMultiVerticalLine(
+        canvas, size.width, size.height, measurePaint, 3,
+        alignRight: true,
+      );
     }
 
 

@@ -46,8 +46,8 @@ class PitchColumnWidget extends StatelessWidget {
               ),
               child: Text(
                 pitch,
-                style: const TextStyle(
-                  fontSize: 12,
+                style: TextStyle(
+                  fontSize: cellHeight * 0.80,
                   fontWeight: FontWeight.bold,
                   color: Colors.black,
                 ),
