@@ -139,6 +139,23 @@ class CompositionController extends ChangeNotifier {
     return measures[selectedMeasureIndex];
   }
 
+  /// Selects whichever measure contains [tick] as the "current" measure
+  /// — this is what the persistent pitch column reads its scale from, so
+  /// tapping anywhere in a measure switches the column to that measure's
+  /// scale.
+  void selectMeasureAtTick(int tick) {
+    if (measures.isEmpty) {
+      return;
+    }
+    final measure = getMeasureAtTick(tick);
+    final index = measures.indexOf(measure);
+    if (index != -1 && index != selectedMeasureIndex) {
+      selectedMeasureIndex = index;
+      notifyListeners();
+    }
+  }
+
+
   void updateCurrentMeasureScale(String newScaleName) {
     if (measures.isEmpty) return;
     final oldMeasure = currentMeasure;
@@ -924,6 +941,26 @@ class CompositionController extends ChangeNotifier {
       return '';
     }
     return scale[note.row % scale.length];
+  }
+
+
+  /// Same lookup as [getNotePitchName] but for a bare grid row instead of
+  /// an existing [Note] — used by the persistent pitch column, which
+  /// shows the scale of [measure] (defaults to [currentMeasure]).
+  String getPitchNameForRow(int row, [Measure? measure]) {
+    final m = measure ?? (measures.isNotEmpty ? currentMeasure : null);
+    if (m == null) {
+      return '';
+    }
+    final shiftedScale = ScaleResolver.transposeScale(
+      m.scaleName,
+      m.pitchOffsetSemitones,
+    );
+    final scale = ScaleResolver.getScale(shiftedScale);
+    if (scale.isEmpty) {
+      return '';
+    }
+    return scale[row % scale.length];
   }
 
 

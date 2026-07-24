@@ -154,11 +154,13 @@ int tempoEventFallbackTick(CompositionController controller, int tick) {
 class GridWidget extends StatelessWidget {
   final CompositionController controller;
   final double cellHeight;
+  final ScrollController? verticalScrollController;
 
   const GridWidget({
     super.key,
     required this.controller,
     required this.cellHeight,
+    this.verticalScrollController,
   });
 
 
@@ -173,6 +175,7 @@ class GridWidget extends StatelessWidget {
       builder: (context, child) {
         return SingleChildScrollView(
           scrollDirection: Axis.vertical,
+          controller: verticalScrollController,
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: SizedBox(
@@ -185,6 +188,18 @@ class GridWidget extends StatelessWidget {
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTapDown: (details) {
+                        // 0. Whatever else this tap does, it also tells us
+                        //    which measure the person is pointing at — so
+                        //    the pitch column can switch to that measure's
+                        //    scale.
+                        final tappedTick =
+                        (details.localPosition.dx / pixelsPerTick)
+                            .floor()
+                            .clamp(0, controller.maxTicks - 1);
+                        if (controller.maxTicks > 0) {
+                          controller.selectMeasureAtTick(tappedTick);
+                        }
+
                         // 1. Check tempo/dynamic labels first — tapping a
                         //    label should open its edit dialog, not create
                         //    a note.

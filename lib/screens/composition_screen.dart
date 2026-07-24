@@ -15,9 +15,10 @@ import '../enums/hand.dart';
 
 import '../services/composition_service.dart';
 import '../widgets/grid_widget.dart';
+import '../widgets/pitch_column_widget.dart';
 
 
-class CompositionScreen extends StatelessWidget {
+class CompositionScreen extends StatefulWidget {
 
   final CompositionController controller;
 
@@ -26,6 +27,39 @@ class CompositionScreen extends StatelessWidget {
     super.key,
     required this.controller,
   });
+
+  @override
+  State<CompositionScreen> createState() => _CompositionScreenState();
+}
+
+class _CompositionScreenState extends State<CompositionScreen> {
+
+  CompositionController get controller => widget.controller;
+
+  // Drives the grid's vertical scroll; the pitch column mirrors it so
+  // the pitch labels always line up with the rows currently on screen.
+  final ScrollController _gridVerticalController = ScrollController();
+  final ScrollController _pitchVerticalController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _gridVerticalController.addListener(_syncPitchColumn);
+  }
+
+  void _syncPitchColumn() {
+    if (_pitchVerticalController.hasClients) {
+      _pitchVerticalController.jumpTo(_gridVerticalController.offset);
+    }
+  }
+
+  @override
+  void dispose() {
+    _gridVerticalController.removeListener(_syncPitchColumn);
+    _gridVerticalController.dispose();
+    _pitchVerticalController.dispose();
+    super.dispose();
+  }
 
 
 
@@ -138,6 +172,9 @@ class CompositionScreen extends StatelessWidget {
         builder: (context, _) {
           final hasMeasures =
               controller.composition.timeline.measures.isNotEmpty;
+
+          final cellHeight = controller.getCellHeight(context);
+
           return Row(
             children: [
 
@@ -400,6 +437,21 @@ class CompositionScreen extends StatelessWidget {
 
 
               // =====================================================
+              // PITCH COLUMN — constantly present, shows the current
+              // scale's pitch for every one of the 56 rows. Scrolls
+              // vertically in sync with the grid.
+              // =====================================================
+
+              SafeArea(
+                child: PitchColumnWidget(
+                  controller: controller,
+                  cellHeight: cellHeight,
+                  scrollController: _pitchVerticalController,
+                ),
+              ),
+
+
+              // =====================================================
               // GRID AREA
               // =====================================================
 
@@ -432,7 +484,8 @@ class CompositionScreen extends StatelessWidget {
                     : SafeArea(
                   child: GridWidget(
                     controller: controller,
-                    cellHeight: controller.getCellHeight(context),
+                    cellHeight: cellHeight,
+                    verticalScrollController: _gridVerticalController,
                   ),
                 ),
               ),
