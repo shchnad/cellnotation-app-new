@@ -304,6 +304,7 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
                                         await _service.deleteComposition(comp.id!);
                                       }
                                     },
+                                    allowDelete: true,
                                   ),
                                 );
                               },

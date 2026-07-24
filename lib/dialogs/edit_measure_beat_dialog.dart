@@ -46,7 +46,11 @@ void editMeasureBeatDialog({
                         leading: const Icon(Icons.playlist_add),
                         title: const Text(
                           "Insert Measure",
-                          style: TextStyle(fontSize: 22),
+                          style: TextStyle(
+                            fontSize: 22,
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         onTap: () {},
                       ),
@@ -55,10 +59,30 @@ void editMeasureBeatDialog({
                         leading: const Icon(Icons.copy),
                         title: const Text(
                           "Duplicate Measure",
-                          style: TextStyle(fontSize: 22),
+                          style: TextStyle(
+                            fontSize: 22,
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         onTap: () {
                           controller.copyMeasure(measureIndex);
+                          Navigator.pop(context);
+                        },
+                      ),
+
+                      ListTile(
+                        leading: const Icon(Icons.cleaning_services_outlined),
+                        title: const Text(
+                          "Clean Measure",
+                          style: TextStyle(
+                            fontSize: 22,
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        onTap: () {
+                          controller.clearMeasureNotes(measureIndex);
                           Navigator.pop(context);
                         },
                       ),
@@ -70,6 +94,7 @@ void editMeasureBeatDialog({
                           style: TextStyle(
                             fontSize: 22,
                             color: Colors.red,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                         onTap: () {
@@ -93,7 +118,11 @@ void editMeasureBeatDialog({
                         leading: const Icon(Icons.playlist_add),
                         title: const Text(
                           "Insert Beat",
-                          style: TextStyle(fontSize: 22),
+                          style: TextStyle(
+                            fontSize: 22,
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         onTap: () {
                           controller.addBeatToMeasure(measureIndex);
@@ -105,10 +134,30 @@ void editMeasureBeatDialog({
                         leading: const Icon(Icons.copy),
                         title: const Text(
                           "Duplicate Beat",
-                          style: TextStyle(fontSize: 22),
+                          style: TextStyle(
+                            fontSize: 22,
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         onTap: () {
                           controller.copyBeat(measureIndex, beatIndex);
+                          Navigator.pop(context);
+                        },
+                      ),
+
+                      ListTile(
+                        leading: const Icon(Icons.cleaning_services_outlined),
+                        title: const Text(
+                          "Clean Beat",
+                          style: TextStyle(
+                            fontSize: 22,
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        onTap: () {
+                          controller.clearBeatNotes(measureIndex, beatIndex);
                           Navigator.pop(context);
                         },
                       ),
@@ -120,6 +169,7 @@ void editMeasureBeatDialog({
                           style: TextStyle(
                             fontSize: 22,
                             color: Colors.red,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                         onTap: () {
@@ -143,15 +193,6 @@ void editMeasureBeatDialog({
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-
-                      // const Text(
-                      //   "Musical Markings",
-                      //   textAlign: TextAlign.center,
-                      //   style: TextStyle(
-                      //     fontSize: 22,
-                      //     fontWeight: FontWeight.bold,
-                      //   ),
-                      // ),
 
                       ListTile(
                         leading: const Icon(Icons.lock_clock),
@@ -275,10 +316,10 @@ void editMeasureBeatDialog({
         ),
 
         // actionsPadding: const EdgeInsets.fromLTRB(
-          // DefaultValues.dialogPaddingRightLeft,
-          // DefaultValues.dialogPaddingBottomTop,
-          // DefaultValues.dialogPaddingRightLeft,
-          // DefaultValues.dialogPaddingBottomTop,
+        // DefaultValues.dialogPaddingRightLeft,
+        // DefaultValues.dialogPaddingBottomTop,
+        // DefaultValues.dialogPaddingRightLeft,
+        // DefaultValues.dialogPaddingBottomTop,
         // ),
         actions: [
           const Divider(thickness: 1.0),

@@ -109,7 +109,7 @@ void tempoDialog(
                   "Delete",
                   style: TextStyle(
                     fontSize: 22,
-                    color: Colors.green,
+                    color: Colors.red,
                     fontWeight: FontWeight.bold,
                   ),
                 ),

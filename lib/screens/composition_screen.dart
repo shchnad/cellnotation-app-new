@@ -61,6 +61,7 @@ class CompositionScreen extends StatelessWidget {
       context: context,
       builder: (context) => EditCompositionDialog(
         composition: controller.composition,
+        allowDelete: false,
         onSaved: (updated) {
           controller.updateComposition(updated);
         },
@@ -203,6 +204,17 @@ class CompositionScreen extends StatelessWidget {
                         },
                       ),
 
+                      // EDIT INFO
+                      IconButton(
+                        icon: const Icon(Icons.edit,
+                          color: Colors.black,
+                        ),
+                        tooltip: 'Edit Title / Composer / Style / Instrument',
+                        onPressed: () {
+                          _showEditDialog(context);
+                        },
+                      ),
+
                       // NEW COMPOSITION
                       IconButton(
                         icon: const Icon(Icons.library_add,
@@ -225,17 +237,6 @@ class CompositionScreen extends StatelessWidget {
                         },
                       ),
 
-
-                      // EDIT INFO
-                      IconButton(
-                        icon: const Icon(Icons.edit,
-                          color: Colors.black,
-                        ),
-                        tooltip: 'Edit Title / Composer / Style / Instrument',
-                        onPressed: () {
-                          _showEditDialog(context);
-                        },
-                      ),
 
                       const Divider(
                         color: Colors.white24,

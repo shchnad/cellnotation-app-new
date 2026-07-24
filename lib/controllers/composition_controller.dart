@@ -9,7 +9,6 @@ import '../enums/musical_dynamic.dart';
 import '../enums/ornament.dart';
 import '../enums/playing_technique.dart';
 import '../enums/tempo.dart';
-import '../enums/dynamic_change.dart';
 import '../enums/hand.dart';
 import '../enums/note_duration.dart';
 
@@ -33,6 +32,8 @@ class CompositionController extends ChangeNotifier {
   CompositionController({
     required this.composition,
   });
+
+
 
   // =====================================================
   // EDITOR STATE
@@ -72,7 +73,7 @@ class CompositionController extends ChangeNotifier {
   int get maxTicks => composition.timeline.totalTicks;
 
   String durationLabel(Note note) {
-  final duration = NoteDuration.values.firstWhere(
+    final duration = NoteDuration.values.firstWhere(
           (d) => d.ticks == note.durationTicks,
       orElse: () => NoteDuration.quarter,
     );
@@ -107,7 +108,7 @@ class CompositionController extends ChangeNotifier {
 
   int getMeasureNumber(Note note) {
     return measures.indexWhere( (m) =>
-      note.startTick >= m.startTick && note.startTick < m.endTick,
+    note.startTick >= m.startTick && note.startTick < m.endTick,
     ) + 1;
   }
 
@@ -157,8 +158,8 @@ class CompositionController extends ChangeNotifier {
       return;
     }
     measures[measureIndex] = measures[measureIndex].copyWith(
-            scaleName: newScaleName
-        );
+        scaleName: newScaleName
+    );
     notifyListeners();
   }
 
@@ -233,6 +234,49 @@ class CompositionController extends ChangeNotifier {
   }
 
 
+  /// Removes all notes inside the given beat WITHOUT deleting the beat
+  /// itself (unlike [removeBeatFromMeasure], which also shrinks the
+  /// measure). Use this for a "Clean Beat" action.
+  void clearBeatNotes(
+      int measureIndex,
+      int beatIndex,
+      ) {
+    if (measureIndex < 0 || measureIndex >= measures.length) {
+      return;
+    }
+    final measure = measures[measureIndex];
+    final beatStart = measure.startTick +
+        beatIndex * measure.timeSignature.ticksPerBeat;
+    final beatEnd = beatStart +
+        measure.timeSignature.ticksPerBeat;
+    notes.removeWhere(
+          (note) =>
+      note.startTick >= beatStart &&
+          note.startTick < beatEnd,
+    );
+    notifyListeners();
+  }
+
+
+  /// Removes all notes inside the given measure WITHOUT deleting the
+  /// measure itself (unlike [deleteMeasure]). Use this for a "Clean
+  /// Measure" action.
+  void clearMeasureNotes(
+      int measureIndex,
+      ) {
+    if (measureIndex < 0 || measureIndex >= measures.length) {
+      return;
+    }
+    final measure = measures[measureIndex];
+    notes.removeWhere(
+          (note) =>
+      note.startTick >= measure.startTick &&
+          note.startTick < measure.endTick,
+    );
+    notifyListeners();
+  }
+
+
   void deleteMeasure(int index) {
     if (index < 0 || index >= measures.length) {
       return;
@@ -274,8 +318,8 @@ class CompositionController extends ChangeNotifier {
     // copy notes inside measure
     final copiedNotes =
     notes.where( (note) =>
-      note.startTick >= original.startTick &&
-          note.startTick < original.endTick,
+    note.startTick >= original.startTick &&
+        note.startTick < original.endTick,
     )
         .map(
           (note) {
@@ -304,11 +348,11 @@ class CompositionController extends ChangeNotifier {
     }
     final measure = measures[measureIndex];
     final beatStart = measure.startTick + beatIndex *
-                measure.timeSignature.ticksPerBeat;
+        measure.timeSignature.ticksPerBeat;
     final beatEnd = beatStart + measure.timeSignature.ticksPerBeat;
     // Copy notes inside this beat
     final copiedNotes = notes.where((note) => note.startTick >= beatStart &&
-          note.startTick < beatEnd,
+        note.startTick < beatEnd,
     )
         .map(
           (note) {
@@ -325,7 +369,7 @@ class CompositionController extends ChangeNotifier {
     notes.addAll(copiedNotes);
     // Copy beat events
     final beatEvents = measure.beatEvents.where((event)=>
-      event.tick >= beatStart && event.tick < beatEnd,
+    event.tick >= beatStart && event.tick < beatEnd,
     )
         .map(
           (event){
@@ -517,7 +561,7 @@ class CompositionController extends ChangeNotifier {
     timeline.removeDynamicChangeEvent(tick);
     notifyListeners();
   }
-  
+
   // =====================================================
   // GRID / SNAP
   // =====================================================
@@ -970,14 +1014,14 @@ class CompositionController extends ChangeNotifier {
       row: row,
     );
     final overlaps = notes.any((note) {
-        if(note.row != row) {
-          return false;
-        }
-        return newNote.startTick <
-            note.endTick &&
-            newNote.endTick >
-                note.startTick;
-      },
+      if(note.row != row) {
+        return false;
+      }
+      return newNote.startTick <
+          note.endTick &&
+          newNote.endTick >
+              note.startTick;
+    },
     );
     if(overlaps) {
       return;

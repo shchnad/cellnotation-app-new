@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../controllers/composition_controller.dart';
 import '../dialogs/tempo_dialog.dart';
 import '../dialogs/dynamic_dialog.dart';
+import '../dialogs/dynamic_change_dialog.dart';
+import '../enums/dynamic_change.dart';
+import '../models/dynamic_change_event.dart';
 import 'note_block_widget.dart';
 
 /// tempo
@@ -23,11 +26,23 @@ const double _labelOffsetX = 5;
 const double _bottomMargin = 5; // distance from bottom of grid to tempo label
 const double _labelGap = 4; // gap between tempo label and dynamic label above it
 
+// How many pixels wide (on each side of the line) count as a hit when
+// tapping a dynamic change line.
+const double _dynamicChangeLineHitTolerance = 6;
+
 class _LabelHit {
   final int tick;
   final Rect rect;
   final bool isTempo; // true = tempo, false = dynamic
   _LabelHit(this.tick, this.rect, this.isTempo);
+}
+
+// Tap target for a dynamic change (crescendo/diminuendo start/finish)
+// vertical line. Tapping it opens the dynamic change dialog.
+class _DynamicChangeLineHit {
+  final int tick;
+  final Rect rect;
+  _DynamicChangeLineHit(this.tick, this.rect);
 }
 
 TextPainter _tempoTextPainter(dynamic tempoEvent) {
@@ -100,6 +115,34 @@ List<_LabelHit> _computeLabelHits(
   return hits;
 }
 
+/// Computes tap-target rects for the green crescendo/diminuendo start &
+/// finish lines. Each line spans the full grid height, so the hit rect is
+/// just a thin vertical strip centered on the line's x position.
+List<_DynamicChangeLineHit> _computeDynamicChangeLineHits(
+    CompositionController controller,
+    double pixelsPerTick,
+    double gridHeight,
+    ) {
+  final hits = <_DynamicChangeLineHit>[];
+
+  for (final event in controller.timeline.dynamicChangeEvents) {
+    final x = event.tick * pixelsPerTick;
+    hits.add(
+      _DynamicChangeLineHit(
+        event.tick,
+        Rect.fromLTWH(
+          x - _dynamicChangeLineHitTolerance,
+          0,
+          _dynamicChangeLineHitTolerance * 2,
+          gridHeight,
+        ),
+      ),
+    );
+  }
+
+  return hits;
+}
+
 /// Helper used only for consistent row height — returns the tick to look
 /// up for sizing purposes (falls back to any existing tempo event if none
 /// exists at this exact tick, since we just need a representative height).
@@ -117,6 +160,7 @@ class GridWidget extends StatelessWidget {
     required this.controller,
     required this.cellHeight,
   });
+
 
   @override
   Widget build(BuildContext context) {
@@ -161,7 +205,24 @@ class GridWidget extends StatelessWidget {
                           }
                         }
 
-                        // 2. Otherwise, normal grid/note tap handling.
+                        // 2. Check crescendo/diminuendo start & finish
+                        //    lines next — tapping one opens the dynamic
+                        //    change dialog instead of creating a note.
+                        final dynamicChangeLineHits =
+                        _computeDynamicChangeLineHits(
+                          controller,
+                          pixelsPerTick,
+                          gridHeight,
+                        );
+
+                        for (final hit in dynamicChangeLineHits) {
+                          if (hit.rect.contains(details.localPosition)) {
+                            dynamicChangeDialog(context, controller, hit.tick);
+                            return; // don't fall through to note creation
+                          }
+                        }
+
+                        // 3. Otherwise, normal grid/note tap handling.
                         final row =
                         (details.localPosition.dy / cellHeight).floor();
                         final rawTick =
@@ -223,6 +284,141 @@ class GridPainter extends CustomPainter {
     required this.pixelsPerTick,
   });
 
+  void _drawCrescendo(
+      Canvas canvas,
+      Paint paint,
+      double x1,
+      double x2,
+      double y,
+      ) {
+    const h = 10.0;
+
+    canvas.drawLine(
+      Offset(x1, y),
+      Offset(x2, y - h),
+      paint,
+    );
+
+    canvas.drawLine(
+      Offset(x1, y),
+      Offset(x2, y + h),
+      paint,
+    );
+  }
+
+
+  void _drawDiminuendo(
+      Canvas canvas,
+      Paint paint,
+      double x1,
+      double x2,
+      double y,
+      ) {
+    const h = 10.0;
+
+    canvas.drawLine(
+      Offset(x1, y - h),
+      Offset(x2, y),
+      paint,
+    );
+
+    canvas.drawLine(
+      Offset(x1, y + h),
+      Offset(x2, y),
+      paint,
+    );
+  }
+
+  void _drawHairpins(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.green
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+
+    DynamicChangeEvent? crescendoBegin;
+    DynamicChangeEvent? diminuendoBegin;
+
+    final referenceTempoHeight =
+    controller.timeline.tempoEvents.isNotEmpty
+        ? _tempoTextPainter(
+      controller.timeline.tempoEvents.first,
+    ).height
+        : 0.0;
+
+    final referenceDynamicHeight = controller.timeline.dynamicEvents.isNotEmpty
+        ? _dynamicTextPainter(
+      controller.timeline.dynamicEvents.first,
+    ).height
+        : 0.0;
+
+    const hairpinOffset = 18.0;
+
+    final y = size.height
+        - referenceTempoHeight
+        - _bottomMargin
+        - _labelGap
+        - referenceDynamicHeight
+        - hairpinOffset;
+
+
+    for (final event in controller.timeline.dynamicChangeEvents) {
+      switch (event.dynamic_change) {
+
+        case DynamicChange.crescendoStart:
+          crescendoBegin = event;
+          break;
+
+        case DynamicChange.crescendoFinish:
+          if (crescendoBegin != null) {
+            _drawCrescendo(
+              canvas,
+              paint,
+              crescendoBegin.tick * pixelsPerTick,
+              event.tick * pixelsPerTick,
+              y,
+            );
+            crescendoBegin = null;
+          }
+          break;
+
+        case DynamicChange.diminuendoStart:
+          diminuendoBegin = event;
+          break;
+
+        case DynamicChange.diminuendoFinish:
+          if (diminuendoBegin != null) {
+            _drawDiminuendo(
+              canvas,
+              paint,
+              diminuendoBegin.tick * pixelsPerTick,
+              event.tick * pixelsPerTick,
+              y,
+            );
+            diminuendoBegin = null;
+          }
+          break;
+      }
+    }
+  }
+
+  // Draws a full-height green vertical line at every crescendo/diminuendo
+  // start & finish tick — these are the tap targets handled in
+  // _computeDynamicChangeLineHits above.
+  void _drawDynamicChangeLines(Canvas canvas, Size size) {
+    final linePaint = Paint()
+      ..color = Colors.green
+      ..strokeWidth = 2;
+
+    for (final event in controller.timeline.dynamicChangeEvents) {
+      final x = event.tick * pixelsPerTick;
+      canvas.drawLine(
+        Offset(x, 0),
+        Offset(x, size.height),
+        linePaint,
+      );
+    }
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     final thinPaint = Paint()
@@ -280,9 +476,9 @@ class GridPainter extends CustomPainter {
       }
     }
 
-    // =====================================================
+
     // TEMPO EVENTS — line full height, label at bottom of grid
-    // =====================================================
+
     final tempoLinePaint = Paint()
       ..color = Colors.blue
       ..strokeWidth = 2;
@@ -301,11 +497,8 @@ class GridPainter extends CustomPainter {
       textPainter.paint(canvas, Offset(x + _labelOffsetX, y));
     }
 
-    // =====================================================
-    // DYNAMIC EVENTS — no line, label stacked above tempo label
-    // =====================================================
-    // Use a representative tempo label height so dynamic labels sit at a
-    // consistent row regardless of which tick they're on.
+// DYNAMIC EVENTS — labels stacked above tempo label
+
     final referenceTempoHeight = controller.timeline.tempoEvents.isNotEmpty
         ? _tempoTextPainter(controller.timeline.tempoEvents.first).height
         : 0.0;
@@ -322,10 +515,17 @@ class GridPainter extends CustomPainter {
 
       textPainter.paint(canvas, Offset(x + _labelOffsetX, y));
     }
+
+// CRESCENDO/DIMINUENDO START & FINISH — full-height green line, clickable
+    _drawDynamicChangeLines(canvas, size);
+
+// DRAW ALL CRESCENDO/DIMINUENDO AT ONE FIXED HEIGHT
+    _drawHairpins(canvas, size);
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) {
     return true;
   }
+
 }

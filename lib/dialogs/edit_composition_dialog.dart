@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../controllers/composition_controller.dart';
 import '../models/composition.dart';
 import '../enums/music_style.dart';
 import '../enums/instrument.dart';
@@ -10,12 +11,16 @@ class EditCompositionDialog extends StatefulWidget {
   final Composition composition;
   final ValueChanged<Composition> onSaved;
   final VoidCallback? onDelete;
+  final bool allowDelete;
+
+
 
   const EditCompositionDialog({
     super.key,
     required this.composition,
     required this.onSaved,
     this.onDelete,
+    required this.allowDelete,
   });
 
   @override
@@ -247,7 +252,7 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
               ),
             ),
 
-            if (widget.onDelete != null)
+            if (widget.onDelete != null && widget.allowDelete)
               TextButton(
                 onPressed: () => confirmDeleteCompositionDialog(
                   context,
