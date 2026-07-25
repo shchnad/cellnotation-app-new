@@ -25,6 +25,7 @@ class DefaultValues {
   static const double dialogPaddingRightLeft = 25.0;
   static const double dialogPaddingBottomTop = 8.0;
 
+
   // NOTE COPYING
   static const String titleOfMessageForCopying = 'Note copying';
   static const String messageForCopying =

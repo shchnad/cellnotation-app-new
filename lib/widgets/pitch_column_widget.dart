@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../controllers/composition_controller.dart';
+import '../utils/default_values.dart';
 
 /// A persistent column, meant to sit right next to the grid, listing the
 /// pitch name of every row (top to bottom) for the current scale. It
@@ -11,7 +12,7 @@ class PitchColumnWidget extends StatelessWidget {
   final double cellHeight;
   final ScrollController scrollController;
 
-  static const double width = 50;
+  static const double widthOfPitchColumn = 20;
 
   const PitchColumnWidget({
     super.key,
@@ -25,8 +26,10 @@ class PitchColumnWidget extends StatelessWidget {
     final totalRows = controller.totalRows;
 
     return Container(
-      width: width,
-      color: Colors.grey.shade200,
+      width: widthOfPitchColumn,
+      // color: Colors.grey.shade200,
+      // color: Colors.white,
+      color: Colors.green.shade100,
       child: SingleChildScrollView(
         controller: scrollController,
         physics: const NeverScrollableScrollPhysics(),
