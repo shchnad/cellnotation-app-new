@@ -166,6 +166,9 @@ class CompositionController extends ChangeNotifier {
     measures[selectedMeasureIndex] =
         oldMeasure.copyWith(
           scaleName: newScaleName,
+          // A deliberate pick becomes the new reset target, not just a
+          // transient raise/lower step.
+          originalScaleName: newScaleName,
         );
     notifyListeners();
   }
@@ -179,7 +182,8 @@ class CompositionController extends ChangeNotifier {
       return;
     }
     measures[measureIndex] = measures[measureIndex].copyWith(
-        scaleName: newScaleName
+      scaleName: newScaleName,
+      originalScaleName: newScaleName,
     );
     notifyListeners();
   }
@@ -1043,6 +1047,62 @@ class CompositionController extends ChangeNotifier {
           measures[i].scaleName,
           -1,
         ),
+      );
+    }
+    notifyListeners();
+  }
+
+
+  /// Restores every measure's scale back to whatever it was originally
+  /// created with (or last deliberately picked via the scale selector),
+  /// undoing any raiseAllScales/lowerAllScales drift.
+  void resetAllScales(){
+    for(int i = 0; i < measures.length; i++){
+      measures[i] = measures[i].copyWith(
+        scaleName: measures[i].originalScaleName,
+      );
+    }
+    notifyListeners();
+  }
+
+
+  /// Indices of every measure whose current scale no longer matches
+  /// what it was originally created with / last deliberately picked —
+  /// i.e. it's been raised/lowered since then. Used to warn before
+  /// saving.
+  List<int> measuresWithScaleDrift() {
+    final indices = <int>[];
+    for (int i = 0; i < measures.length; i++) {
+      if (measures[i].scaleName != measures[i].originalScaleName) {
+        indices.add(i);
+      }
+    }
+    return indices;
+  }
+
+  /// How many semitones up (positive) or down (negative) measure
+  /// [index]'s current scale sits relative to its original scale. Both
+  /// scales are assumed to share the same mode (raise/lower never
+  /// changes major↔minor), so this is just the shortest signed
+  /// distance between their roots on that mode's 12-slot chromatic
+  /// circle.
+  int semitoneDeltaForMeasure(int index) {
+    if (index < 0 || index >= measures.length) {
+      return 0;
+    }
+    return ScaleResolver.semitoneDelta(
+      measures[index].originalScaleName,
+      measures[index].scaleName,
+    );
+  }
+
+  /// Accepts every measure's current (possibly raised/lowered) scale as
+  /// the new baseline — i.e. "Reset Scales" will no longer undo it, and
+  /// it won't be flagged as drift again on the next save.
+  void commitScaleChanges() {
+    for (int i = 0; i < measures.length; i++) {
+      measures[i] = measures[i].copyWith(
+        originalScaleName: measures[i].scaleName,
       );
     }
     notifyListeners();

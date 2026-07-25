@@ -12,7 +12,7 @@ class PitchColumnWidget extends StatelessWidget {
   final double cellHeight;
   final ScrollController scrollController;
 
-  static const double widthOfPitchColumn = 20;
+  static const double widthOfPitchColumn = 15;
 
   const PitchColumnWidget({
     super.key,
@@ -38,7 +38,7 @@ class PitchColumnWidget extends StatelessWidget {
             final pitch = controller.getPitchNameForRow(row);
             return Container(
               height: cellHeight,
-              alignment: Alignment.center,
+              // alignment: Alignment.centerLeft,
               decoration: BoxDecoration(
                 border: Border(
                   bottom: BorderSide(

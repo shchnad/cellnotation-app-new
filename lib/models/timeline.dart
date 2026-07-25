@@ -9,11 +9,11 @@ import 'tempo_event.dart';
 
 
 class Timeline {
-final List<Measure> measures;
-final List<TempoEvent> tempoEvents;
-final List<DynamicEvent> dynamicEvents;
-final List<BeatEvent> beatEvents;
-final List<DynamicChangeEvent> dynamicChangeEvents;
+  final List<Measure> measures;
+  final List<TempoEvent> tempoEvents;
+  final List<DynamicEvent> dynamicEvents;
+  final List<BeatEvent> beatEvents;
+  final List<DynamicChangeEvent> dynamicChangeEvents;
 
   Timeline({
     required this.measures,
@@ -22,10 +22,10 @@ final List<DynamicChangeEvent> dynamicChangeEvents;
     List<DynamicChangeEvent>? dynamicChangeEvents,
     List<BeatEvent>? beatEvents,
   }) :
-tempoEvents = tempoEvents ?? [],
-dynamicEvents = dynamicEvents ?? [],
-dynamicChangeEvents = dynamicChangeEvents ?? [],
-beatEvents = beatEvents ?? [] {
+        tempoEvents = tempoEvents ?? [],
+        dynamicEvents = dynamicEvents ?? [],
+        dynamicChangeEvents = dynamicChangeEvents ?? [],
+        beatEvents = beatEvents ?? [] {
     if(this.tempoEvents.isEmpty){
       this.tempoEvents.add(
         TempoEvent(
@@ -66,6 +66,7 @@ beatEvents = beatEvents ?? [] {
         startTick: totalTicks,
         timeSignature: signature,
         scaleName: scaleName,
+        originalScaleName: scaleName,
       ),
     );
     rebuild();
@@ -87,6 +88,7 @@ beatEvents = beatEvents ?? [] {
         startTick:tick,
         timeSignature:signature,
         scaleName:scaleName,
+        originalScaleName: scaleName,
       ),
     );
     rebuild();
@@ -293,4 +295,3 @@ beatEvents = beatEvents ?? [] {
   }
 
 }
-

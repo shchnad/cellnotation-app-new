@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 void saveExitDialog(
     BuildContext context, {
-      required Future<void> Function() onSave,
+      required Future<bool> Function() onSave,
     }) {
   showDialog(
     context: context,
@@ -52,8 +52,13 @@ void saveExitDialog(
         TextButton(
           onPressed: () async {
             Navigator.pop(dialogContext);
-            await onSave();
-            if (context.mounted) {
+            // Only leave the composition screen if the save actually
+            // went through — onSave can return false (e.g. the person
+            // cancelled a confirmation prompt partway through), in
+            // which case we stay put instead of silently discarding
+            // that cancellation.
+            final proceeded = await onSave();
+            if (context.mounted && proceeded) {
               Navigator.pop(context);
             }
           },

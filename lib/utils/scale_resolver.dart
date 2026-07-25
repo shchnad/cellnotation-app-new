@@ -79,6 +79,45 @@ class ScaleResolver {
   }
 
 
+  /// Shortest signed semitone distance from [fromScale] to [toScale] on
+  /// their mode's chromatic circle (positive = toScale is higher,
+  /// negative = lower). Assumes both are the same mode — if they
+  /// somehow differ, or either root isn't recognized, returns 0 rather
+  /// than guessing.
+  static int semitoneDelta(String fromScale, String toScale) {
+    final fromNormalized = normalizeScaleName(fromScale);
+    final toNormalized = normalizeScaleName(toScale);
+
+    final fromParts = fromNormalized.split(' ');
+    final toParts = toNormalized.split(' ');
+    if (fromParts.length < 2 || toParts.length < 2) return 0;
+
+    final String mode = fromParts.last;
+    if (toParts.last != mode) return 0;
+
+    final String fromRoot = fromParts.sublist(0, fromParts.length - 1).join(' ');
+    final String toRoot = toParts.sublist(0, toParts.length - 1).join(' ');
+
+    final List<String> chromaticNotes =
+    mode == 'minor' ? _minorChromaticNotes : _majorChromaticNotes;
+
+    final int fromIdx = chromaticNotes.indexWhere(
+            (n) => n.toLowerCase() == fromRoot.toLowerCase());
+    final int toIdx = chromaticNotes.indexWhere(
+            (n) => n.toLowerCase() == toRoot.toLowerCase());
+    if (fromIdx == -1 || toIdx == -1) return 0;
+
+    final int total = chromaticNotes.length;
+    int raw = (toIdx - fromIdx) % total;
+    if (raw > total ~/ 2) {
+      raw -= total;
+    } else if (raw < -(total ~/ 2)) {
+      raw += total;
+    }
+    return raw;
+  }
+
+
   /// Shifts the base scale root up or down by [semitoneOffset]
   /// semitones, one semitone at a time, using the chromatic circle for
   /// whichever mode (major/minor) [baseScale] is in. Each single

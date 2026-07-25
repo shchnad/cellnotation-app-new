@@ -11,6 +11,7 @@ import '../dialogs/add_measures_dialog.dart';
 
 import '../dialogs/simple_message_dialog.dart';
 import '../dialogs/edit_composition_dialog.dart';
+import '../dialogs/scale_change_warning_dialog.dart';
 import '../enums/hand.dart';
 
 import '../services/composition_service.dart';
@@ -124,7 +125,40 @@ class _CompositionScreenState extends State<CompositionScreen> {
 
 
 
-  Future<void> _saveComposition(BuildContext context) async {
+  /// Checks for any measure whose scale has drifted from its original
+  /// (via raise/lower) and, if so, asks the user whether to keep or
+  /// revert before actually saving. Proceeds straight to saving if
+  /// there's no drift, or if the user cancels the whole save.
+  Future<bool> _saveComposition(BuildContext context) async {
+    final driftIndices = controller.measuresWithScaleDrift();
+
+    if (driftIndices.isNotEmpty) {
+      final keepChanges = await scaleChangeWarningDialog(
+        context: context,
+        controller: controller,
+        driftMeasureIndices: driftIndices,
+      );
+
+      if (keepChanges == null) {
+        // User cancelled the whole save — signal callers (e.g. the
+        // save-and-exit flow) not to navigate away either.
+        return false;
+      }
+
+      if (keepChanges) {
+        controller.commitScaleChanges();
+      } else {
+        controller.resetAllScales();
+      }
+
+      if (!context.mounted) return false;
+    }
+
+    await _performSave(context);
+    return true;
+  }
+
+  Future<void> _performSave(BuildContext context) async {
     final service = CompositionService();
 
     // Show a small non-blocking indicator while saving
@@ -275,11 +309,6 @@ class _CompositionScreenState extends State<CompositionScreen> {
                       ),
 
 
-                      const Divider(
-                        color: Colors.white24,
-                      ),
-
-
                       // RAISE SCALE
                       IconButton(
                         icon: const Icon(Icons.arrow_upward,
@@ -288,6 +317,17 @@ class _CompositionScreenState extends State<CompositionScreen> {
                         tooltip: 'Raise scales',
                         onPressed:
                         controller.raiseAllScales,
+                      ),
+
+
+                      // RESET SCALE
+                      IconButton(
+                        icon: const Icon(Icons.adjust_sharp,
+                          color: Colors.black,
+                        ),
+                        tooltip: 'Reset scales',
+                        onPressed:
+                        controller.resetAllScales,
                       ),
 
 
@@ -327,11 +367,6 @@ class _CompositionScreenState extends State<CompositionScreen> {
                         tooltip: 'Hand',
                         onPressed:
                         controller.toggleHand,
-                      ),
-
-
-                      const Divider(
-                        color: Colors.white24,
                       ),
 
 
@@ -380,10 +415,6 @@ class _CompositionScreenState extends State<CompositionScreen> {
                           },
                         ),
 
-
-                      const Divider(
-                        color: Colors.white24,
-                      ),
 
                       // ZOOM IN
                       IconButton(
