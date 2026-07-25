@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:music_composer/dialogs/scale_dialog.dart';
+import 'package:music_composer/utils/scale_resolver.dart';
 
 import '../controllers/composition_controller.dart';
 
@@ -52,9 +53,11 @@ class _AddMeasuresDialogState extends State<AddMeasuresDialog> {
     super.initState();
 
     if(widget.controller.measures.isNotEmpty){
-      _selectedScale =  widget.controller.measures.last.scaleName;
+      _selectedScale = ScaleResolver.normalizeScaleName(
+        widget.controller.measures.last.scaleName,
+      );
     } else {
-      _selectedScale = DefaultValues.scale;
+      _selectedScale = ScaleResolver.normalizeScaleName(DefaultValues.scale);
     }
   }
 
@@ -123,13 +126,10 @@ class _AddMeasuresDialogState extends State<AddMeasuresDialog> {
   @override
   Widget build(BuildContext context) {
 
-    // scale name transformation
-    final parts = _selectedScale.split(' ');
-    final scaleDisplayLabel = parts.length == 2
-        ? '${parts[1]} ${parts[0]}'
-        : parts.length > 2
-          ? '${parts.sublist(1).join(' ')} ${parts[0]}'
-          : _selectedScale;
+    // _selectedScale is normalized to "<root> <mode>" the moment it's
+    // set (see initState / scaleDialog callback), so it's already the
+    // display format we want here.
+    final scaleDisplayLabel = _selectedScale;
 
     return SafeArea(
       child: AlertDialog(
@@ -334,7 +334,7 @@ class _AddMeasuresDialogState extends State<AddMeasuresDialog> {
                 onPressed:
                     ()=>Navigator.pop(context),
                 child: const Text(
-                    'Close',
+                  'Close',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,

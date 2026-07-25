@@ -978,35 +978,36 @@ class CompositionController extends ChangeNotifier {
 
 
   List<String> get availableScales => [
-    'major C',
-    'major C sharp',
-    'major D flat',
-    'major D',
-    'major E flat',
-    'major E',
-    'major F',
-    'major F sharp',
-    'major G flat',
-    'major G',
-    'major A flat',
-    'major A',
-    'major B flat',
+    'do major',
+    'do sharp major',
+    're flat major',
+    're major',
+    'mi flat major',
+    'mi major',
+    'fa major',
+    'fa sharp major',
+    'sol flat major',
+    'sol major',
+    'la flat major',
+    'la major',
+    'si flat major',
+    'si major',
 
-    'minor C',
-    'minor C sharp',
-    'minor D',
-    'minor D sharp',
-    'minor E flat',
-    'minor E',
-    'minor F',
-    'minor F sharp',
-    'minor G',
-    'minor G sharp',
-    'minor A flat',
-    'minor A',
-    'minor A sharp',
-    'minor B flat',
-    'minor B',
+    'do minor',
+    'do sharp minor',
+    're minor',
+    're sharp minor',
+    'mi flat minor',
+    'mi minor',
+    'fa minor',
+    'fa sharp minor',
+    'sol minor',
+    'sol sharp minor',
+    'la flat minor',
+    'la minor',
+    'la sharp minor',
+    'si flat minor',
+    'si minor',
   ];
 
   get dynamicChangeEvents => null;
@@ -1017,22 +1018,31 @@ class CompositionController extends ChangeNotifier {
   }
 
 
+  /// Each tap moves every measure's scale one step up the chromatic
+  /// circle from wherever it currently is — landing on the next
+  /// *defined* scale for that mode (major/minor), skipping any
+  /// enharmonic spelling that has no scale defined for it.
   void raiseAllScales(){
     for(int i = 0; i < measures.length; i++){
       measures[i] = measures[i].copyWith(
-        pitchOffsetSemitones:
-        measures[i].pitchOffsetSemitones + 1,
+        scaleName: ScaleResolver.transposeScale(
+          measures[i].scaleName,
+          1,
+        ),
       );
     }
     notifyListeners();
   }
 
 
+  /// Same as [raiseAllScales] but one step down instead of up.
   void lowerAllScales(){
     for(int i = 0; i < measures.length; i++){
       measures[i] = measures[i].copyWith(
-        pitchOffsetSemitones:
-        measures[i].pitchOffsetSemitones - 1,
+        scaleName: ScaleResolver.transposeScale(
+          measures[i].scaleName,
+          -1,
+        ),
       );
     }
     notifyListeners();

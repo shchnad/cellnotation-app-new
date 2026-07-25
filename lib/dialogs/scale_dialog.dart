@@ -48,22 +48,22 @@ Future<void> scaleDialog({
                   spacing: 8,
                   runSpacing: 8,
                   children: controller.availableScales
-                      .where((scale) => scale.startsWith("major"))
+                      .where((scale) => scale.endsWith("major"))
                       .map(
                         (scale) => ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.grey.shade300,
-                            foregroundColor: scale == currentScale
-                                ? Colors.blue
-                                : Colors.black,
-                            elevation: 0,
-                          ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey.shade300,
+                        foregroundColor: scale == currentScale
+                            ? Colors.blue
+                            : Colors.black,
+                        elevation: 0,
+                      ),
                       onPressed: () {
                         onSelected(scale);
                         Navigator.pop(context);
                       },
                       child: Text(
-                        scale.replaceFirst("major ", ""),
+                        scale.replaceFirst(RegExp(r' major$'), ''),
                         style: const TextStyle(
                           fontSize: 20,
                         ),
@@ -97,7 +97,7 @@ Future<void> scaleDialog({
                   spacing: 8,
                   runSpacing: 8,
                   children: controller.availableScales
-                      .where((scale) => scale.startsWith("minor"))
+                      .where((scale) => scale.endsWith("minor"))
                       .map(
                         (scale) => ElevatedButton(
                       style: ElevatedButton.styleFrom(
@@ -112,7 +112,7 @@ Future<void> scaleDialog({
                         Navigator.pop(context);
                       },
                       child: Text(
-                        scale.replaceFirst("minor ", ""),
+                        scale.replaceFirst(RegExp(r' minor$'), ''),
                         style: const TextStyle(
                           fontSize: 20,
                         ),
