@@ -14,21 +14,21 @@ import '../models/note.dart';
 const double _articulationMarkHeight = 12.0;
 
 // Height of the strip reserved above each note for the finger number.
-const double _fingerHeight = 14.0;
+const double _fingerHeight = 26.0;
 
 // Height of the strip reserved below each note for the playing
 // technique abbreviation.
-const double _techniqueHeight = 14.0;
+const double _techniqueHeight = 26.0;
 
 const _fingerTextStyle = TextStyle(
   color: Colors.red,
-  fontSize: 11,
+  fontSize: 22,
   fontWeight: FontWeight.bold,
 );
 
 const _techniqueTextStyle = TextStyle(
   color: Colors.red,
-  fontSize: 11,
+  fontSize: 22,
   fontWeight: FontWeight.bold,
   // fontStyle: FontStyle.italic,
 );

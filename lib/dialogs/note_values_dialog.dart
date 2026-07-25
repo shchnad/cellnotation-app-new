@@ -23,13 +23,12 @@ void noteValuesDialog<T>({
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-        return painter.width;
+    return painter.width;
   }
 
-  final maxWidth = [
-    ...values.map((v) => textWidth(labelBuilder(v))),
-    if (onClear != null) textWidth('none'),
-  ].reduce((a, b) => a > b ? a : b);
+  final maxWidth = values
+      .map((v) => textWidth(labelBuilder(v)))
+      .reduce((a, b) => a > b ? a : b);
 
   final buttonWidth = maxWidth + 40;
 
@@ -40,33 +39,20 @@ void noteValuesDialog<T>({
       .toDouble() // <-- Add this right here
       .clamp(0.0, screenWidth * 0.8));
 
-  final buttons = [
-    ...values.map(
-          (value) {
-        final selected = value == currentValue;
-        return _button(
-          labelBuilder(value),
-          selected,
-          buttonWidth,
-          () {
-            onSelected(value);
-            Navigator.pop(context);
-          },
-        );
-      },
-    ),
-    if (onClear != null)
-      _button(
-        'none',
-        currentValue == null,
+  final buttons = values.map(
+        (value) {
+      final selected = value == currentValue;
+      return _button(
+        labelBuilder(value),
+        selected,
         buttonWidth,
-        () {
-          onClear();
+            () {
+          onSelected(value);
           Navigator.pop(context);
         },
-      ),
-
-  ];
+      );
+    },
+  ).toList();
 
 
   showDialog(
@@ -78,9 +64,9 @@ void noteValuesDialog<T>({
         title,
         textAlign: TextAlign.center,
         style: const TextStyle(
-            fontSize: fontSize,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
+          fontSize: fontSize,
+          fontWeight: FontWeight.bold,
+          color: Colors.black,
         ),
       ),
       content: SizedBox(
@@ -94,6 +80,40 @@ void noteValuesDialog<T>({
           children: buttons,
         ),
       ),
+      actions: [
+        const Divider(thickness: 1.0),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (onClear != null)
+              TextButton(
+                onPressed: () {
+                  onClear();
+                  Navigator.pop(context);
+                },
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                  ),
+                ),
+              ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Close',
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     ),
   );
 }
