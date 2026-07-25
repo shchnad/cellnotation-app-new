@@ -481,6 +481,26 @@ class CompositionController extends ChangeNotifier {
     }
   }
 
+  /// The tempo actually in effect AT [tick] — i.e. the latest tempo
+  /// event at or before it — as opposed to [getTempoAtTick], which only
+  /// matches an exact tick. tempoEvents always has at least the tick-0
+  /// entry (guaranteed by Timeline), so this never returns null as long
+  /// as there's at least one tempo event.
+  TempoEvent? getActiveTempoAtTick(int tick) {
+    if (timeline.tempoEvents.isEmpty) {
+      return null;
+    }
+    TempoEvent active = timeline.tempoEvents.first;
+    for (final event in timeline.tempoEvents) {
+      if (event.tick <= tick) {
+        active = event;
+      } else {
+        break; // tempoEvents is kept sorted ascending by tick
+      }
+    }
+    return active;
+  }
+
 
   void updateTempoEvent(
       int tick,

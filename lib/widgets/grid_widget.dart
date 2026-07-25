@@ -155,12 +155,14 @@ class GridWidget extends StatelessWidget {
   final CompositionController controller;
   final double cellHeight;
   final ScrollController? verticalScrollController;
+  final ScrollController? horizontalScrollController;
 
   const GridWidget({
     super.key,
     required this.controller,
     required this.cellHeight,
     this.verticalScrollController,
+    this.horizontalScrollController,
   });
 
 
@@ -178,6 +180,7 @@ class GridWidget extends StatelessWidget {
           controller: verticalScrollController,
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
+            controller: horizontalScrollController,
             child: SizedBox(
               width: gridWidth,
               height: gridHeight,

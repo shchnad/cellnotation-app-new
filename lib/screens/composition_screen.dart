@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:music_composer/dialogs/save_exit_dialog.dart';
 import 'package:music_composer/utils/default_values.dart';
 
@@ -33,7 +34,8 @@ class CompositionScreen extends StatefulWidget {
   State<CompositionScreen> createState() => _CompositionScreenState();
 }
 
-class _CompositionScreenState extends State<CompositionScreen> {
+class _CompositionScreenState extends State<CompositionScreen>
+    with TickerProviderStateMixin {
 
   CompositionController get controller => widget.controller;
 
@@ -41,6 +43,102 @@ class _CompositionScreenState extends State<CompositionScreen> {
   // the pitch labels always line up with the rows currently on screen.
   final ScrollController _gridVerticalController = ScrollController();
   final ScrollController _pitchVerticalController = ScrollController();
+
+  // Drives the grid's horizontal scroll — used for both normal manual
+  // scrolling and, while playing, the auto-scroll below.
+  final ScrollController _gridHorizontalController = ScrollController();
+
+  // =====================================================
+  // PLAYBACK (auto-scroll timed to tempo)
+  // =====================================================
+
+  Ticker? _playbackTicker;
+  Duration _lastTickerElapsed = Duration.zero;
+  double _playbackTick = 0; // fractional current tick position
+  bool _isPlaying = false;
+  bool _pauseScheduled = false; // prevents scheduling the deferred
+  // pause below more than once per gesture
+
+  void _togglePlayback() {
+    if (_isPlaying) {
+      _pausePlayback();
+    } else {
+      _startPlayback();
+    }
+  }
+
+  void _startPlayback() {
+    if (controller.maxTicks <= 0) {
+      return;
+    }
+
+    // Resume from wherever the grid is currently scrolled to, so a
+    // paused playback picks up right where it left off, and a person
+    // can also manually position the view and then hit play.
+    _playbackTick = _gridHorizontalController.hasClients
+        ? _gridHorizontalController.offset / controller.pixelsPerTick
+        : 0;
+
+    if (_playbackTick >= controller.maxTicks) {
+      _playbackTick = 0; // was already at the end — start over
+    }
+
+    _lastTickerElapsed = Duration.zero;
+    setState(() => _isPlaying = true);
+    _playbackTicker = createTicker(_onPlaybackTick)..start();
+  }
+
+  /// Halts the ticker without resetting [_playbackTick] — this is a
+  /// pause, not a stop: the grid stays scrolled exactly where playback
+  /// left off, so hitting Play again resumes from that same spot.
+  void _pausePlayback() {
+    _playbackTicker?.stop();
+    _playbackTicker?.dispose();
+    _playbackTicker = null;
+    if (mounted) {
+      setState(() => _isPlaying = false);
+    }
+  }
+
+  void _onPlaybackTick(Duration elapsed) {
+    final dtSeconds =
+        (elapsed - _lastTickerElapsed).inMicroseconds / 1000000.0;
+    _lastTickerElapsed = elapsed;
+
+    // Speed = (ticks per beat, from whichever measure we're currently
+    // in) × (BPM, from whichever tempo event is currently active) / 60
+    // — re-evaluated every frame so it correctly follows tempo changes
+    // and measures with a different beat unit as playback crosses them.
+    final currentTickInt =
+    _playbackTick.floor().clamp(0, controller.maxTicks - 1);
+    final measure = controller.getMeasureAtTick(currentTickInt);
+    final activeTempo = controller.getActiveTempoAtTick(currentTickInt);
+
+    final beatTicks = measure.timeSignature.beatDuration.ticks;
+    final bpm = activeTempo?.tempo.value ?? 0;
+    final ticksPerSecond = beatTicks * bpm / 60.0;
+
+    _playbackTick += ticksPerSecond * dtSeconds;
+
+    if (_playbackTick >= controller.maxTicks) {
+      _playbackTick = controller.maxTicks.toDouble();
+      _scrollTo(_playbackTick);
+      // Reached the end on its own — pause here too (rather than a
+      // silent auto-rewind), since _startPlayback already resets to 0
+      // when play is pressed again from an at-the-end position.
+      _pausePlayback();
+      return;
+    }
+
+    _scrollTo(_playbackTick);
+  }
+
+  void _scrollTo(double tick) {
+    if (!_gridHorizontalController.hasClients) return;
+    final offset = tick * controller.pixelsPerTick;
+    final maxScroll = _gridHorizontalController.position.maxScrollExtent;
+    _gridHorizontalController.jumpTo(offset.clamp(0.0, maxScroll));
+  }
 
   @override
   void initState() {
@@ -59,6 +157,8 @@ class _CompositionScreenState extends State<CompositionScreen> {
     _gridVerticalController.removeListener(_syncPitchColumn);
     _gridVerticalController.dispose();
     _pitchVerticalController.dispose();
+    _gridHorizontalController.dispose();
+    _playbackTicker?.dispose();
     super.dispose();
   }
 
@@ -309,6 +409,25 @@ class _CompositionScreenState extends State<CompositionScreen> {
                       ),
 
 
+                      // PLAY / PAUSE — auto-scrolls the grid left to
+                      // right at a speed derived from tempo and beat
+                      // duration. Pausing keeps the current position,
+                      // so Play resumes right where it left off.
+                      IconButton(
+                        icon: Icon(
+                          _isPlaying ? Icons.pause : Icons.play_arrow,
+                          color: _isPlaying ? Colors.blue : Colors.black,
+                        ),
+                        tooltip: _isPlaying ? 'Pause' : 'Play',
+                        onPressed: hasMeasures ? _togglePlayback : null,
+                      ),
+
+
+                      const Divider(
+                        color: Colors.white24,
+                      ),
+
+
                       // RAISE SCALE
                       IconButton(
                         icon: const Icon(Icons.arrow_upward,
@@ -322,7 +441,7 @@ class _CompositionScreenState extends State<CompositionScreen> {
 
                       // RESET SCALE
                       IconButton(
-                        icon: const Icon(Icons.adjust_sharp,
+                        icon: const Icon(Icons.restore,
                           color: Colors.black,
                         ),
                         tooltip: 'Reset scales',
@@ -367,6 +486,11 @@ class _CompositionScreenState extends State<CompositionScreen> {
                         tooltip: 'Hand',
                         onPressed:
                         controller.toggleHand,
+                      ),
+
+
+                      const Divider(
+                        color: Colors.white24,
                       ),
 
 
@@ -415,6 +539,10 @@ class _CompositionScreenState extends State<CompositionScreen> {
                           },
                         ),
 
+
+                      const Divider(
+                        color: Colors.white24,
+                      ),
 
                       // ZOOM IN
                       IconButton(
@@ -513,10 +641,45 @@ class _CompositionScreenState extends State<CompositionScreen> {
                   ),
                 )
                     : SafeArea(
-                  child: GridWidget(
-                    controller: controller,
-                    cellHeight: cellHeight,
-                    verticalScrollController: _gridVerticalController,
+                  child: NotificationListener<ScrollNotification>(
+                    // If playback is running and the person starts an
+                    // actual finger drag (as opposed to the jumpTo()
+                    // calls the ticker itself makes every frame), pause
+                    // playback — otherwise the next frame's jumpTo()
+                    // would just override their gesture, and manual
+                    // scrolling (especially backward) would look like
+                    // it's not working at all.
+                    //
+                    // The actual pause is deferred to a post-frame
+                    // callback rather than called synchronously here:
+                    // this notification fires WHILE the descendant
+                    // Scrollable's drag gesture is still being
+                    // dispatched, and calling setState() at that exact
+                    // moment can leave the ticker/gesture plumbing in a
+                    // bad state (symptom: Play appears to work again
+                    // but the grid never actually resumes moving).
+                    onNotification: (notification) {
+                      if (_isPlaying &&
+                          !_pauseScheduled &&
+                          notification.metrics.axis == Axis.horizontal &&
+                          notification is ScrollUpdateNotification &&
+                          notification.dragDetails != null) {
+                        _pauseScheduled = true;
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _pauseScheduled = false;
+                          if (mounted) {
+                            _pausePlayback();
+                          }
+                        });
+                      }
+                      return false;
+                    },
+                    child: GridWidget(
+                      controller: controller,
+                      cellHeight: cellHeight,
+                      verticalScrollController: _gridVerticalController,
+                      horizontalScrollController: _gridHorizontalController,
+                    ),
                   ),
                 ),
               ),
