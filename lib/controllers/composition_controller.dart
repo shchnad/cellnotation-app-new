@@ -759,7 +759,7 @@ class CompositionController extends ChangeNotifier {
 
 
   int getOctave(Note note) {
-    return 7 - (note.row ~/ 7);
+    return note.row ~/ 7;
   }
 
 
@@ -1107,7 +1107,7 @@ class CompositionController extends ChangeNotifier {
     if (scale.isEmpty) {
       return '';
     }
-    return scale[row % scale.length];
+    return scale[(scale.length - 1) - (row % scale.length)];
   }
 
 

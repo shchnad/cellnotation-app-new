@@ -241,8 +241,13 @@ class GridWidget extends StatelessWidget {
                         }
 
                         // 3. Otherwise, normal grid/note tap handling.
-                        final row =
+
+                        // final row =
+                        // (details.localPosition.dy / cellHeight).floor();
+                        final visualRow =
                         (details.localPosition.dy / cellHeight).floor();
+                        final row = controller.totalRows - 1 - visualRow;
+
                         final rawTick =
                         (details.localPosition.dx / pixelsPerTick).floor();
 
