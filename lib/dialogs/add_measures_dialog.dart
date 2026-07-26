@@ -255,6 +255,7 @@ class _AddMeasuresDialogState extends State<AddMeasuresDialog> {
                               child: InkWell(
                                 onTap: () {
                                   noteValuesDialog<NoteDuration>(
+                                    allowToCloseNextWindow: false,
                                     context: context,
                                     title: 'Beat Duration',
                                     currentValue: _selectedBeatUnit,

@@ -153,6 +153,7 @@ class _NewCompositionDialogState extends State<NewCompositionDialog> {
                             icon: Icons.palette,
                             onTap: () {
                               noteValuesDialog<MusicStyle>(
+                                allowToCloseNextWindow: false,
                                 context: context,
                                 title: 'Select Style',
                                 currentValue: _selectedStyle,
@@ -172,6 +173,7 @@ class _NewCompositionDialogState extends State<NewCompositionDialog> {
                             onTap: () {
                               noteValuesDialog<Instrument>(
                                 context: context,
+                                allowToCloseNextWindow: false,
                                 title: 'Select Instrument',
                                 currentValue: _selectedInstrument,
                                 values: Instrument.values,

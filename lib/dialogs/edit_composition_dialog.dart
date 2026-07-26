@@ -179,6 +179,7 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
                             onTap: () {
                               noteValuesDialog<MusicStyle>(
                                 context: context,
+                                allowToCloseNextWindow: false,
                                 title: 'Select Style',
                                 currentValue: _selectedStyle,
                                 values: MusicStyle.values,
@@ -197,6 +198,7 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
                             onTap: () {
                               noteValuesDialog<Instrument>(
                                 context: context,
+                                allowToCloseNextWindow: false,
                                 title: 'Select Instrument',
                                 currentValue: _selectedInstrument,
                                 values: Instrument.values,

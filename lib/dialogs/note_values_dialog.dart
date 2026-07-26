@@ -8,6 +8,7 @@ void noteValuesDialog<T>({
   required List<T> values,
   required String Function(T) labelBuilder,
   required int numberOfColumns,
+  required bool allowToCloseNextWindow,
   VoidCallback? onClear,
 }) {
   const fontSize = 22.0;
@@ -49,6 +50,7 @@ void noteValuesDialog<T>({
             () {
           onSelected(value);
           Navigator.pop(context);
+          if (allowToCloseNextWindow) Navigator.pop(context);
         },
       );
     },

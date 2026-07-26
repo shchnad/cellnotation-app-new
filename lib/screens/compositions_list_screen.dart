@@ -109,6 +109,7 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
                   icon: Icons.palette,
                   onTap: () {
                     noteValuesDialog<MusicStyle>(
+                      allowToCloseNextWindow: false,
                       context: context,
                       title: 'Filter by Style',
                       currentValue: _styleFilter,
@@ -128,6 +129,7 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
                   onTap: () {
                     noteValuesDialog<Instrument>(
                       context: context,
+                      allowToCloseNextWindow: false,
                       title: 'Filter by Instrument',
                       currentValue: _instrumentFilter,
                       values: Instrument.values,

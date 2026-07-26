@@ -137,6 +137,7 @@ class NoteDialog extends StatelessWidget {
               onTap: () {
                 noteValuesDialog<Accidental>(
                   context: context,
+                  allowToCloseNextWindow: true,
                   currentValue: editedNote.accidental,
                   title: 'Accidental',
                   values: Accidental.values,
@@ -176,6 +177,7 @@ class NoteDialog extends StatelessWidget {
                 );
                 noteValuesDialog<NoteDuration>(
                   context: context,
+                  allowToCloseNextWindow: true,
                   currentValue: duration,
                   title: 'Duration',
                   values: NoteDuration.values,
@@ -202,6 +204,7 @@ class NoteDialog extends StatelessWidget {
             onTap: () {
               noteValuesDialog<Hand>(
                 context: context,
+                allowToCloseNextWindow: true,
                 currentValue: editedNote.hand,
                 title: 'Hand',
                 values: Hand.values,
@@ -227,6 +230,7 @@ class NoteDialog extends StatelessWidget {
             onTap: () {
               noteValuesDialog<Finger>(
                 context: context,
+                allowToCloseNextWindow: true,
                 currentValue: editedNote.finger,
                 title: 'Finger',
                 values: Finger.values,
@@ -255,6 +259,7 @@ class NoteDialog extends StatelessWidget {
             onTap: () {
               noteValuesDialog<Articulation>(
                 context: context,
+                allowToCloseNextWindow: true,
                 currentValue: editedNote.articulation,
                 title: 'Articulation',
                 values: Articulation.values,
@@ -286,6 +291,7 @@ class NoteDialog extends StatelessWidget {
             onTap: () {
               noteValuesDialog<Ornament>(
                 context: context,
+                allowToCloseNextWindow: true,
                 currentValue: editedNote.ornament,
                 title: 'Ornament',
                 values: Ornament.values,
@@ -314,6 +320,7 @@ class NoteDialog extends StatelessWidget {
             onTap: () {
               noteValuesDialog<PlayingTechnique>(
                 context: context,
+                allowToCloseNextWindow: true,
                 currentValue: editedNote.playingTechnique,
                 title: 'Playing Technique',
                 values: PlayingTechnique.values,
