@@ -72,6 +72,16 @@ class _CompositionScreenState extends State<CompositionScreen>
       return;
     }
 
+    // Defensive: tear down any ticker that's still alive before making
+    // a new one. SingleTickerProviderStateMixin throws if createTicker
+    // is called while a previous ticker from it hasn't been disposed —
+    // which could otherwise happen if Play is pressed again in the
+    // brief window before a deferred pause (see the drag-detection
+    // listener below) has actually run.
+    _playbackTicker?.stop();
+    _playbackTicker?.dispose();
+    _playbackTicker = null;
+
     // Resume from wherever the grid is currently scrolled to, so a
     // paused playback picks up right where it left off, and a person
     // can also manually position the view and then hit play.
@@ -118,7 +128,25 @@ class _CompositionScreenState extends State<CompositionScreen>
     final bpm = activeTempo?.tempo.value ?? 0;
     final ticksPerSecond = beatTicks * bpm / 60.0;
 
+    final previousTickInt = _playbackTick.floor();
+
     _playbackTick += ticksPerSecond * dtSeconds;
+
+    // Play every note whose start tick falls in the range playback
+    // just crossed this frame (half-open, so each note triggers
+    // exactly once as the cursor passes it — never re-triggered on
+    // later frames, never skipped on fast frames covering many ticks).
+    if (controller.soundEnabled) {
+      final newTickInt = _playbackTick.floor();
+      if (newTickInt > previousTickInt) {
+        for (final note in controller.notes) {
+          if (note.startTick >= previousTickInt &&
+              note.startTick < newTickInt) {
+            controller.playNoteSound(note);
+          }
+        }
+      }
+    }
 
     if (_playbackTick >= controller.maxTicks) {
       _playbackTick = controller.maxTicks.toDouble();
@@ -422,6 +450,23 @@ class _CompositionScreenState extends State<CompositionScreen>
                         onPressed: hasMeasures ? _togglePlayback : null,
                       ),
 
+                      // SOUND ON/OFF — notes play a synthesized tone
+                      // when created (by tapping the grid) and while
+                      // scroll playback passes them; this toggles that
+                      // off without affecting anything else.
+                      IconButton(
+                        icon: Icon(
+                          controller.soundEnabled
+                              ? Icons.volume_up
+                              : Icons.volume_off,
+                          color: Colors.black,
+                        ),
+                        tooltip: controller.soundEnabled
+                            ? 'Sound On'
+                            : 'Sound Off',
+                        onPressed: controller.toggleSound,
+                      ),
+
 
                       const Divider(
                         color: Colors.white24,
@@ -441,7 +486,7 @@ class _CompositionScreenState extends State<CompositionScreen>
 
                       // RESET SCALE
                       IconButton(
-                        icon: const Icon(Icons.restore,
+                        icon: const Icon(Icons.adjust,
                           color: Colors.black,
                         ),
                         tooltip: 'Reset scales',
@@ -650,27 +695,33 @@ class _CompositionScreenState extends State<CompositionScreen>
                     // scrolling (especially backward) would look like
                     // it's not working at all.
                     //
-                    // The actual pause is deferred to a post-frame
-                    // callback rather than called synchronously here:
-                    // this notification fires WHILE the descendant
-                    // Scrollable's drag gesture is still being
-                    // dispatched, and calling setState() at that exact
-                    // moment can leave the ticker/gesture plumbing in a
-                    // bad state (symptom: Play appears to work again
-                    // but the grid never actually resumes moving).
+                    // The ticker itself is torn down immediately (safe
+                    // — no setState involved), so there's no window
+                    // where Play could create a second ticker while
+                    // this one is still alive. Only the setState/icon
+                    // update is deferred to a post-frame callback,
+                    // since this notification fires WHILE the
+                    // descendant Scrollable's drag gesture is still
+                    // being dispatched, and calling setState() at that
+                    // exact moment can misbehave.
                     onNotification: (notification) {
                       if (_isPlaying &&
-                          !_pauseScheduled &&
                           notification.metrics.axis == Axis.horizontal &&
                           notification is ScrollUpdateNotification &&
                           notification.dragDetails != null) {
-                        _pauseScheduled = true;
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          _pauseScheduled = false;
-                          if (mounted) {
-                            _pausePlayback();
-                          }
-                        });
+                        _playbackTicker?.stop();
+                        _playbackTicker?.dispose();
+                        _playbackTicker = null;
+
+                        if (!_pauseScheduled) {
+                          _pauseScheduled = true;
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            _pauseScheduled = false;
+                            if (mounted) {
+                              setState(() => _isPlaying = false);
+                            }
+                          });
+                        }
                       }
                       return false;
                     },

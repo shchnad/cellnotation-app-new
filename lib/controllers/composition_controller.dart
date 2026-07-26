@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:music_composer/enums/articulation.dart';
 import 'package:music_composer/utils/default_values.dart';
@@ -20,6 +22,7 @@ import '../models/tempo_event.dart';
 import '../models/time_signature.dart';
 import '../models/timeline.dart';
 import '../models/dynamic_change_event.dart';
+import '../services/note_sound_service.dart';
 
 
 import '../utils/scale_resolver.dart';
@@ -717,6 +720,7 @@ class CompositionController extends ChangeNotifier {
       hand: currentHand,
     );
     composition.notes.add(note);
+    playNoteSound(note);
     notifyListeners();
   }
 
@@ -960,6 +964,112 @@ class CompositionController extends ChangeNotifier {
 
 
   // =====================================================
+  // =====================================================
+  // SOUND
+  // =====================================================
+
+  bool soundEnabled = true;
+
+  void toggleSound() {
+    soundEnabled = !soundEnabled;
+    NoteSoundService.instance.enabled = soundEnabled;
+    notifyListeners();
+  }
+
+  // Semitone offset of each natural scale degree (1..7 = do..si) from
+  // the octave's root, matching a standard major scale.
+  static const List<int> _naturalDegreeSemitones = [0, 2, 4, 5, 7, 9, 11];
+
+  // Tuning reference: octave 4 ("One-line" per getOctaveName), degree 6
+  // (la), natural = 440 Hz — standard concert pitch A440. Everything
+  // else is derived from that (in standard 12-tone equal temperament)
+  // by converting it back to the equivalent degree-1 (do) frequency at
+  // that same octave, since the rest of the math below is anchored on
+  // the octave's root note.
+  static final double _referenceFrequencyC4 =
+  (440 * math.pow(2, -_naturalDegreeSemitones[5] / 12)).toDouble();
+
+  // Semitone shift for accidental signs, keyed by whatever string
+  // Accidental.sign actually produces (checked at runtime rather than
+  // assuming the enum's member names, since this file doesn't declare
+  // that enum). Unrecognized signs contribute no shift.
+  static const Map<String, int> _accidentalSemitoneShift = {
+    '#': 1, '♯': 1,
+    'x': 2, '𝄪': 2,
+    'b': -1, '♭': -1,
+    'bb': -2, '𝄫': -2,
+  };
+
+  /// The absolute frequency (Hz) [note] should sound at: the scale
+  /// degree's own +/- alteration (from the measure's current scale
+  /// pattern) combined with any accidental manually set on the note,
+  /// then shifted by octave. See [_referenceFrequencyC4] for the tuning
+  /// reference this is built on.
+  double getNoteFrequencyHz(Note note) {
+    final measure = getMeasureAtTick(note.startTick);
+    final shiftedScale = ScaleResolver.transposeScale(
+      measure.scaleName,
+      measure.pitchOffsetSemitones,
+    );
+    final scale = ScaleResolver.getScale(shiftedScale);
+    if (scale.isEmpty) {
+      return 0;
+    }
+
+    final degreeIndex = note.row % scale.length;
+    final degreeToken = scale[degreeIndex];
+
+    int scaleAlteration = 0;
+    if (degreeToken.endsWith('+')) {
+      scaleAlteration = 1;
+    } else if (degreeToken.endsWith('-')) {
+      scaleAlteration = -1;
+    }
+
+    final naturalSemitone = _naturalDegreeSemitones[
+    degreeIndex % _naturalDegreeSemitones.length];
+
+    final accidentalShift = note.accidental != null
+        ? (_accidentalSemitoneShift[note.accidental!.sign] ?? 0)
+        : 0;
+
+    final octaveShift = (getOctave(note) - 4) * 12;
+
+    final totalSemitonesFromC4 =
+        naturalSemitone + scaleAlteration + accidentalShift + octaveShift;
+
+    return _referenceFrequencyC4 * math.pow(2, totalSemitonesFromC4 / 12);
+  }
+
+  /// How long [note] actually lasts in real time — same tempo/beat-unit
+  /// formula the playback ticker uses, evaluated at the note's own
+  /// start so it's correct even if tempo changes partway through.
+  double getNoteDurationSeconds(Note note) {
+    final measure = getMeasureAtTick(note.startTick);
+    final activeTempo = getActiveTempoAtTick(note.startTick);
+    final beatTicks = measure.timeSignature.beatDuration.ticks;
+    final bpm = activeTempo?.tempo.value ?? 0;
+    if (bpm <= 0 || beatTicks <= 0) {
+      return 0.3; // sane fallback rather than dividing by zero
+    }
+    final ticksPerSecond = beatTicks * bpm / 60.0;
+    return note.durationTicks / ticksPerSecond;
+  }
+
+  /// Plays [note]'s tone if sound is currently enabled. Public so both
+  /// this controller (on note creation) and the playback loop
+  /// (composition_screen.dart, as it scrolls past each note's start
+  /// tick) can trigger it.
+  void playNoteSound(Note note) {
+    if (!soundEnabled) return;
+    NoteSoundService.instance.playTone(
+      frequencyHz: getNoteFrequencyHz(note),
+      durationSeconds: getNoteDurationSeconds(note),
+    );
+  }
+
+
+  // =====================================================
   // SCALE SYSTEM
   // =====================================================
 
@@ -1167,6 +1277,7 @@ class CompositionController extends ChangeNotifier {
       return;
     }
     notes.add(newNote);
+    playNoteSound(newNote);
     // pasteMode = false;
     notifyListeners();
   }
