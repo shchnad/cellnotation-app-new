@@ -241,9 +241,11 @@ class GridWidget extends StatelessWidget {
                         }
 
                         // 3. Otherwise, normal grid/note tap handling.
-
-                        // final row =
-                        // (details.localPosition.dy / cellHeight).floor();
+                        // The tapped screen position is converted to a
+                        // musical row: row 0 (lowest pitch) sits at the
+                        // BOTTOM of the grid, so a tap near the bottom
+                        // (large visualRow) should map to a small row
+                        // number.
                         final visualRow =
                         (details.localPosition.dy / cellHeight).floor();
                         final row = controller.totalRows - 1 - visualRow;
@@ -493,6 +495,7 @@ class GridPainter extends CustomPainter {
     // HORIZONTAL LINES
     for (int row = 0; row <= controller.totalRows; row++) {
       final y = row * cellHeight;
+
       Paint linePaint = thinPaint;
 
       if (row > 0 && row % 7 == 0) {

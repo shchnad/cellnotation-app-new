@@ -18,8 +18,49 @@ import 'tone_synthesizer.dart';
 /// audioplayers version, while DeviceFileSource has been stable for a
 /// long time.
 class NoteSoundService {
-  NoteSoundService._();
+  NoteSoundService._() {
+    // Without this, most platforms treat starting a NEW AudioPlayer's
+    // playback as "taking over" the app's audio session — which
+    // interrupts/ducks whatever is already playing on other players in
+    // the pool, even though they're separate AudioPlayer instances.
+    // That's what makes overlapping notes (a chord, or several notes
+    // crossed in the same playback frame) sound like only the most
+    // recently started one survives. Configuring the global
+    // AudioContext to mix rather than take exclusive focus lets all of
+    // them actually play together.
+    _configureAudioContext();
+  }
+
   static final NoteSoundService instance = NoteSoundService._();
+
+  Future<void> _configureAudioContext() async {
+    try {
+      await AudioPlayer.global.setAudioContext(
+        AudioContext(
+          iOS: AudioContextIOS(
+            category: AVAudioSessionCategory.ambient,
+            options: const {
+              AVAudioSessionOptions.mixWithOthers,
+            },
+          ),
+          android: const AudioContextAndroid(
+            isSpeakerphoneOn: false,
+            stayAwake: false,
+            contentType: AndroidContentType.sonification,
+            usageType: AndroidUsageType.assistanceSonification,
+            // Don't request exclusive audio focus — otherwise each new
+            // player in the pool would interrupt the others the same
+            // way iOS does without mixWithOthers above.
+            audioFocus: AndroidAudioFocus.none,
+          ),
+        ),
+      );
+    } catch (_) {
+      // If a platform/version doesn't support one of these fields,
+      // overlapping notes just fall back to whatever the platform
+      // default is rather than crashing sound entirely.
+    }
+  }
 
   static const int _poolSize = 8;
   final List<AudioPlayer> _pool = List.generate(
@@ -45,7 +86,6 @@ class NoteSoundService {
       double frequencyHz, double durationSeconds) async {
     final key =
         '${frequencyHz.toStringAsFixed(1)}_${durationSeconds.toStringAsFixed(2)}';
-
     final cached = _toneFileCache[key];
     if (cached != null) {
       return cached;

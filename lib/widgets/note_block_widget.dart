@@ -13,18 +13,9 @@ import '../models/note.dart';
 // tenuto / marcato / accent marks.
 const double _articulationMarkHeight = 12.0;
 
-// Height of the strip reserved above each note for the finger number.
-const double _fingerHeight = 26.0;
-
 // Height of the strip reserved below each note for the playing
 // technique abbreviation.
 const double _techniqueHeight = 26.0;
-
-const _fingerTextStyle = TextStyle(
-  color: Colors.red,
-  fontSize: 22,
-  fontWeight: FontWeight.bold,
-);
 
 const _techniqueTextStyle = TextStyle(
   color: Colors.red,
@@ -32,6 +23,16 @@ const _techniqueTextStyle = TextStyle(
   fontWeight: FontWeight.bold,
   // fontStyle: FontStyle.italic,
 );
+
+// Height of the strip reserved above each note for the finger number.
+const double _fingerHeight = 26.0;
+
+const _fingerTextStyle = TextStyle(
+  color: Colors.red,
+  fontSize: 22,
+  fontWeight: FontWeight.bold,
+);
+
 
 // Articulations that get a drawn symbol above the note (as opposed to
 // the border-based treatment used for legato / sforzando).
@@ -76,9 +77,16 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
   Border? _articulationBorder() {
     switch (widget.note.articulation) {
       case Articulation.sforzando:
-        return Border.all(color: Colors.green, width: 3);
+        return Border.all(
+          color: Colors.green,
+          width: 3,
+        );
       case Articulation.legato:
-        return const Border(bottom: BorderSide(color: Colors.red, width: 3));
+        return const Border(
+            bottom: BorderSide(
+              color: Colors.red,
+              width: 3,
+            ));
       case Articulation.staccato:
       case Articulation.tenuto:
       case Articulation.marcato:
@@ -90,13 +98,18 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
 
   @override
   Widget build(BuildContext context) {
+
     final note = widget.note;
 
     final controller = widget.controller;
 
-    final accidental = note.accidental?.sign ?? '';
+    // Read the *effective* accidental (inherited from an earlier note
+    // on this row within the measure, if any) rather than only this
+    // note's own stored value — this keeps the displayed sign in sync
+    // with what getNoteFrequencyHz actually plays.
+    final accidental = controller.getEffectiveAccidental(note)?.sign ?? '';
 
-    final pitch = controller.getNotePitchName(note);
+    final pitch = controller.getPitchNameForRow(note.row);
 
     final left = note.startTick * widget.pixelsPerTick;
 
@@ -106,7 +119,12 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
 
     final showAccidental = noteWidth >= 36;
 
-    final top = note.row * widget.cellHeight;
+    // Row 0 is the lowest pitch (octave 0, degree 1) and should render
+    // at the BOTTOM of the grid; the highest row should render at the
+    // TOP. Since `top` grows downward on screen, we flip the row here
+    // so the highest row gets the smallest `top` (top of screen) and
+    // row 0 gets the largest `top` (bottom of screen).
+    final top = (controller.totalRows - 1 - note.row) * widget.cellHeight;
 
     final drawMark = _hasDrawnMark(note.articulation);
     final hasFinger = note.finger != null;
@@ -175,7 +193,11 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
                 final dx = details.globalPosition.dx - dragStartPosition.dx;
                 final dy = details.globalPosition.dy - dragStartPosition.dy;
                 final tickChange = (dx / widget.pixelsPerTick).round();
-                final rowChange = (dy / widget.cellHeight).round();
+                // Screen Y grows downward, but row now grows upward
+                // (row 0 = bottom, highest row = top) to match the
+                // flipped `top` above — so dragging the finger down
+                // (positive dy) must DECREASE the row, not increase it.
+                final rowChange = -(dy / widget.cellHeight).round();
                 final newTick =
                 controller.snapTick(dragStartTick + tickChange);
                 final newRow = (dragStartRow + rowChange)

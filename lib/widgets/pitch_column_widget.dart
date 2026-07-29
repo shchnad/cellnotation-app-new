@@ -34,7 +34,9 @@ class PitchColumnWidget extends StatelessWidget {
         controller: scrollController,
         physics: const NeverScrollableScrollPhysics(),
         child: Column(
-          children: List.generate(totalRows, (row) {
+          children:
+          List.generate(totalRows, (index) {
+            final row = totalRows - 1 - index;
             final pitch = controller.getPitchNameForRow(row);
             return Container(
               height: cellHeight,

@@ -711,7 +711,7 @@ class CompositionController extends ChangeNotifier {
     if(overlaps){
       return;
     }
-    final note = Note(
+    var note = Note(
       id: generateNoteId(),
       startTick: tick,
       durationTicks:
@@ -720,6 +720,16 @@ class CompositionController extends ChangeNotifier {
       hand: currentHand,
     );
     composition.notes.add(note);
+    // If an accidental is already in effect on this row at this point
+    // in the measure (from an earlier note), the new note is born
+    // carrying that same accidental — not left null and merely
+    // "computed as correct" via getEffectiveAccidental.
+    final inherited = getEffectiveAccidental(note);
+    if (inherited != null) {
+      final index = composition.notes.indexWhere((n) => n.id == note.id);
+      note = note.copyWith(accidental: inherited);
+      composition.notes[index] = note;
+    }
     playNoteSound(note);
     notifyListeners();
   }
@@ -916,9 +926,35 @@ class CompositionController extends ChangeNotifier {
       Note note,
       Accidental? accidental,
       ) {
-    _replaceNote(
-      note.copyWith(accidental: accidental),
-    );
+    final index = notes.indexWhere((n) => n.id == note.id);
+    if (index == -1) return;
+    final updated = note.copyWith(accidental: accidental);
+    notes[index] = updated;
+    // Write the accidental onto every later note on this same row for
+    // the rest of the measure too — not just this one — so the data
+    // itself (not just playback/display lookups) reflects that it
+    // holds through the measure. A later explicit call to this method
+    // on one of those notes (including clearing back to natural) will
+    // itself propagate forward from that point, which is how
+    // "cancelling" an accidental partway through the measure works.
+    _propagateAccidentalForward(updated, accidental);
+    notifyListeners();
+  }
+
+  /// Overwrites `.accidental` on every later note sharing [editedNote]'s
+  /// row within the same measure, so the accidental is actually stored
+  /// on each note rather than only derived at lookup time. Does not
+  /// call notifyListeners() itself — callers do that once after.
+  void _propagateAccidentalForward(Note editedNote, Accidental? accidental) {
+    final measure = getMeasureAtTick(editedNote.startTick);
+    for (int i = 0; i < notes.length; i++) {
+      final n = notes[i];
+      if (n.id == editedNote.id) continue;
+      if (n.row != editedNote.row) continue;
+      if (n.startTick <= editedNote.startTick) continue;
+      if (n.startTick >= measure.endTick) continue;
+      notes[i] = n.copyWith(accidental: accidental);
+    }
   }
 
   void setNoteDuration(
@@ -989,22 +1025,51 @@ class CompositionController extends ChangeNotifier {
   static final double _referenceFrequencyC4 =
   (440 * math.pow(2, -_naturalDegreeSemitones[5] / 12)).toDouble();
 
-  // Semitone shift for accidental signs, keyed by whatever string
-  // Accidental.sign actually produces (checked at runtime rather than
-  // assuming the enum's member names, since this file doesn't declare
-  // that enum). Unrecognized signs contribute no shift.
+  // Semitone shift for accidental signs. These four keys are exactly
+  // what Accidental.sign produces (see enums/accidental.dart):
+  // sharp='+', doubleSharp='++', flat='-', doubleFlat='--'.
+  // Unrecognized signs contribute no shift.
   static const Map<String, int> _accidentalSemitoneShift = {
-    '#': 1, '♯': 1,
-    'x': 2, '𝄪': 2,
-    'b': -1, '♭': -1,
-    'bb': -2, '𝄫': -2,
+    '+': 1,
+    '++': 2,
+    '-': -1,
+    '--': -2,
   };
+
+  /// The accidental actually in effect for [note], accounting for
+  /// measure-persistence: an explicit accidental set on an earlier note
+  /// sharing the same row (same octave + degree) stays in effect for
+  /// the rest of the measure until a later note on that same row sets
+  /// a different explicit accidental (including cancelling back to
+  /// natural by clearing it). This mirrors standard notation, where an
+  /// accidental applies for the whole measure on that line unless
+  /// overridden.
+  Accidental? getEffectiveAccidental(Note note) {
+    final measure = getMeasureAtTick(note.startTick);
+    Note? mostRecent;
+    for (final n in notes) {
+      if (n.row != note.row) continue;
+      if (n.startTick < measure.startTick || n.startTick >= measure.endTick) {
+        continue;
+      }
+      if (n.startTick > note.startTick) continue;
+      if (n.startTick == note.startTick && n.id != note.id) continue;
+      if (n.accidental == null) continue;
+      if (mostRecent == null ||
+          n.startTick > mostRecent.startTick ||
+          (n.startTick == mostRecent.startTick && n.id == note.id)) {
+        mostRecent = n;
+      }
+    }
+    return mostRecent?.accidental;
+  }
 
   /// The absolute frequency (Hz) [note] should sound at: the scale
   /// degree's own +/- alteration (from the measure's current scale
-  /// pattern) combined with any accidental manually set on the note,
-  /// then shifted by octave. See [_referenceFrequencyC4] for the tuning
-  /// reference this is built on.
+  /// pattern) combined with whichever accidental is actually in effect
+  /// on that row at this point in the measure (see
+  /// [getEffectiveAccidental]), then shifted by octave. See
+  /// [_referenceFrequencyC4] for the tuning reference this is built on.
   double getNoteFrequencyHz(Note note) {
     final measure = getMeasureAtTick(note.startTick);
     final shiftedScale = ScaleResolver.transposeScale(
@@ -1029,8 +1094,9 @@ class CompositionController extends ChangeNotifier {
     final naturalSemitone = _naturalDegreeSemitones[
     degreeIndex % _naturalDegreeSemitones.length];
 
-    final accidentalShift = note.accidental != null
-        ? (_accidentalSemitoneShift[note.accidental!.sign] ?? 0)
+    final effectiveAccidental = getEffectiveAccidental(note);
+    final accidentalShift = effectiveAccidental != null
+        ? (_accidentalSemitoneShift[effectiveAccidental.sign] ?? 0)
         : 0;
 
     final octaveShift = (getOctave(note) - 4) * 12;
@@ -1091,9 +1157,7 @@ class CompositionController extends ChangeNotifier {
   }
 
 
-  /// Same lookup as [getNotePitchName] but for a bare grid row instead of
-  /// an existing [Note] — used by the persistent pitch column, which
-  /// shows the scale of [measure] (defaults to [currentMeasure]).
+
   String getPitchNameForRow(int row, [Measure? measure]) {
     final m = measure ?? (measures.isNotEmpty ? currentMeasure : null);
     if (m == null) {
@@ -1107,7 +1171,13 @@ class CompositionController extends ChangeNotifier {
     if (scale.isEmpty) {
       return '';
     }
-    return scale[(scale.length - 1) - (row % scale.length)];
+    // Row increases with pitch (row 0 = lowest, octave 0 degree 1) —
+    // kept in direct correspondence with getDegree/getOctave/
+    // getNoteFrequencyHz, which all treat row the same way. Flipping
+    // this for display (e.g. so the lowest row renders at the bottom
+    // of the screen) is a layout concern handled by the calling
+    // widgets, not here.
+    return scale[row % scale.length];
   }
 
 
