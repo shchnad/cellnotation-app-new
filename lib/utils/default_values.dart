@@ -35,4 +35,10 @@ class DefaultValues {
       'To disable Paste Mode toggle the button.';
   static const snackBarMessageForCopying = 'Paste Mode is disable';
 // Message of copied note is in note_block_widget LongTap action.
+
+
+// SIMPLIFY MODE
+  static const String messageForSimplifyMode =
+      'Turn off the simplify mode first!';
+
 }

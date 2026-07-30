@@ -21,7 +21,7 @@ void editMeasureBeatDialog({
 
         content: SizedBox(
           // width: MediaQuery.of(context).size.width * 0.75,
-          height: MediaQuery.of(context).size.height * 0.55,
+          // height: MediaQuery.of(context).size.height * 0.55,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

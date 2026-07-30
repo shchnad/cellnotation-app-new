@@ -506,6 +506,28 @@ class _CompositionScreenState extends State<CompositionScreen>
                       ),
 
 
+                      // COMPENSATED NOTATION TOGGLE — switches between
+                      // normal notation (scale sign + accidental shown
+                      // separately, e.g. "4+" plus a "-") and a
+                      // simplified view where opposing signs cancel to
+                      // a plain note and matching signs respell as the
+                      // next degree over. Purely a display switch —
+                      // note.row/note.accidental never change, so this
+                      // toggles back instantly with no data loss.
+                      IconButton(
+                        icon: Icon(Icons.auto_fix_high,
+                          color: controller.showCompensatedNotation
+                              ? Colors.blue
+                              : Colors.black,
+                        ),
+                        tooltip: controller.showCompensatedNotation
+                            ? 'Compensated Notation: On'
+                            : 'Compensated Notation: Off',
+                        onPressed:
+                        controller.toggleCompensatedNotation,
+                      ),
+
+
                       // DURATION
                       IconButton(
                         icon: const Icon(Icons.av_timer,

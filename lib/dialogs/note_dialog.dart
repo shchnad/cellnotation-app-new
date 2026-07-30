@@ -62,6 +62,16 @@ class NoteDialog extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                Row(
+                  children: [
+                    Text(
+                      'Pitch: ${controller.getNotePitchName(editedNote)}${editedNote.accidental?.sign ?? ''}',
+                      style: TextStyle(
+                        fontSize: 22,
+                      ),
+                    ),
+                  ],
+                ),
 
                 Row(
                   children: [
@@ -110,7 +120,8 @@ class NoteDialog extends StatelessWidget {
                           width: DefaultValues.widthBetweenWidgets,
                         ),
                         Text(
-                          'Pitch: ${controller.getNotePitchName(editedNote)} ${editedNote.accidental?.sign ?? ''}',
+                          // 'Scale Pitch: ${controller.getNotePitchName(editedNote)}',
+                          'Degree: ${controller.getDegree(editedNote)}',
                           style: TextStyle(
                               fontSize: 22,
                               ),
@@ -127,7 +138,8 @@ class NoteDialog extends StatelessWidget {
               // leading: const Icon(Icons.swap_vertical_circle_sharp),
               leading: const Icon(Icons.open_in_full_sharp),
               title: Text(
-                'Accidental: ${editedNote.accidental?.sign ?? 'none'}',
+                // 'Accidental: ${editedNote.accidental?.sign ?? 'none'}',
+                'Accidental: ${editedNote.accidental?.label ?? 'none'}',
                 style: const TextStyle(
                   fontSize: 22,
                   color: Colors.black,

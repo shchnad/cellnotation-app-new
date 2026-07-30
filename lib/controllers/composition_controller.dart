@@ -1034,19 +1034,25 @@ class CompositionController extends ChangeNotifier {
     '++': 2,
     '-': -1,
     '--': -2,
+    'x': 0,
   };
 
   /// The accidental actually in effect for [note], accounting for
   /// measure-persistence: an explicit accidental set on an earlier note
   /// sharing the same row (same octave + degree) stays in effect for
-  /// the rest of the measure until a later note on that same row sets
-  /// a different explicit accidental (including cancelling back to
-  /// natural by clearing it). This mirrors standard notation, where an
-  /// accidental applies for the whole measure on that line unless
-  /// overridden.
+  /// the rest of the measure until a later note on that same row is
+  /// given a different explicit accidental — including being cleared
+  /// back to natural, which is honored as-is here rather than skipped
+  /// past. In practice, since [setNoteAccidental] and
+  /// [addNoteAtGridPosition] already keep every note's own
+  /// `.accidental` field correctly propagated, the nearest note at or
+  /// before [note]'s tick is always [note] itself — so this mostly
+  /// just returns [note].accidental — but the search stays measure-
+  /// and row-aware as a safety net for notes that reached the list by
+  /// some other path.
   Accidental? getEffectiveAccidental(Note note) {
     final measure = getMeasureAtTick(note.startTick);
-    Note? mostRecent;
+    Note? nearest;
     for (final n in notes) {
       if (n.row != note.row) continue;
       if (n.startTick < measure.startTick || n.startTick >= measure.endTick) {
@@ -1054,14 +1060,36 @@ class CompositionController extends ChangeNotifier {
       }
       if (n.startTick > note.startTick) continue;
       if (n.startTick == note.startTick && n.id != note.id) continue;
-      if (n.accidental == null) continue;
-      if (mostRecent == null ||
-          n.startTick > mostRecent.startTick ||
-          (n.startTick == mostRecent.startTick && n.id == note.id)) {
-        mostRecent = n;
+      if (nearest == null ||
+          n.startTick > nearest.startTick ||
+          (n.startTick == nearest.startTick && n.id == note.id)) {
+        nearest = n;
       }
     }
-    return mostRecent?.accidental;
+    return nearest?.accidental;
+  }
+
+  /// Whichever accidental (if any) is currently in effect at [row] for
+  /// a position at [tick] within its measure, based on the *closest
+  /// earlier* note on that row — used only to decide what a brand-new
+  /// note should be created with. Unlike [getEffectiveAccidental], this
+  /// takes raw tick/row rather than an existing Note, specifically so a
+  /// note being created can't end up referencing its own (not-yet-set)
+  /// value while searching.
+  Accidental? _accidentalInEffectAt(int tick, int row) {
+    final measure = getMeasureAtTick(tick);
+    Note? nearest;
+    for (final n in notes) {
+      if (n.row != row) continue;
+      if (n.startTick < measure.startTick || n.startTick >= measure.endTick) {
+        continue;
+      }
+      if (n.startTick >= tick) continue; // strictly earlier only
+      if (nearest == null || n.startTick > nearest.startTick) {
+        nearest = n;
+      }
+    }
+    return nearest?.accidental;
   }
 
   /// The absolute frequency (Hz) [note] should sound at: the scale
@@ -1084,17 +1112,25 @@ class CompositionController extends ChangeNotifier {
     final degreeIndex = note.row % scale.length;
     final degreeToken = scale[degreeIndex];
 
+    final effectiveAccidental = getEffectiveAccidental(note);
+
+    // A natural cancels ANY alteration in effect for this note — that
+    // includes one baked into the scale itself for this degree, not
+    // just a previous accidental. So unlike a normal +/- (which is
+    // additive on top of the scale's own sign), natural forces the
+    // scale's contribution to 0 rather than adding 0 to it.
     int scaleAlteration = 0;
-    if (degreeToken.endsWith('+')) {
-      scaleAlteration = 1;
-    } else if (degreeToken.endsWith('-')) {
-      scaleAlteration = -1;
+    if (effectiveAccidental != Accidental.natural) {
+      if (degreeToken.endsWith('+')) {
+        scaleAlteration = 1;
+      } else if (degreeToken.endsWith('-')) {
+        scaleAlteration = -1;
+      }
     }
 
     final naturalSemitone = _naturalDegreeSemitones[
     degreeIndex % _naturalDegreeSemitones.length];
 
-    final effectiveAccidental = getEffectiveAccidental(note);
     final accidentalShift = effectiveAccidental != null
         ? (_accidentalSemitoneShift[effectiveAccidental.sign] ?? 0)
         : 0;
@@ -1180,6 +1216,136 @@ class CompositionController extends ChangeNotifier {
     return scale[row % scale.length];
   }
 
+
+  /// Whether notes are currently shown in "compensated" notation — see
+  /// [getCompensatedDisplay]. Purely a display switch: toggling this
+  /// never touches note.row or note.accidental, so switching back to
+  /// normal notation is instant and lossless.
+  bool showCompensatedNotation = false;
+
+  void toggleCompensatedNotation() {
+    showCompensatedNotation = !showCompensatedNotation;
+    notifyListeners();
+  }
+
+  /// The pitch label to actually display for [note]: under compensated
+  /// notation this is the full computed word from
+  /// [getCompensatedDisplay] — e.g. scale sign "1+" plus accidental "+"
+  /// becomes "2", or "1+" plus accidental "-" stays "1" at the same
+  /// row. Outside compensated mode it's just the plain scale label for
+  /// the row (e.g. "4+"); the accidental itself is drawn separately by
+  /// the caller in that mode.
+  String getDisplayPitchLabel(Note note) {
+    if (showCompensatedNotation) {
+      return getCompensatedDisplay(note).label;
+    }
+    return getPitchNameForRow(note.row, getMeasureAtTick(note.startTick));
+  }
+
+  /// Computes, WITHOUT mutating [note] (note.row and note.accidental
+  /// are never touched — this is a pure display computation), the row
+  /// and full pitch word ("1", "1+", "2", "7-", etc.) to show for it
+  /// under compensated notation.
+  ///
+  /// The scale's own sign for the note's row and its effective
+  /// accidental are combined into one net semitone offset. If that's
+  /// zero, it displays as a plain digit at the same row (opposing
+  /// signs cancel, e.g. "1+" + "-" → "1"). If it's not zero, it's
+  /// walked toward the adjacent degree in that direction, comparing
+  /// against the REAL semitone gap between the two degrees — half a
+  /// step at 3→4 and 7→1, a whole step everywhere else — rather than
+  /// assuming every degree is the same distance apart. A gap that
+  /// exactly absorbs the remaining offset lands on that row as a plain
+  /// digit (e.g. "1+" + "+" → "2", since the 1→2 gap is a whole step
+  /// and a scale-sign-plus-accidental "+" is exactly 2 semitones).
+  /// A gap that doesn't fully absorb it keeps walking (so a 3-semitone
+  /// total can cross two rows), and whatever's left after the walk
+  /// stops is shown as a plain sign on the digit at that row (e.g.
+  /// "3++" → "4+", since only 1 of the 2 semitones is absorbed by the
+  /// half-step 3→4 gap).
+  ({int row, String label}) getCompensatedDisplay(Note note) {
+    final effectiveAccidental = getEffectiveAccidental(note);
+    final measure = getMeasureAtTick(note.startTick);
+
+    // A natural cancels ANY alteration in effect — the scale's own
+    // sign for this degree included, not just the accidental itself —
+    // same as getNoteFrequencyHz treats it. So regardless of what the
+    // scale says for this row (5+, 5-, or plain), a natural always
+    // displays as the plain digit at the note's own row.
+    if (effectiveAccidental == Accidental.natural) {
+      return (
+      row: note.row,
+      label: _stripSign(getPitchNameForRow(note.row, measure)),
+      );
+    }
+
+    final shiftedScale = ScaleResolver.transposeScale(
+      measure.scaleName,
+      measure.pitchOffsetSemitones,
+    );
+    final scale = ScaleResolver.getScale(shiftedScale);
+    if (scale.isEmpty) {
+      return (row: note.row, label: getPitchNameForRow(note.row, measure));
+    }
+
+    final degreeToken = scale[note.row % scale.length];
+    int scaleAlteration = 0;
+    if (degreeToken.endsWith('+')) {
+      scaleAlteration = 1;
+    } else if (degreeToken.endsWith('-')) {
+      scaleAlteration = -1;
+    }
+
+    final accidentalShift = effectiveAccidental != null
+        ? (_accidentalSemitoneShift[effectiveAccidental.sign] ?? 0)
+        : 0;
+
+    int remaining = scaleAlteration + accidentalShift;
+    int currentRow = note.row;
+
+    if (remaining != 0) {
+      final direction = remaining > 0 ? 1 : -1;
+      while (remaining != 0) {
+        final nextRow = currentRow + direction;
+        if (nextRow < 0 || nextRow >= totalRows) break;
+        final stepInterval = (_naturalAbsoluteSemitone(nextRow) -
+            _naturalAbsoluteSemitone(currentRow))
+            .abs();
+        if (stepInterval == 0 || remaining.abs() < stepInterval) break;
+        currentRow = nextRow;
+        remaining -= direction * stepInterval;
+      }
+    }
+
+    final baseDigit = _stripSign(getPitchNameForRow(currentRow, measure));
+    final sign = switch (remaining) {
+      0 => '',
+      1 => '+',
+      2 => '++',
+      -1 => '-',
+      -2 => '--',
+      _ => '',
+    };
+
+    return (row: currentRow, label: '$baseDigit$sign');
+  }
+
+  String _stripSign(String token) {
+    if (token.endsWith('+') || token.endsWith('-')) {
+      return token.substring(0, token.length - 1);
+    }
+    return token;
+  }
+
+  /// The row's natural (unaltered) semitone position, absolute across
+  /// octaves — i.e. ignoring any scale-specific alteration for that
+  /// degree. Used only to measure the real gap between adjacent
+  /// degrees when walking in [getCompensatedDisplay].
+  int _naturalAbsoluteSemitone(int row) {
+    final octave = row ~/ 7;
+    final degreeIndex = row % 7;
+    return octave * 12 + _naturalDegreeSemitones[degreeIndex];
+  }
 
   List<String> get availableScales => [
     'do major',

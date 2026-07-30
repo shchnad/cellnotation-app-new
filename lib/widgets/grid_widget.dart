@@ -191,6 +191,18 @@ class GridWidget extends StatelessWidget {
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTapDown: (details) {
+                        if (controller.showCompensatedNotation) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Turn off Compensated Notation to edit notes',
+                                style: TextStyle(fontSize: 22),
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+
                         // 0. Whatever else this tap does, it also tells us
                         //    which measure the person is pointing at — so
                         //    the pitch column can switch to that measure's

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../controllers/composition_controller.dart';
 import '../dialogs/edit_measure_beat_dialog.dart';
 import '../dialogs/note_dialog.dart';
+import '../enums/accidental.dart';
 import '../enums/articulation.dart';
 import '../enums/hand.dart';
 import '../models/note.dart';
@@ -72,6 +73,23 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
 
   late Offset dragStartPosition;
 
+  /// If compensated notation is on, shows a message and returns true
+  /// so the caller can bail out — editing is disabled in that mode
+  /// since it's meant as a read-only simplified view, not an
+  /// alternate way to edit the same notes.
+  bool _blockedByCompensatedNotation(BuildContext context) {
+    if (!widget.controller.showCompensatedNotation) return false;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Turn off Compensated Notation to edit notes',
+          style: TextStyle(fontSize: 22),
+        ),
+      ),
+    );
+    return true;
+  }
+
   //Articulation borders — only for articulations that don't have their
   //own drawn mark above the note.
   Border? _articulationBorder() {
@@ -103,13 +121,19 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
 
     final controller = widget.controller;
 
-    // Read the *effective* accidental (inherited from an earlier note
-    // on this row within the measure, if any) rather than only this
-    // note's own stored value — this keeps the displayed sign in sync
-    // with what getNoteFrequencyHz actually plays.
-    final accidental = controller.getEffectiveAccidental(note)?.sign ?? '';
+    // Under normal notation, show the note's own effective accidental
+    // as a separate glyph next to the pitch — "x" included, so a
+    // natural note reads literally as e.g. "4+" next to "x". Under
+    // compensated notation the sign (if any) is already merged into
+    // the single computed word from getDisplayPitchLabel — and a
+    // natural collapses everything to a plain digit there — so no
+    // separate glyph is drawn in that mode.
+    final effectiveAccidental = controller.getEffectiveAccidental(note);
+    final accidental = controller.showCompensatedNotation
+        ? ''
+        : (effectiveAccidental?.sign ?? '');
 
-    final pitch = controller.getPitchNameForRow(note.row);
+    final pitch = controller.getDisplayPitchLabel(note);
 
     final left = note.startTick * widget.pixelsPerTick;
 
@@ -124,7 +148,15 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
     // TOP. Since `top` grows downward on screen, we flip the row here
     // so the highest row gets the smallest `top` (top of screen) and
     // row 0 gets the largest `top` (bottom of screen).
-    final top = (controller.totalRows - 1 - note.row) * widget.cellHeight;
+    //
+    // When compensated notation is on, a note whose accidental doubles
+    // up with the scale's own sign displays on the *next* row over
+    // (see getCompensatedDisplay) — note.row itself is untouched, this
+    // only affects where the block is drawn.
+    final displayRow = controller.showCompensatedNotation
+        ? controller.getCompensatedDisplay(note).row
+        : note.row;
+    final top = (controller.totalRows - 1 - displayRow) * widget.cellHeight;
 
     final drawMark = _hasDrawnMark(note.articulation);
     final hasFinger = note.finger != null;
@@ -184,12 +216,16 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
               behavior: HitTestBehavior.deferToChild,
 
               onPanStart: (details) {
+                if (_blockedByCompensatedNotation(context)) return;
                 dragStartTick = note.startTick;
                 dragStartRow = note.row;
                 dragStartPosition = details.globalPosition;
               },
 
               onPanUpdate: (details) {
+                // No message here — onPanStart already warned once for
+                // this gesture; repeating it every frame would spam.
+                if (widget.controller.showCompensatedNotation) return;
                 final dx = details.globalPosition.dx - dragStartPosition.dx;
                 final dy = details.globalPosition.dy - dragStartPosition.dy;
                 final tickChange = (dx / widget.pixelsPerTick).round();
@@ -209,6 +245,7 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
               },
 
               onTap: () {
+                if (_blockedByCompensatedNotation(context)) return;
                 if (controller.pasteMode) {
                   return;
                 }
@@ -220,6 +257,7 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
               },
 
               onLongPress: () {
+                if (_blockedByCompensatedNotation(context)) return;
                 controller.copyNote(note);
                 controller.enterPasteMode();
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -233,6 +271,7 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
               },
 
               onDoubleTap: () {
+                if (_blockedByCompensatedNotation(context)) return;
                 final rawTick = note.startTick;
                 final measure = controller.getMeasureAtTick(rawTick);
                 final measureIndex = controller.measures.indexOf(measure);
