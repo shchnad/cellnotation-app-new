@@ -133,6 +133,108 @@ class CompositionController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Inserts a brand-new (empty) measure at [index] — pushing that
+  /// measure and everything after it later in time — unlike
+  /// [addMeasure], which only appends one at the very end.
+  ///
+  /// Timeline.rebuild() (called by Timeline.insertMeasure) only
+  /// recalculates each Measure's own startTick from ordering. It does
+  /// NOT know about notes, tempo/dynamic/dynamic-change events, the
+  /// timeline's own beatEvents, or a pushed-back measure's *internal*
+  /// beatEvents (which store absolute ticks too — see how copyBeat
+  /// uses them) — all of those have their own independent tick numbers
+  /// that need shifting forward by the new measure's duration too, or
+  /// they'd silently end up misaligned with the measures around them.
+  void insertMeasureAt(
+      int index,
+      TimeSignature signature,
+      String scaleName,
+      ) {
+    if (index < 0 || index > measures.length) {
+      return;
+    }
+
+    final insertTick = index == 0 ? 0 : measures[index - 1].endTick;
+    _shiftTicksFrom(insertTick, signature.durationTicks);
+
+    timeline.insertMeasure(index, signature, scaleName);
+
+    // The new measure landed at [index] — anything that was pointing
+    // at a measure at or after that position should keep pointing at
+    // the same logical measure, now one slot later.
+    if (selectedMeasureIndex >= index) {
+      selectedMeasureIndex++;
+    }
+
+    notifyListeners();
+  }
+
+  /// Shifts every tick-based thing at or after [fromTick] by
+  /// [shiftAmount] — positive when time was inserted (see
+  /// [insertMeasureAt]), negative when time was removed (see
+  /// [removeBeatFromMeasure] and [deleteMeasure]): notes, tempo events
+  /// (except the tick-0 anchor, which never moves), dynamic events,
+  /// dynamic-change events, the timeline's own beatEvents, and every
+  /// measure's own internal beatEvents (which store absolute ticks
+  /// too — see how copyBeat uses them). Doesn't touch
+  /// Measure.startTick itself — callers follow up with
+  /// timeline.rebuild() (directly or via a Timeline method that calls
+  /// it) for that. Callers are also responsible for removing/adding
+  /// whatever actually occupied the affected range beforehand — this
+  /// only repositions what's left.
+  void _shiftTicksFrom(int fromTick, int shiftAmount) {
+    if (shiftAmount == 0) return;
+
+    for (final measure in measures) {
+      for (int i = 0; i < measure.beatEvents.length; i++) {
+        final event = measure.beatEvents[i];
+        if (event.tick >= fromTick) {
+          measure.beatEvents[i] =
+              event.copyWith(tick: event.tick + shiftAmount);
+        }
+      }
+    }
+
+    for (int i = 0; i < notes.length; i++) {
+      final note = notes[i];
+      if (note.startTick >= fromTick) {
+        notes[i] = note.copyWith(startTick: note.startTick + shiftAmount);
+      }
+    }
+
+    for (int i = 0; i < timeline.tempoEvents.length; i++) {
+      final event = timeline.tempoEvents[i];
+      if (event.tick != 0 && event.tick >= fromTick) {
+        timeline.tempoEvents[i] =
+            event.copyWith(tick: event.tick + shiftAmount);
+      }
+    }
+    timeline.tempoEvents.sort((a, b) => a.tick.compareTo(b.tick));
+
+    for (final event in timeline.dynamicEvents) {
+      if (event.tick >= fromTick) {
+        event.tick += shiftAmount;
+      }
+    }
+    timeline.dynamicEvents.sort((a, b) => a.tick.compareTo(b.tick));
+
+    for (final event in timeline.dynamicChangeEvents) {
+      if (event.tick >= fromTick) {
+        event.tick += shiftAmount;
+      }
+    }
+    timeline.dynamicChangeEvents.sort((a, b) => a.tick.compareTo(b.tick));
+
+    for (int i = 0; i < timeline.beatEvents.length; i++) {
+      final event = timeline.beatEvents[i];
+      if (event.tick >= fromTick) {
+        timeline.beatEvents[i] =
+            event.copyWith(tick: event.tick + shiftAmount);
+      }
+    }
+    timeline.beatEvents.sort((a, b) => a.tick.compareTo(b.tick));
+  }
+
   int selectedMeasureIndex = 0;
 
   Measure get currentMeasure {
@@ -247,15 +349,21 @@ class CompositionController extends ChangeNotifier {
       return;
     }
     // Remove notes that belong to the deleted beat.
-    final beatStart = measure.startTick +
-        beatIndex * measure.timeSignature.ticksPerBeat;
-    final beatEnd = beatStart +
-        measure.timeSignature.ticksPerBeat;
+    final beatTicks = measure.timeSignature.ticksPerBeat;
+    final beatStart = measure.startTick + beatIndex * beatTicks;
+    final beatEnd = beatStart + beatTicks;
     notes.removeWhere(
           (note) =>
       note.startTick >= beatStart &&
           note.startTick < beatEnd,
     );
+    // Close the gap: everything from beatEnd onward — later beats in
+    // this measure, and every measure after it — shifts back by one
+    // beat's worth of ticks. Without this, only capacity gets trimmed
+    // off the very END of the measure while whatever was actually
+    // after the deleted beat stays at its old, now-wrong absolute
+    // tick — which looks like the wrong beat got deleted.
+    _shiftTicksFrom(beatEnd, -beatTicks);
     measure.removeBeat();
     timeline.rebuild();
     notifyListeners();
@@ -311,12 +419,18 @@ class CompositionController extends ChangeNotifier {
     }
     final startTick = measures[index].startTick;
     final endTick = measures[index].endTick;
-    timeline.deleteMeasure(index);
     notes.removeWhere(
           (note) =>
       note.startTick >= startTick &&
           note.startTick < endTick,
     );
+    // Close the gap: everything after the deleted measure shifts back
+    // by its full duration — same reasoning as removeBeatFromMeasure.
+    // Done before timeline.deleteMeasure() removes it from the list;
+    // shifting the doomed measure's own beatEvents too is harmless
+    // wasted work since it's about to be discarded anyway.
+    _shiftTicksFrom(endTick, -(endTick - startTick));
+    timeline.deleteMeasure(index);
     // Keep selectedMeasureIndex valid — it may have been pointing at the
     // measure we just deleted (or one after it), which would otherwise
     // leave it out of range and crash the next read of currentMeasure
@@ -1392,7 +1506,17 @@ class CompositionController extends ChangeNotifier {
   /// circle from wherever it currently is — landing on the next
   /// *defined* scale for that mode (major/minor), skipping any
   /// enharmonic spelling that has no scale defined for it.
+  /// Net rows each note has been shifted by raiseAllScales/
+  /// lowerAllScales since the last commit/reset, keyed by note id.
+  /// Tracked per-note (not as one global counter) because a shift only
+  /// happens for notes in a measure whose scale root LETTER actually
+  /// changed that round — see [_shiftNotesForScaleChange] — so
+  /// different notes can accumulate different amounts, including notes
+  /// added partway through a sequence of raises/lowers.
+  final Map<int, int> _noteRowShiftLog = {};
+
   void raiseAllScales(){
+    final oldScaleNames = measures.map((m) => m.scaleName).toList();
     for(int i = 0; i < measures.length; i++){
       measures[i] = measures[i].copyWith(
         scaleName: ScaleResolver.transposeScale(
@@ -1401,12 +1525,14 @@ class CompositionController extends ChangeNotifier {
         ),
       );
     }
+    _shiftNotesForScaleChange(oldScaleNames, 1);
     notifyListeners();
   }
 
 
   /// Same as [raiseAllScales] but one step down instead of up.
   void lowerAllScales(){
+    final oldScaleNames = measures.map((m) => m.scaleName).toList();
     for(int i = 0; i < measures.length; i++){
       measures[i] = measures[i].copyWith(
         scaleName: ScaleResolver.transposeScale(
@@ -1415,19 +1541,72 @@ class CompositionController extends ChangeNotifier {
         ),
       );
     }
+    _shiftNotesForScaleChange(oldScaleNames, -1);
     notifyListeners();
+  }
+
+  /// Shifts each note by [direction] (+1 or -1) ONLY if the root
+  /// LETTER of its measure's scale actually changed this round — i.e.
+  /// the scale's first word (do/re/mi/fa/sol/la/si) differs between
+  /// [oldScaleNames] (what each measure's scale was before this
+  /// change, indexed the same as [measures]) and that measure's scale
+  /// now. A pure sharp/flat respelling of the same letter (e.g. "re
+  /// flat major" -> "re major") keeps the note on the same staff
+  /// position, so no shift; an actual letter change (e.g. "do major"
+  /// -> "re flat major") does. Every shift applied is logged per note
+  /// id in [_noteRowShiftLog] so [resetAllScales] can undo exactly
+  /// what each individual note actually experienced.
+  void _shiftNotesForScaleChange(List<String> oldScaleNames, int direction) {
+    for (int i = 0; i < notes.length; i++) {
+      final note = notes[i];
+      final measureIndex = measures.indexWhere(
+            (m) => note.startTick >= m.startTick && note.startTick < m.endTick,
+      );
+      if (measureIndex == -1 || measureIndex >= oldScaleNames.length) continue;
+
+      final oldRoot = _scaleFirstWord(oldScaleNames[measureIndex]);
+      final newRoot = _scaleFirstWord(measures[measureIndex].scaleName);
+      if (oldRoot == newRoot) continue; // same letter — no shift
+
+      final newRow = (note.row + direction).clamp(0, totalRows - 1);
+      if (newRow != note.row) {
+        notes[i] = note.copyWith(row: newRow);
+        _noteRowShiftLog[note.id] = (_noteRowShiftLog[note.id] ?? 0) + direction;
+      }
+    }
+  }
+
+  /// The scale's root letter alone (do/re/mi/fa/sol/la/si), stripped
+  /// of any sharp/flat and mode — used only to detect an actual letter
+  /// change vs a same-letter respelling in [_shiftNotesForScaleChange].
+  String _scaleFirstWord(String scaleName) {
+    final normalized = ScaleResolver.normalizeScaleName(scaleName);
+    final spaceIndex = normalized.indexOf(' ');
+    return spaceIndex == -1 ? normalized : normalized.substring(0, spaceIndex);
   }
 
 
   /// Restores every measure's scale back to whatever it was originally
   /// created with (or last deliberately picked via the scale selector),
-  /// undoing any raiseAllScales/lowerAllScales drift.
+  /// and restores every note to the row it had before any
+  /// raiseAllScales/lowerAllScales drift — using each note's own
+  /// logged shift, not a single global amount, so this stays correct
+  /// even for notes added partway through a sequence of raises/lowers.
   void resetAllScales(){
     for(int i = 0; i < measures.length; i++){
       measures[i] = measures[i].copyWith(
         scaleName: measures[i].originalScaleName,
       );
     }
+    for (int i = 0; i < notes.length; i++) {
+      final note = notes[i];
+      final shift = _noteRowShiftLog[note.id];
+      if (shift != null && shift != 0) {
+        final restoredRow = (note.row - shift).clamp(0, totalRows - 1);
+        notes[i] = note.copyWith(row: restoredRow);
+      }
+    }
+    _noteRowShiftLog.clear();
     notifyListeners();
   }
 
@@ -1471,6 +1650,7 @@ class CompositionController extends ChangeNotifier {
         originalScaleName: measures[i].scaleName,
       );
     }
+    _noteRowShiftLog.clear();
     notifyListeners();
   }
 

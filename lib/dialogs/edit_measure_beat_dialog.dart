@@ -52,7 +52,15 @@ void editMeasureBeatDialog({
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        onTap: () {},
+                        onTap: () {
+                          final measure = controller.measures[measureIndex];
+                          controller.insertMeasureAt(
+                            measureIndex,
+                            measure.timeSignature,
+                            measure.scaleName,
+                          );
+                          Navigator.pop(context);
+                        },
                       ),
 
                       ListTile(
