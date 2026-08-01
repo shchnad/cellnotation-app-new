@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:music_composer/dialogs/tempo_dialog.dart';
 
 import '../controllers/composition_controller.dart';
+import '../utils/scale_resolver.dart';
 import 'dynamic_change_dialog.dart';
 import 'dynamic_dialog.dart';
+import 'scale_dialog.dart';
 
 
 void editMeasureBeatDialog({
@@ -20,8 +22,8 @@ void editMeasureBeatDialog({
         surfaceTintColor: Colors.white,
 
         content: SizedBox(
-          // width: MediaQuery.of(context).size.width * 0.75,
-          // height: MediaQuery.of(context).size.height * 0.55,
+          width: MediaQuery.of(context).size.width * 0.75,
+          height: MediaQuery.of(context).size.height * 0.55,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -132,6 +134,34 @@ void editMeasureBeatDialog({
                               measureIndex,
                               beatIndex,
                             ),
+                          );
+                        },
+                      ),
+
+                      ListTile(
+                        leading: const Icon(Icons.music_note),
+                        title: const Text(
+                          "Set Scale",
+                          style: TextStyle(
+                            fontSize: 22,
+                            color: Colors.blue,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        onTap: () {
+                          Navigator.pop(context);
+                          scaleDialog(
+                            context: context,
+                            controller: controller,
+                            currentScale: ScaleResolver.normalizeScaleName(
+                              controller.measures[measureIndex].scaleName,
+                            ),
+                            onSelected: (scale) {
+                              controller.updateMeasureScale(
+                                measureIndex,
+                                scale,
+                              );
+                            },
                           );
                         },
                       ),

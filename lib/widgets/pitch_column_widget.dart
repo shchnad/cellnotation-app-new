@@ -12,7 +12,7 @@ class PitchColumnWidget extends StatelessWidget {
   final double cellHeight;
   final ScrollController scrollController;
 
-  static const double widthOfPitchColumn = 15;
+  static const double widthOfPitchColumn = 25;
 
   const PitchColumnWidget({
     super.key,

@@ -178,9 +178,19 @@ class GridWidget extends StatelessWidget {
         return SingleChildScrollView(
           scrollDirection: Axis.vertical,
           controller: verticalScrollController,
+          // Draw mode takes over pan gestures for drawing strokes
+          // instead of scrolling — disable scroll physics on both
+          // axes while it's active so gestures go entirely to the
+          // draw overlay below rather than fighting it.
+          physics: controller.drawMode
+              ? const NeverScrollableScrollPhysics()
+              : null,
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             controller: horizontalScrollController,
+            physics: controller.drawMode
+                ? const NeverScrollableScrollPhysics()
+                : null,
             child: SizedBox(
               width: gridWidth,
               height: gridHeight,
@@ -191,12 +201,12 @@ class GridWidget extends StatelessWidget {
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTapDown: (details) {
-                        if (controller.showCompensatedNotation) {
+                        if (controller.editingBlocked) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
+                            SnackBar(
                               content: Text(
-                                'Turn off Compensated Notation to edit notes',
-                                style: TextStyle(fontSize: 22),
+                                controller.editingBlockedMessage,
+                                style: const TextStyle(fontSize: 22),
                               ),
                             ),
                           );
@@ -300,6 +310,37 @@ class GridWidget extends StatelessWidget {
                       controller: controller,
                     ),
                   ),
+
+                  // DRAW OVERLAY — red freehand annotation strokes,
+                  // stored in the grid's own coordinate space so they
+                  // scroll with the composition. Only captures
+                  // gestures (and only renders at all) while draw mode
+                  // is on; otherwise taps/drags pass straight through
+                  // to the grid/notes below.
+                  //
+                  // Uses Listener (raw pointer events) rather than
+                  // GestureDetector's onPan* callbacks — those compete
+                  // in the gesture arena against the enclosing
+                  // SingleChildScrollViews' own drag recognizers even
+                  // with NeverScrollableScrollPhysics set, which is
+                  // what made strokes come out stuttery/incomplete.
+                  // Listener receives every pointer event
+                  // unconditionally instead of negotiating for it.
+                  if (controller.drawMode)
+                    Positioned.fill(
+                      child: Listener(
+                        behavior: HitTestBehavior.opaque,
+                        onPointerDown: (event) {
+                          controller.startDrawStroke(event.localPosition);
+                        },
+                        onPointerMove: (event) {
+                          controller.addDrawPoint(event.localPosition);
+                        },
+                        child: CustomPaint(
+                          painter: _DrawOverlayPainter(controller.drawStrokes),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -614,4 +655,36 @@ class GridPainter extends CustomPainter {
     return true;
   }
 
+}
+
+/// Draws the freehand red-ink annotation strokes captured while draw
+/// mode is on (see CompositionController.drawStrokes).
+class _DrawOverlayPainter extends CustomPainter {
+  final List<List<Offset>> strokes;
+
+  _DrawOverlayPainter(this.strokes);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.red
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    for (final stroke in strokes) {
+      if (stroke.length < 2) continue;
+      final path = Path()..moveTo(stroke.first.dx, stroke.first.dy);
+      for (int i = 1; i < stroke.length; i++) {
+        path.lineTo(stroke[i].dx, stroke[i].dy);
+      }
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DrawOverlayPainter oldDelegate) {
+    return true;
+  }
 }

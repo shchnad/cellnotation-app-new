@@ -73,17 +73,16 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
 
   late Offset dragStartPosition;
 
-  /// If compensated notation is on, shows a message and returns true
-  /// so the caller can bail out — editing is disabled in that mode
-  /// since it's meant as a read-only simplified view, not an
-  /// alternate way to edit the same notes.
-  bool _blockedByCompensatedNotation(BuildContext context) {
-    if (!widget.controller.showCompensatedNotation) return false;
+  /// If compensated notation, input lock, or draw mode is on, shows a
+  /// message naming which one and returns true so the caller can bail
+  /// out — none of them allow editing notes through this widget.
+  bool _blockedFromEditing(BuildContext context) {
+    if (!widget.controller.editingBlocked) return false;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
+      SnackBar(
         content: Text(
-          'Turn off Compensated Notation to edit notes',
-          style: TextStyle(fontSize: 22),
+          widget.controller.editingBlockedMessage,
+          style: const TextStyle(fontSize: 22),
         ),
       ),
     );
@@ -216,7 +215,7 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
               behavior: HitTestBehavior.deferToChild,
 
               onPanStart: (details) {
-                if (_blockedByCompensatedNotation(context)) return;
+                if (_blockedFromEditing(context)) return;
                 dragStartTick = note.startTick;
                 dragStartRow = note.row;
                 dragStartPosition = details.globalPosition;
@@ -225,7 +224,7 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
               onPanUpdate: (details) {
                 // No message here — onPanStart already warned once for
                 // this gesture; repeating it every frame would spam.
-                if (widget.controller.showCompensatedNotation) return;
+                if (widget.controller.editingBlocked) return;
                 final dx = details.globalPosition.dx - dragStartPosition.dx;
                 final dy = details.globalPosition.dy - dragStartPosition.dy;
                 final tickChange = (dx / widget.pixelsPerTick).round();
@@ -245,7 +244,7 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
               },
 
               onTap: () {
-                if (_blockedByCompensatedNotation(context)) return;
+                if (_blockedFromEditing(context)) return;
                 if (controller.pasteMode) {
                   return;
                 }
@@ -257,7 +256,7 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
               },
 
               onLongPress: () {
-                if (_blockedByCompensatedNotation(context)) return;
+                if (_blockedFromEditing(context)) return;
                 controller.copyNote(note);
                 controller.enterPasteMode();
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -271,7 +270,7 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
               },
 
               onDoubleTap: () {
-                if (_blockedByCompensatedNotation(context)) return;
+                if (_blockedFromEditing(context)) return;
                 final rawTick = note.startTick;
                 final measure = controller.getMeasureAtTick(rawTick);
                 final measureIndex = controller.measures.indexOf(measure);

@@ -168,6 +168,15 @@ class _CompositionScreenState extends State<CompositionScreen>
     _gridHorizontalController.jumpTo(offset.clamp(0.0, maxScroll));
   }
 
+  void _scrollToStart() {
+    if (!_gridHorizontalController.hasClients) return;
+    _gridHorizontalController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -405,7 +414,7 @@ class _CompositionScreenState extends State<CompositionScreen>
 
                       // EDIT INFO
                       IconButton(
-                        icon: const Icon(Icons.edit,
+                        icon: const Icon(Icons.title,
                           color: Colors.black,
                         ),
                         tooltip: 'Edit Title / Composer / Style / Instrument',
@@ -448,6 +457,17 @@ class _CompositionScreenState extends State<CompositionScreen>
                         ),
                         tooltip: _isPlaying ? 'Pause' : 'Play',
                         onPressed: hasMeasures ? _togglePlayback : null,
+                      ),
+
+                      // SCROLL TO START — jumps the horizontal view
+                      // back to the very beginning of the composition.
+                      IconButton(
+                        icon: const Icon(
+                          Icons.first_page,
+                          color: Colors.black,
+                        ),
+                        tooltip: 'Scroll to Start',
+                        onPressed: hasMeasures ? _scrollToStart : null,
                       ),
 
                       // SOUND ON/OFF — notes play a synthesized tone
@@ -526,6 +546,62 @@ class _CompositionScreenState extends State<CompositionScreen>
                         onPressed:
                         controller.toggleCompensatedNotation,
                       ),
+
+
+                      // SCROLL LOCK — blocks tapping the grid from
+                      // creating/editing notes, so the composition can
+                      // be scrolled around without accidentally adding
+                      // a note on every tap.
+                      IconButton(
+                        icon: Icon(
+                          controller.inputLocked
+                              ? Icons.lock
+                              : Icons.lock_open,
+                          color: controller.inputLocked
+                              ? Colors.blue
+                              : Colors.black,
+                        ),
+                        tooltip: controller.inputLocked
+                            ? 'Scroll Lock: On'
+                            : 'Scroll Lock: Off',
+                        onPressed:
+                        controller.toggleInputLocked,
+                      ),
+
+
+                      // DRAW MODE — lets a person mark up the
+                      // composition with freehand red-ink strokes;
+                      // editing is disabled while this is on, and
+                      // dragging draws instead of scrolling.
+                      IconButton(
+                        icon: Icon(
+                          Icons.brush,
+                          color: controller.drawMode
+                              ? Colors.red
+                              : Colors.black,
+                        ),
+                        tooltip: controller.drawMode
+                            ? 'Draw Mode: On'
+                            : 'Draw Mode: Off',
+                        onPressed:
+                        controller.toggleDrawMode,
+                      ),
+
+                      // UNDO STROKE — removes the most recent drawn
+                      // stroke; only shown while draw mode is active
+                      // (same pattern as the Paste button below, which
+                      // only appears once there's something to paste).
+                      if (controller.drawMode)
+                        IconButton(
+                          icon: const Icon(
+                            Icons.undo,
+                            color: Colors.black,
+                          ),
+                          tooltip: 'Undo Stroke',
+                          onPressed: controller.drawStrokes.isEmpty
+                              ? null
+                              : controller.undoLastDrawStroke,
+                        ),
 
 
                       // DURATION
