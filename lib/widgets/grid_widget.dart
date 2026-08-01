@@ -7,6 +7,7 @@ import '../dialogs/dynamic_dialog.dart';
 import '../dialogs/dynamic_change_dialog.dart';
 import '../enums/dynamic_change.dart';
 import '../models/dynamic_change_event.dart';
+import '../utils/scale_resolver.dart';
 import 'note_block_widget.dart';
 
 /// tempo
@@ -23,8 +24,17 @@ const _dynamicLabelStyle = TextStyle(
   fontWeight: FontWeight.bold,
 );
 
+/// scale name — drawn at the TOP of the grid, same size/weight as the
+/// tempo label at the bottom, in red.
+const _scaleLabelStyle = TextStyle(
+  color: Colors.red,
+  fontSize: 22,
+  fontWeight: FontWeight.bold,
+);
+
 const double _labelOffsetX = 5;
 const double _bottomMargin = 5; // distance from bottom of grid to tempo label
+const double _topMargin = 5; // distance from top of grid to scale label
 const double _labelGap = 4; // gap between tempo label and dynamic label above it
 
 // How many pixels wide (on each side of the line) count as a hit when
@@ -61,6 +71,16 @@ TextPainter _dynamicTextPainter(dynamic dynamicEvent) {
     text: TextSpan(
       text: dynamicEvent.musical_dynamic.abbreviation,
       style: _dynamicLabelStyle,
+    ),
+    textDirection: TextDirection.ltr,
+  )..layout();
+}
+
+TextPainter _scaleTextPainter(String scaleName) {
+  return TextPainter(
+    text: TextSpan(
+      text: ScaleResolver.normalizeScaleName(scaleName),
+      style: _scaleLabelStyle,
     ),
     textDirection: TextDirection.ltr,
   )..layout();
@@ -585,6 +605,19 @@ class GridPainter extends CustomPainter {
           Offset(measureX, 0),
           Offset(measureX, size.height),
           measurePaint,
+        );
+      }
+
+      // SCALE NAME — drawn at the top of the grid, same way the tempo
+      // label is drawn at the bottom, but red. Only shown for the
+      // first measure and wherever the scale actually changes (same
+      // condition as the double measure-line above) — not repeated on
+      // every single measure.
+      if (i == 0 || scaleChanged) {
+        final scaleTextPainter = _scaleTextPainter(measure.scaleName);
+        scaleTextPainter.paint(
+          canvas,
+          Offset(measureX + _labelOffsetX, _topMargin),
         );
       }
 
