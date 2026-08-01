@@ -296,30 +296,42 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
                 showPitch // PITCH
                     ? Padding(
                   padding: const EdgeInsets.only(left: 3, right: 2),
-                  child: FittedBox(
-                    alignment: Alignment.centerLeft,
-                    fit: BoxFit.scaleDown,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          pitch,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: widget.cellHeight * .80,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        if (accidental.isNotEmpty)
+                  child: RotatedBox(
+                    quarterTurns: controller.rotatePitchText ? 3 : 0,
+                    child: FittedBox(
+                      // Alignment is applied BEFORE the RotatedBox
+                      // above rotates everything — "right" becomes
+                      // "top" after a 90° counter-clockwise turn, so
+                      // this has to flip to centerRight while rotated
+                      // to keep the digit pinned to the top of the
+                      // cell (matching centerLeft's normal, unrotated
+                      // placement at the left edge).
+                      alignment: controller.rotatePitchText
+                          ? Alignment.topCenter
+                          : Alignment.centerLeft,
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
                           Text(
-                            accidental, // ACCIDENTAL
+                            pitch,
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: widget.cellHeight * .80,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                      ],
+                          if (accidental.isNotEmpty)
+                            Text(
+                              accidental, // ACCIDENTAL
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: widget.cellHeight * .80,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 )

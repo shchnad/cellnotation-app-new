@@ -1367,6 +1367,17 @@ class CompositionController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// When on, the pitch text drawn inside each note cell is rotated
+  /// 90° — purely cosmetic, useful when cells are narrow (zoomed in
+  /// tightly) and a vertical label reads more comfortably than a
+  /// horizontal one squeezed into a thin box.
+  bool rotatePitchText = false;
+
+  void toggleRotatePitchText() {
+    rotatePitchText = !rotatePitchText;
+    notifyListeners();
+  }
+
   /// Freehand red-ink strokes drawn while [drawMode] is on. Each inner
   /// list is one continuous stroke (one finger-down-to-up gesture) as
   /// a sequence of points in the grid's own coordinate space, so they

@@ -49,12 +49,17 @@ class PitchColumnWidget extends StatelessWidget {
                   ),
                 ),
               ),
-              child: Text(
-                pitch,
-                style: TextStyle(
-                  fontSize: cellHeight * 0.80,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
+              // Rotated the same way (and by the same toggle) as the
+              // pitch text inside note cells, so both stay consistent.
+              child: RotatedBox(
+                quarterTurns: controller.rotatePitchText ? 3 : 0,
+                child: Text(
+                  pitch,
+                  style: TextStyle(
+                    fontSize: cellHeight * 0.80,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
                 ),
               ),
             );

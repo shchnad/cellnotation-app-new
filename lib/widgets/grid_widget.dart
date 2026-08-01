@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../controllers/composition_controller.dart';
@@ -151,6 +152,15 @@ int tempoEventFallbackTick(CompositionController controller, int tick) {
   return exists != null ? tick : controller.timeline.tempoEvents.first.tick;
 }
 
+/// Draw mode only reacts to stylus (and inverted stylus, i.e. the
+/// eraser end) input — finger touches are deliberately left alone so
+/// scrolling keeps working normally with a finger even while draw
+/// mode is on.
+bool _isDrawingDevice(PointerDeviceKind kind) {
+  return kind == PointerDeviceKind.stylus ||
+      kind == PointerDeviceKind.invertedStylus;
+}
+
 class GridWidget extends StatelessWidget {
   final CompositionController controller;
   final double cellHeight;
@@ -178,19 +188,9 @@ class GridWidget extends StatelessWidget {
         return SingleChildScrollView(
           scrollDirection: Axis.vertical,
           controller: verticalScrollController,
-          // Draw mode takes over pan gestures for drawing strokes
-          // instead of scrolling — disable scroll physics on both
-          // axes while it's active so gestures go entirely to the
-          // draw overlay below rather than fighting it.
-          physics: controller.drawMode
-              ? const NeverScrollableScrollPhysics()
-              : null,
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             controller: horizontalScrollController,
-            physics: controller.drawMode
-                ? const NeverScrollableScrollPhysics()
-                : null,
             child: SizedBox(
               width: gridWidth,
               height: gridHeight,
@@ -313,27 +313,32 @@ class GridWidget extends StatelessWidget {
 
                   // DRAW OVERLAY — red freehand annotation strokes,
                   // stored in the grid's own coordinate space so they
-                  // scroll with the composition. Only captures
-                  // gestures (and only renders at all) while draw mode
-                  // is on; otherwise taps/drags pass straight through
-                  // to the grid/notes below.
+                  // scroll with the composition. Only renders (and
+                  // only reacts to STYLUS input, not finger touches)
+                  // while draw mode is on — a finger drag still
+                  // scrolls normally, so drawing doesn't take over
+                  // scrolling.
                   //
-                  // Uses Listener (raw pointer events) rather than
-                  // GestureDetector's onPan* callbacks — those compete
-                  // in the gesture arena against the enclosing
-                  // SingleChildScrollViews' own drag recognizers even
-                  // with NeverScrollableScrollPhysics set, which is
-                  // what made strokes come out stuttery/incomplete.
-                  // Listener receives every pointer event
-                  // unconditionally instead of negotiating for it.
+                  // behavior: translucent lets pointer events also
+                  // reach the scroll views underneath (rather than
+                  // consuming them the way HitTestBehavior.opaque
+                  // would), so finger-drag scrolling is completely
+                  // untouched by this overlay being present. Listener
+                  // (raw pointer events) is used instead of
+                  // GestureDetector's onPan* callbacks since those
+                  // compete in the gesture arena against the scroll
+                  // views' own drag recognizers, which is what made
+                  // strokes stuttery/incomplete before.
                   if (controller.drawMode)
                     Positioned.fill(
                       child: Listener(
-                        behavior: HitTestBehavior.opaque,
+                        behavior: HitTestBehavior.translucent,
                         onPointerDown: (event) {
+                          if (!_isDrawingDevice(event.kind)) return;
                           controller.startDrawStroke(event.localPosition);
                         },
                         onPointerMove: (event) {
+                          if (!_isDrawingDevice(event.kind)) return;
                           controller.addDrawPoint(event.localPosition);
                         },
                         child: CustomPaint(
