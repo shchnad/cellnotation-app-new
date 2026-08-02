@@ -1,4 +1,3 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../controllers/composition_controller.dart';
@@ -172,15 +171,6 @@ int tempoEventFallbackTick(CompositionController controller, int tick) {
   return exists != null ? tick : controller.timeline.tempoEvents.first.tick;
 }
 
-/// Draw mode only reacts to stylus (and inverted stylus, i.e. the
-/// eraser end) input — finger touches are deliberately left alone so
-/// scrolling keeps working normally with a finger even while draw
-/// mode is on.
-bool _isDrawingDevice(PointerDeviceKind kind) {
-  return kind == PointerDeviceKind.stylus ||
-      kind == PointerDeviceKind.invertedStylus;
-}
-
 class GridWidget extends StatelessWidget {
   final CompositionController controller;
   final double cellHeight;
@@ -330,42 +320,6 @@ class GridWidget extends StatelessWidget {
                       controller: controller,
                     ),
                   ),
-
-                  // DRAW OVERLAY — red freehand annotation strokes,
-                  // stored in the grid's own coordinate space so they
-                  // scroll with the composition. Only renders (and
-                  // only reacts to STYLUS input, not finger touches)
-                  // while draw mode is on — a finger drag still
-                  // scrolls normally, so drawing doesn't take over
-                  // scrolling.
-                  //
-                  // behavior: translucent lets pointer events also
-                  // reach the scroll views underneath (rather than
-                  // consuming them the way HitTestBehavior.opaque
-                  // would), so finger-drag scrolling is completely
-                  // untouched by this overlay being present. Listener
-                  // (raw pointer events) is used instead of
-                  // GestureDetector's onPan* callbacks since those
-                  // compete in the gesture arena against the scroll
-                  // views' own drag recognizers, which is what made
-                  // strokes stuttery/incomplete before.
-                  if (controller.drawMode)
-                    Positioned.fill(
-                      child: Listener(
-                        behavior: HitTestBehavior.translucent,
-                        onPointerDown: (event) {
-                          if (!_isDrawingDevice(event.kind)) return;
-                          controller.startDrawStroke(event.localPosition);
-                        },
-                        onPointerMove: (event) {
-                          if (!_isDrawingDevice(event.kind)) return;
-                          controller.addDrawPoint(event.localPosition);
-                        },
-                        child: CustomPaint(
-                          painter: _DrawOverlayPainter(controller.drawStrokes),
-                        ),
-                      ),
-                    ),
                 ],
               ),
             ),
@@ -693,36 +647,4 @@ class GridPainter extends CustomPainter {
     return true;
   }
 
-}
-
-/// Draws the freehand red-ink annotation strokes captured while draw
-/// mode is on (see CompositionController.drawStrokes).
-class _DrawOverlayPainter extends CustomPainter {
-  final List<List<Offset>> strokes;
-
-  _DrawOverlayPainter(this.strokes);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.red
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    for (final stroke in strokes) {
-      if (stroke.length < 2) continue;
-      final path = Path()..moveTo(stroke.first.dx, stroke.first.dy);
-      for (int i = 1; i < stroke.length; i++) {
-        path.lineTo(stroke[i].dx, stroke[i].dy);
-      }
-      canvas.drawPath(path, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DrawOverlayPainter oldDelegate) {
-    return true;
-  }
 }

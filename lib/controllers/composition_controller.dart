@@ -1356,17 +1356,6 @@ class CompositionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// When on, dragging over the grid draws a red annotation stroke
-  /// instead of scrolling or creating/moving notes — a freehand
-  /// markup layer on top of the composition, not part of the musical
-  /// data itself.
-  bool drawMode = false;
-
-  void toggleDrawMode() {
-    drawMode = !drawMode;
-    notifyListeners();
-  }
-
   /// When on, the pitch text drawn inside each note cell is rotated
   /// 90° — purely cosmetic, useful when cells are narrow (zoomed in
   /// tightly) and a vertical label reads more comfortably than a
@@ -1378,45 +1367,11 @@ class CompositionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Freehand red-ink strokes drawn while [drawMode] is on. Each inner
-  /// list is one continuous stroke (one finger-down-to-up gesture) as
-  /// a sequence of points in the grid's own coordinate space, so they
-  /// scroll along with the composition rather than staying fixed on
-  /// screen.
-  final List<List<Offset>> drawStrokes = [];
-
-  void startDrawStroke(Offset point) {
-    drawStrokes.add([point]);
-    notifyListeners();
-  }
-
-  void addDrawPoint(Offset point) {
-    if (drawStrokes.isEmpty) return;
-    drawStrokes.last.add(point);
-    notifyListeners();
-  }
-
-  void clearDrawStrokes() {
-    if (drawStrokes.isEmpty) return;
-    drawStrokes.clear();
-    notifyListeners();
-  }
-
-  /// Removes the most recently drawn stroke — one undo per completed
-  /// finger-down-to-up gesture, not per point.
-  void undoLastDrawStroke() {
-    if (drawStrokes.isEmpty) return;
-    drawStrokes.removeLast();
-    notifyListeners();
-  }
-
   /// Whether grid taps/drags should currently be blocked from
   /// creating/editing notes — true under compensated notation (a
-  /// read-only simplified view), while input is locked (scrolling-only
-  /// mode), or while draw mode is active (freehand annotation takes
-  /// over the gesture instead).
-  bool get editingBlocked =>
-      showCompensatedNotation || inputLocked || drawMode;
+  /// read-only simplified view) or while input is locked
+  /// (scrolling-only mode).
+  bool get editingBlocked => showCompensatedNotation || inputLocked;
 
   /// The message to show when a grid/note interaction is blocked by
   /// [editingBlocked] — names whichever mode is actually responsible,
@@ -1424,9 +1379,6 @@ class CompositionController extends ChangeNotifier {
   String get editingBlockedMessage {
     if (showCompensatedNotation) {
       return 'Turn off Compensated Notation to edit notes';
-    }
-    if (drawMode) {
-      return 'Turn off Draw Mode to edit notes';
     }
     if (inputLocked) {
       return 'Turn off Scroll Lock to edit notes';

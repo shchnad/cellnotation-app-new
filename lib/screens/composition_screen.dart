@@ -614,41 +614,6 @@ class _CompositionScreenState extends State<CompositionScreen>
                           ),
 
 
-                          // DRAW MODE — lets a person mark up the
-                          // composition with freehand red-ink strokes;
-                          // editing is disabled while this is on, and
-                          // dragging draws instead of scrolling.
-                          IconButton(
-                            icon: Icon(
-                              Icons.brush,
-                              color: controller.drawMode
-                                  ? Colors.red
-                                  : Colors.black,
-                            ),
-                            tooltip: controller.drawMode
-                                ? 'Draw Mode: On'
-                                : 'Draw Mode: Off',
-                            onPressed:
-                            controller.toggleDrawMode,
-                          ),
-
-                          // UNDO STROKE — removes the most recent drawn
-                          // stroke; only shown while draw mode is active
-                          // (same pattern as the Paste button below, which
-                          // only appears once there's something to paste).
-                          if (controller.drawMode)
-                            IconButton(
-                              icon: const Icon(
-                                Icons.undo,
-                                color: Colors.black,
-                              ),
-                              tooltip: 'Undo Stroke',
-                              onPressed: controller.drawStrokes.isEmpty
-                                  ? null
-                                  : controller.undoLastDrawStroke,
-                            ),
-
-
                           // DURATION
                           IconButton(
                             icon: const Icon(Icons.av_timer,
