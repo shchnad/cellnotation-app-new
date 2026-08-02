@@ -310,14 +310,19 @@ class GridWidget extends StatelessWidget {
                     ),
                   ),
 
-                  // NOTES
-                  ...controller.notes.map(
-                        (note) => NoteBlockWidget(
-                      key: ValueKey(note.id),
-                      note: note,
+                  // NOTES — displayNotes is just controller.notes
+                  // unchanged outside compensated notation; under it,
+                  // a note with an ornament expands into its ghost
+                  // sequence (see Ornament.shiftMap /
+                  // CompositionController.displayNotes).
+                  ...controller.displayNotes.map(
+                        (entry) => NoteBlockWidget(
+                      key: ValueKey(entry.note.id),
+                      note: entry.note,
                       pixelsPerTick: pixelsPerTick,
                       cellHeight: cellHeight,
                       controller: controller,
+                      isCompensatedGhost: entry.isGhost,
                     ),
                   ),
                 ],

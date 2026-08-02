@@ -1458,9 +1458,24 @@ class CompositionController extends ChangeNotifier {
         ? (_accidentalSemitoneShift[effectiveAccidental.sign] ?? 0)
         : 0;
 
-    int remaining = scaleAlteration + accidentalShift;
-    int currentRow = note.row;
+    final walked = _walkToRow(note.row, scaleAlteration + accidentalShift);
+    final baseDigit = _stripSign(getPitchNameForRow(walked.row, measure));
 
+    return (row: walked.row, label: '$baseDigit${_signStringFor(walked.remainingShift)}');
+  }
+
+  /// Walks from [startRow] toward the degree in whichever direction
+  /// [netShift] semitones points, comparing against the REAL semitone
+  /// gap between adjacent degrees at each step (not assuming every
+  /// degree is the same distance apart — see [_naturalAbsoluteSemitone]).
+  /// A gap that exactly absorbs what's left lands there with nothing
+  /// left over; a gap that doesn't fully absorb it keeps walking, so a
+  /// large shift can cross more than one row. Returns wherever the walk
+  /// stops, plus whatever's left of [netShift] that couldn't be
+  /// absorbed by a whole-row step.
+  ({int row, int remainingShift}) _walkToRow(int startRow, int netShift) {
+    int remaining = netShift;
+    int currentRow = startRow;
     if (remaining != 0) {
       final direction = remaining > 0 ? 1 : -1;
       while (remaining != 0) {
@@ -1474,9 +1489,16 @@ class CompositionController extends ChangeNotifier {
         remaining -= direction * stepInterval;
       }
     }
+    return (row: currentRow, remainingShift: remaining);
+  }
 
-    final baseDigit = _stripSign(getPitchNameForRow(currentRow, measure));
-    final sign = switch (remaining) {
+  /// The +/- suffix for a leftover semitone amount after [_walkToRow]
+  /// — only ±1/±2 are representable as a single accidental sign; a
+  /// larger leftover (rare — e.g. an ornament shift bigger than any
+  /// available accidental) has no sign to show and is dropped rather
+  /// than displayed wrong.
+  String _signStringFor(int remainingShift) {
+    return switch (remainingShift) {
       0 => '',
       1 => '+',
       2 => '++',
@@ -1484,8 +1506,20 @@ class CompositionController extends ChangeNotifier {
       -2 => '--',
       _ => '',
     };
+  }
 
-    return (row: currentRow, label: '$baseDigit$sign');
+  /// The single-accidental equivalent of a leftover semitone amount
+  /// after [_walkToRow] — same representable range as
+  /// [_signStringFor], returning null (no accidental) for 0 or for
+  /// anything too large to represent as one sign.
+  Accidental? _accidentalForShift(int remainingShift) {
+    return switch (remainingShift) {
+      1 => Accidental.sharp,
+      2 => Accidental.doubleSharp,
+      -1 => Accidental.flat,
+      -2 => Accidental.doubleFlat,
+      _ => null,
+    };
   }
 
   String _stripSign(String token) {
@@ -1498,11 +1532,71 @@ class CompositionController extends ChangeNotifier {
   /// The row's natural (unaltered) semitone position, absolute across
   /// octaves — i.e. ignoring any scale-specific alteration for that
   /// degree. Used only to measure the real gap between adjacent
-  /// degrees when walking in [getCompensatedDisplay].
+  /// degrees when walking in [_walkToRow].
   int _naturalAbsoluteSemitone(int row) {
     final octave = row ~/ 7;
     final degreeIndex = row % 7;
     return octave * 12 + _naturalDegreeSemitones[degreeIndex];
+  }
+
+  /// The notes to actually draw on the grid right now. Normally just
+  /// [notes] itself — but under compensated notation, any note
+  /// carrying an [Ornament] (see Ornament.shiftMap) is expanded into
+  /// the short sequence of display-only "ghost" notes its shiftMap
+  /// describes: one ghost per shiftMap entry, `coeff` scaling that
+  /// ghost's slice of the original note's duration and `shift` giving
+  /// its pitch offset in semitones from the original (walked to a row
+  /// + leftover accidental the same way [getCompensatedDisplay] does).
+  /// Ghosts are marked (isGhost: true) so NoteBlockWidget can render
+  /// them literally — using their own precomputed row/accidental
+  /// directly — rather than running them back through the normal
+  /// note/measure lookups, which wouldn't find them since they were
+  /// never added to [notes]. The real note's own startTick/
+  /// durationTicks/row/ornament are never touched; this is purely a
+  /// read-only view, same as every other compensated-notation
+  /// computation, and playback always uses the real [notes] list
+  /// regardless of this.
+  List<({Note note, bool isGhost})> get displayNotes {
+    if (!showCompensatedNotation) {
+      return [for (final n in notes) (note: n, isGhost: false)];
+    }
+
+    final result = <({Note note, bool isGhost})>[];
+    for (final note in notes) {
+      final ornament = note.ornament;
+      if (ornament == null || ornament.shiftMap.isEmpty) {
+        result.add((note: note, isGhost: false));
+        continue;
+      }
+
+      double runningTick = note.startTick.toDouble();
+      for (int i = 0; i < ornament.shiftMap.length; i++) {
+        final entry = ornament.shiftMap[i] as Map;
+        final coeff = (entry['coeff'] as num).toDouble();
+        final shift = (entry['shift'] as num).toInt();
+
+        final rawDuration = note.durationTicks * coeff;
+        final startTickRounded = runningTick.round();
+        final endTickRounded = (runningTick + rawDuration).round();
+        final subDuration = endTickRounded - startTickRounded;
+        runningTick += rawDuration;
+        if (subDuration <= 0) continue;
+
+        final walked = _walkToRow(note.row, shift);
+        result.add((
+        note: note.copyWith(
+          id: note.id * 100 + i,
+          startTick: startTickRounded,
+          durationTicks: subDuration,
+          row: walked.row,
+          accidental: _accidentalForShift(walked.remainingShift),
+          ornament: null,
+        ),
+        isGhost: true,
+        ));
+      }
+    }
+    return result;
   }
 
   List<String> get availableScales => [
