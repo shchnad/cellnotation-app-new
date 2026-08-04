@@ -1492,6 +1492,38 @@ class CompositionController extends ChangeNotifier {
     return (row: currentRow, remainingShift: remaining);
   }
 
+  /// Like [_walkToRow], but for ornament ghost notes specifically —
+  /// where a different rule applies: any nonzero shift should land on
+  /// a DIFFERENT row whenever one is available, showing whatever's
+  /// left over as an accidental there, rather than staying on the
+  /// same row with the accidental (which is what [_walkToRow] prefers
+  /// for the pitch+accidental compensation display). E.g. pitch "2"
+  /// shifted by 1 semitone becomes the row above shown as "3-" (the
+  /// 2->3 gap is a whole tone, so 1 of its 2 semitones is left over as
+  /// a flat) -- not "2+" on the same row.
+  ({int row, int remainingShift}) _walkOrnamentShift(int startRow, int shift) {
+    if (shift == 0) return (row: startRow, remainingShift: 0);
+    int direction = shift > 0 ? 1 : -1;
+    int nextRow = startRow + direction;
+    if (nextRow < 0 || nextRow >= totalRows) {
+      // Blocked at the edge of the grid in the requested direction —
+      // fall back to the opposite direction so the ornament still
+      // lands on a genuinely different row (with a correspondingly
+      // adjusted leftover accidental) instead of silently collapsing
+      // onto the same row as the un-shifted entries.
+      direction = -direction;
+      nextRow = startRow + direction;
+      if (nextRow < 0 || nextRow >= totalRows) {
+        // Truly nowhere to go either way (a degenerate 1-row grid).
+        return (row: startRow, remainingShift: shift);
+      }
+    }
+    final stepInterval = (_naturalAbsoluteSemitone(nextRow) -
+        _naturalAbsoluteSemitone(startRow))
+        .abs();
+    return (row: nextRow, remainingShift: shift - direction * stepInterval);
+  }
+
   /// The +/- suffix for a leftover semitone amount after [_walkToRow]
   /// — only ±1/±2 are representable as a single accidental sign; a
   /// larger leftover (rare — e.g. an ornament shift bigger than any
@@ -1569,10 +1601,25 @@ class CompositionController extends ChangeNotifier {
         continue;
       }
 
+      // shiftMap coefficients are trusted to describe RELATIVE
+      // proportions, not necessarily ones that already sum to exactly
+      // 1 (e.g. the trill entries sum to 0.5 as authored) — normalize
+      // so the ghost sequence always exactly fills the original
+      // note's duration regardless of what the raw coefficients add
+      // up to.
+      final totalCoeff = ornament.shiftMap.fold<double>(
+        0.0,
+            (sum, e) => sum + ((e as Map)['coeff'] as num).toDouble(),
+      );
+      if (totalCoeff <= 0) {
+        result.add((note: note, isGhost: false));
+        continue;
+      }
+
       double runningTick = note.startTick.toDouble();
       for (int i = 0; i < ornament.shiftMap.length; i++) {
         final entry = ornament.shiftMap[i] as Map;
-        final coeff = (entry['coeff'] as num).toDouble();
+        final coeff = (entry['coeff'] as num).toDouble() / totalCoeff;
         final shift = (entry['shift'] as num).toInt();
 
         final rawDuration = note.durationTicks * coeff;
@@ -1582,7 +1629,7 @@ class CompositionController extends ChangeNotifier {
         runningTick += rawDuration;
         if (subDuration <= 0) continue;
 
-        final walked = _walkToRow(note.row, shift);
+        final walked = _walkOrnamentShift(note.row, shift);
         result.add((
         note: note.copyWith(
           id: note.id * 100 + i,
