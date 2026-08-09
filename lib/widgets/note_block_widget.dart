@@ -8,7 +8,6 @@ import '../dialogs/note_dialog.dart';
 import '../enums/accidental.dart';
 import '../enums/articulation.dart';
 import '../enums/hand.dart';
-import '../enums/ornament.dart';
 import '../models/note.dart';
 
 // Height of the strip reserved above each note for drawing staccato /
@@ -35,15 +34,14 @@ const _fingerTextStyle = TextStyle(
   fontWeight: FontWeight.bold,
 );
 
-// Height of the strip reserved above each note (above even the finger
-// number) for the ornament sign — e.g. "uM" for upper mordent.
-const double _ornamentHeight = 24.0;
-
-const _ornamentTextStyle = TextStyle(
-  color: Colors.blue,
-  fontSize: 18,
-  fontWeight: FontWeight.bold,
-);
+// NOTE: ornaments are no longer drawn as a sign/symbol above the note.
+// When a note carries an ornament, CompositionController.displayNotes
+// always expands it into its short "ghost" sequence of shifted-pitch
+// notes (see that getter) — that sequence IS the ornament's entire
+// presentation now. Accordingly, the ornament sign/symbol strip
+// (previously reserved via an "ornament space" above the finger
+// number) and the custom painter that drew mordent/turn/tremolo
+// symbols have been removed from this widget.
 
 
 // Articulations that get a drawn symbol above the note (as opposed to
@@ -67,13 +65,45 @@ class NoteBlockWidget extends StatefulWidget {
   final CompositionController controller;
 
   /// True for a display-only "ghost" note produced by
-  /// CompositionController.displayNotes when expanding an ornament
-  /// under compensated notation — never actually in
-  /// controller.notes. Ghosts render their own precomputed row/
-  /// accidental literally (no measure/propagation lookups, since
-  /// those only work for real notes in the list) and never show an
-  /// ornament sign of their own.
+  /// CompositionController.displayNotes when expanding an ornament —
+  /// never actually in controller.notes. A ghost's `note.row` is
+  /// always the underlying real note's own UNCHANGED row (no walking
+  /// baked in); this widget always walks `note.row` plus
+  /// `ornamentShift` to the genuinely different row the ghost
+  /// actually displays on (see the pitch/row computation in build()),
+  /// regardless of the compensated-notation toggle. Ghosts never show
+  /// an ornament sign of their own (ornaments no longer draw a sign
+  /// at all — the ghost sequence's shifted pitches ARE the ornament's
+  /// presentation).
   final bool isCompensatedGhost;
+
+  /// Whether this block responds to taps/drags/long-press/double-tap
+  /// at all. False for every ghost in an ornament's sequence except
+  /// the one covering the longest slice of the original note's
+  /// duration — see CompositionController.displayNotes. Always true
+  /// for ordinary (non-ghost) notes.
+  final bool isClickable;
+
+  /// The real note that a tap/drag on this block should actually
+  /// edit. Defaults to [note] itself. For the one clickable ghost in
+  /// an ornament's sequence, this is the real underlying note (which
+  /// still carries the ornament) rather than that ghost's own
+  /// synthetic copy — edits to the synthetic copy would silently go
+  /// nowhere, since it isn't in controller.notes.
+  final Note? interactionNote;
+
+  /// For a ghost only: the RAW semitone shift from its ornament's
+  /// shiftMap entry (0 for the ornament's own unaltered/base-pitch
+  /// ghosts, and for every non-ghost note). [note]'s own row is
+  /// always the underlying note's UNCHANGED row; this shift is what
+  /// build() walks (via [CompositionController.resolveOrnamentWalk])
+  /// to find the genuinely different row the ghost actually displays
+  /// on — e.g. pitch "3" shifted by a semitone below shows as "2+" on
+  /// the row below, not "3-" on the same row. This walking is always
+  /// applied for ghosts, regardless of
+  /// [CompositionController.showCompensatedNotation] (that toggle
+  /// only affects ORDINARY notes' display).
+  final int ornamentShift;
 
   const NoteBlockWidget({
     super.key,
@@ -82,6 +112,9 @@ class NoteBlockWidget extends StatefulWidget {
     required this.cellHeight,
     required this.controller,
     this.isCompensatedGhost = false,
+    this.isClickable = true,
+    this.interactionNote,
+    this.ornamentShift = 0,
   });
 
   @override
@@ -119,12 +152,6 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
           color: Colors.green,
           width: 3,
         );
-      case Articulation.legato:
-        return const Border(
-            bottom: BorderSide(
-              color: Colors.red,
-              width: 3,
-            ));
       case Articulation.staccato:
       case Articulation.tenuto:
       case Articulation.marcato:
@@ -132,6 +159,30 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
       case null:
         return null;
     }
+  }
+
+  /// Legato used to be one of the mutually exclusive Articulation
+  /// values, drawn as a red bottom border — it's now a separate,
+  /// independent flag ([Note.legato]), so a note can be legato AND
+  /// carry an articulation (e.g. sforzando) at the same time. This
+  /// merges the two: [_articulationBorder]'s border (if any) is kept
+  /// on every side except the bottom, which legato — when on —
+  /// always claims for its own red border, overriding whatever that
+  /// side would otherwise have been.
+  Border? _combinedBorder() {
+    final articulationBorder = _articulationBorder();
+    if (!widget.note.legato) return articulationBorder;
+
+    const legatoBottom = BorderSide(color: Colors.red, width: 3);
+    if (articulationBorder == null) {
+      return const Border(bottom: legatoBottom);
+    }
+    return Border(
+      top: articulationBorder.top,
+      left: articulationBorder.left,
+      right: articulationBorder.right,
+      bottom: legatoBottom,
+    );
   }
 
   @override
@@ -143,26 +194,45 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
 
     final isGhost = widget.isCompensatedGhost;
 
-    // Ghost notes (from CompositionController.displayNotes expanding
-    // an ornament) carry their own already-computed row/accidental
-    // directly — they're never in controller.notes, so the normal
-    // getDisplayPitchLabel/getEffectiveAccidental lookups (which scan
-    // that list for measure/propagation context) wouldn't find them
-    // and would derive the wrong thing from whatever real note
-    // happens to be nearby instead. So ghosts read note.row/
-    // note.accidental literally and build the same "merged word" style
-    // compensated notes already use, without going through that
-    // machinery.
+    // The note that taps/drags on this block should actually mutate.
+    // For ordinary notes this is just `note` itself; for the one
+    // clickable ghost in an ornament's sequence, the caller passes the
+    // real underlying note explicitly (see the class doc above).
+    final interactionNote = widget.interactionNote ?? note;
+
     final String pitch;
     final String accidental;
+    // Only ever actually read for a ghost (see the `isGhost ?`
+    // ternary building `displayRow` below) — declared as a plain
+    // initialized local so it's always unambiguously assigned
+    // regardless of which branch runs.
+    int ghostWalkedRow = note.row;
     if (isGhost) {
+      // An ornament ghost ALWAYS shows its shift by moving to a
+      // genuinely different row (walking, via resolveOrnamentWalk)
+      // rather than staying on the base note's row with an
+      // accidental — this is how mordents/turns/etc. are actually
+      // notated: the auxiliary note gets its own staff position, not
+      // an accidental glued onto the same line. E.g. a note at
+      // pitch "3" with a semitone-below shift shows as "2+" on the
+      // row below, not "3-" on the same row. This is independent of
+      // the compensated-notation toggle, which only affects ORDINARY
+      // notes' display (see the else branch below) — a ghost's
+      // actual SOUND (see CompositionController.getOrnamentFrequencyHz)
+      // is unaffected either way, since it's computed directly from
+      // the base row and raw shift regardless of how it's drawn.
       final measure = controller.getMeasureAtTick(note.startTick);
-      final baseDigit = controller.getPitchNameForRow(note.row, measure);
-      final sign = note.accidental?.sign ?? '';
-      pitch = sign.isEmpty
-          ? baseDigit
-          : '${baseDigit.endsWith('+') || baseDigit.endsWith('-') ? baseDigit.substring(0, baseDigit.length - 1) : baseDigit}$sign';
+      final walked =
+      controller.resolveOrnamentWalk(note.row, widget.ornamentShift);
+      final baseDigit = controller.getPitchNameForRow(walked.row, measure);
+      final strippedDigit =
+      baseDigit.endsWith('+') || baseDigit.endsWith('-')
+          ? baseDigit.substring(0, baseDigit.length - 1)
+          : baseDigit;
+      final leftoverSign = controller.signStringForShift(walked.remainingShift);
+      pitch = '$strippedDigit$leftoverSign';
       accidental = '';
+      ghostWalkedRow = walked.row;
     } else {
       // Under normal notation, show the note's own effective
       // accidental as a separate glyph next to the pitch — "x"
@@ -185,8 +255,6 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
 
     final showPitch = noteWidth >= 24;
 
-    final showAccidental = noteWidth >= 36;
-
     // Row 0 is the lowest pitch (octave 0, degree 1) and should render
     // at the BOTTOM of the grid; the highest row should render at the
     // TOP. Since `top` grows downward on screen, we flip the row here
@@ -196,11 +264,12 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
     // When compensated notation is on, a note whose accidental doubles
     // up with the scale's own sign displays on the *next* row over
     // (see getCompensatedDisplay) — note.row itself is untouched, this
-    // only affects where the block is drawn. Ghost notes already carry
-    // their final row directly (computed when they were expanded), so
-    // they skip this lookup too.
+    // only affects where the block is drawn. Ghost notes always walk
+    // to their own genuinely-different row (see the pitch/accidental
+    // computation above, and ghostWalkedRow), regardless of the
+    // compensated-notation toggle.
     final displayRow = isGhost
-        ? note.row
+        ? ghostWalkedRow
         : (controller.showCompensatedNotation
         ? controller.getCompensatedDisplay(note).row
         : note.row);
@@ -209,23 +278,71 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
     final drawMark = _hasDrawnMark(note.articulation);
     final hasFinger = note.finger != null;
     final hasTechnique = note.playingTechnique != null;
-    // Ghosts never carry their own ornament (it's cleared when they're
-    // expanded), so this is naturally false for them without needing
-    // an extra check.
-    final hasOrnament = note.ornament != null;
 
-    // Reserve extra room above the note box: ornament sign at the very
-    // top, finger number below that, articulation mark just above the
-    // note itself. Reserve extra room below for the playing technique
-    // abbreviation. The note's own position/size (and drag math below)
-    // stays untouched — it's simply offset within this taller
-    // Positioned/Stack.
-    final ornamentSpace = hasOrnament ? _ornamentHeight : 0.0;
+    // Reserve extra room above the note box: finger number at the
+    // top, articulation mark just above the note itself. Reserve
+    // extra room below for the playing technique abbreviation. The
+    // note's own position/size (and drag math below) stays untouched
+    // — it's simply offset within this taller Positioned/Stack.
+    // (Ornaments no longer reserve any space here — see the file-level
+    // note above.)
     final fingerSpace = hasFinger ? _fingerHeight : 0.0;
     final markSpace = drawMark ? _articulationMarkHeight : 0.0;
-    final topExtra = ornamentSpace + fingerSpace + markSpace;
+    final topExtra = fingerSpace + markSpace;
 
     final techniqueSpace = hasTechnique ? _techniqueHeight : 0.0;
+
+    final noteContainer = Container(
+      decoration: BoxDecoration(
+        color: _handColor(note.hand),
+        borderRadius: BorderRadius.circular(4),
+        border: _combinedBorder(),
+      ),
+
+      child:
+      showPitch // PITCH
+          ? Padding(
+        padding: const EdgeInsets.only(left: 3, right: 2),
+        child: RotatedBox(
+          quarterTurns: controller.rotatePitchText ? 3 : 0,
+          child: FittedBox(
+            // Alignment is applied BEFORE the RotatedBox above
+            // rotates everything — "right" becomes "top" after a
+            // 90° counter-clockwise turn, so this has to flip to
+            // centerRight while rotated to keep the digit pinned
+            // to the top of the cell (matching centerLeft's
+            // normal, unrotated placement at the left edge).
+            alignment: controller.rotatePitchText
+                ? Alignment.topCenter
+                : Alignment.centerLeft,
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  pitch,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: widget.cellHeight * .80,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (accidental.isNotEmpty)
+                  Text(
+                    accidental, // ACCIDENTAL
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: widget.cellHeight * .80,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      )
+          : const SizedBox(),
+    );
 
     return Positioned(
       left: left,
@@ -235,24 +352,11 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          if (hasOrnament)
-            Positioned(
-              left: 0,
-              top: 0,
-              width: noteWidth,
-              height: _ornamentHeight,
-              child: Center(
-                child: Text(
-                  note.ornament!.sign,
-                  style: _ornamentTextStyle,
-                ),
-              ),
-            ),
 
           if (hasFinger)
             Positioned(
               left: 0,
-              top: ornamentSpace,
+              top: 0,
               width: noteWidth,
               height: _fingerHeight,
               child: Center(
@@ -266,7 +370,7 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
           if (drawMark)
             Positioned(
               left: 0,
-              top: ornamentSpace + fingerSpace,
+              top: fingerSpace,
               width: noteWidth,
               height: _articulationMarkHeight,
               child: CustomPaint(
@@ -279,14 +383,21 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
             top: topExtra,
             width: noteWidth,
             height: widget.cellHeight,
-            child: GestureDetector(
+            // Only the clickable block (ordinary notes, or the
+            // single longest ghost in an ornament's sequence — see
+            // CompositionController.displayNotes) gets a
+            // GestureDetector at all. Every other ghost renders the
+            // same visual container but is otherwise inert, so
+            // tapping/dragging it does nothing.
+            child: widget.isClickable
+                ? GestureDetector(
               // behavior: HitTestBehavior.opaque,
               behavior: HitTestBehavior.deferToChild,
 
               onPanStart: (details) {
                 if (_blockedFromEditing(context)) return;
-                dragStartTick = note.startTick;
-                dragStartRow = note.row;
+                dragStartTick = interactionNote.startTick;
+                dragStartRow = interactionNote.row;
                 dragStartPosition = details.globalPosition;
               },
 
@@ -307,8 +418,9 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
                 final newRow = (dragStartRow + rowChange)
                     .clamp(0, controller.totalRows - 1)
                     .toInt();
-                if (newTick != note.startTick || newRow != note.row) {
-                  controller.updateNote(note, newTick, newRow);
+                if (newTick != interactionNote.startTick ||
+                    newRow != interactionNote.row) {
+                  controller.updateNote(interactionNote, newTick, newRow);
                 }
               },
 
@@ -317,22 +429,33 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
                 if (controller.pasteMode) {
                   return;
                 }
+                // Legato Mode is its own tap interaction, the same
+                // way paste mode overrides a normal tap above — while
+                // it's on, tapping a note toggles Note.legato instead
+                // of opening the edit dialog. Drag/long-press/
+                // double-tap are unaffected by this mode.
+                if (controller.legatoMode) {
+                  controller.toggleNoteLegato(interactionNote);
+                  return;
+                }
                 showDialog(
                   context: context,
-                  builder: (_) =>
-                      NoteDialog(note: note, controller: controller),
+                  builder: (_) => NoteDialog(
+                    note: interactionNote,
+                    controller: controller,
+                  ),
                 );
               },
 
               onLongPress: () {
                 if (_blockedFromEditing(context)) return;
-                controller.copyNote(note);
+                controller.copyNote(interactionNote);
                 controller.enterPasteMode();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                        'Note ${controller.noteNumber(note)} is copied',
-                        style: TextStyle(fontSize: 22)
+                        'Note ${controller.noteNumber(interactionNote)} is copied',
+                        style: const TextStyle(fontSize: 22)
                     ),
                   ),
                 );
@@ -340,7 +463,7 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
 
               onDoubleTap: () {
                 if (_blockedFromEditing(context)) return;
-                final rawTick = note.startTick;
+                final rawTick = interactionNote.startTick;
                 final measure = controller.getMeasureAtTick(rawTick);
                 final measureIndex = controller.measures.indexOf(measure);
                 final beatIndex =
@@ -354,59 +477,9 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
                 );
               },
 
-              child: Container(
-                decoration: BoxDecoration(
-                  color: _handColor(note.hand),
-                  borderRadius: BorderRadius.circular(4),
-                  border: _articulationBorder(),
-                ),
-
-                child:
-                showPitch // PITCH
-                    ? Padding(
-                  padding: const EdgeInsets.only(left: 3, right: 2),
-                  child: RotatedBox(
-                    quarterTurns: controller.rotatePitchText ? 3 : 0,
-                    child: FittedBox(
-                      // Alignment is applied BEFORE the RotatedBox
-                      // above rotates everything — "right" becomes
-                      // "top" after a 90° counter-clockwise turn, so
-                      // this has to flip to centerRight while rotated
-                      // to keep the digit pinned to the top of the
-                      // cell (matching centerLeft's normal, unrotated
-                      // placement at the left edge).
-                      alignment: controller.rotatePitchText
-                          ? Alignment.topCenter
-                          : Alignment.centerLeft,
-                      fit: BoxFit.scaleDown,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            pitch,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: widget.cellHeight * .80,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          if (accidental.isNotEmpty)
-                            Text(
-                              accidental, // ACCIDENTAL
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: widget.cellHeight * .80,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                )
-                    : const SizedBox(),
-              ),
-            ),
+              child: noteContainer,
+            )
+                : noteContainer,
           ),
 
           if (hasTechnique)

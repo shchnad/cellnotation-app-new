@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
 
 import '../controllers/composition_controller.dart';
-import '../utils/default_values.dart';
 
 /// A persistent column, meant to sit right next to the grid, listing the
-/// pitch name of every row (top to bottom) for the current scale. It
-/// scrolls vertically in lockstep with the grid via [scrollController],
-/// but never scrolls on its own — dragging happens on the grid.
+/// pitch name of every row (top to bottom) for the CURRENT MEASURE's
+/// scale (controller.currentMeasure, via getPitchNameForRow). It scrolls
+/// vertically in lockstep with the grid via [scrollController], but never
+/// scrolls on its own — dragging happens on the grid.
+///
+/// Wrapped in an AnimatedBuilder listening to [controller] so that
+/// tapping a different measure on the grid (which calls
+/// controller.selectMeasureAtTick, changing controller.currentMeasure)
+/// actually rebuilds this column to show that measure's scale, instead of
+/// only ever showing whatever scale was current when this widget was
+/// first built.
 class PitchColumnWidget extends StatelessWidget {
   final CompositionController controller;
   final double cellHeight;
@@ -23,49 +30,59 @@ class PitchColumnWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalRows = controller.totalRows;
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final totalRows = controller.totalRows;
 
-    return Container(
-      width: widthOfPitchColumn,
-      // color: Colors.grey.shade200,
-      // color: Colors.white,
-      color: Colors.green.shade100,
-      child: SingleChildScrollView(
-        controller: scrollController,
-        physics: const NeverScrollableScrollPhysics(),
-        child: Column(
-          children:
-          List.generate(totalRows, (index) {
-            final row = totalRows - 1 - index;
-            final pitch = controller.getPitchNameForRow(row);
-            return Container(
-              height: cellHeight,
-              // alignment: Alignment.centerLeft,
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(
-                    color: Colors.grey.shade400,
-                    width: 0.5,
+        return Container(
+          width: widthOfPitchColumn,
+          // color: Colors.grey.shade200,
+          // color: Colors.white,
+          color: Colors.green.shade100,
+          child: SingleChildScrollView(
+            controller: scrollController,
+            physics: const NeverScrollableScrollPhysics(),
+            child: Column(
+              children:
+              List.generate(totalRows, (index) {
+                final row = totalRows - 1 - index;
+                // No measure argument passed — defaults to
+                // controller.currentMeasure, i.e. the scale of
+                // whichever measure was most recently tapped/selected
+                // on the grid (see CompositionController.
+                // selectMeasureAtTick).
+                final pitch = controller.getPitchNameForRow(row);
+                return Container(
+                  height: cellHeight,
+                  // alignment: Alignment.centerLeft,
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: Colors.grey.shade400,
+                        width: 0.5,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              // Rotated the same way (and by the same toggle) as the
-              // pitch text inside note cells, so both stay consistent.
-              child: RotatedBox(
-                quarterTurns: controller.rotatePitchText ? 3 : 0,
-                child: Text(
-                  pitch,
-                  style: TextStyle(
-                    fontSize: cellHeight * 0.80,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
+                  // Rotated the same way (and by the same toggle) as the
+                  // pitch text inside note cells, so both stay consistent.
+                  child: RotatedBox(
+                    quarterTurns: controller.rotatePitchText ? 3 : 0,
+                    child: Text(
+                      pitch,
+                      style: TextStyle(
+                        fontSize: cellHeight * 0.80,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            );
-          }),
-        ),
-      ),
+                );
+              }),
+            ),
+          ),
+        );
+      },
     );
   }
 }

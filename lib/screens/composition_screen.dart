@@ -136,13 +136,29 @@ class _CompositionScreenState extends State<CompositionScreen>
     // just crossed this frame (half-open, so each note triggers
     // exactly once as the cursor passes it — never re-triggered on
     // later frames, never skipped on fast frames covering many ticks).
+    //
+    // Uses controller.displayNotes rather than controller.notes: a
+    // plain note comes through unchanged (isGhost: false) and plays
+    // exactly as before, but a note carrying an ornament is expanded
+    // into its short "ghost" sequence of sub-notes (see
+    // CompositionController.displayNotes / Ornament.shiftMap) — so
+    // instead of the ornamented note sounding as one long tone at its
+    // base pitch, each ghost in the sequence triggers its own tone,
+    // at its own onset tick, at its own EXACT pitch (base row shifted
+    // by its raw semitone shift — see
+    // CompositionController.getOrnamentFrequencyHz), actually playing
+    // the ornament's pattern regardless of how it's currently drawn.
     if (controller.soundEnabled) {
       final newTickInt = _playbackTick.floor();
       if (newTickInt > previousTickInt) {
-        for (final note in controller.notes) {
-          if (note.startTick >= previousTickInt &&
-              note.startTick < newTickInt) {
-            controller.playNoteSound(note);
+        for (final entry in controller.displayNotes) {
+          final n = entry.note;
+          if (n.startTick >= previousTickInt && n.startTick < newTickInt) {
+            if (entry.isGhost) {
+              controller.playGhostNoteSound(n, entry.shift);
+            } else {
+              controller.playNoteSound(n);
+            }
           }
         }
       }
@@ -611,6 +627,25 @@ class _CompositionScreenState extends State<CompositionScreen>
                                 : 'Scroll Lock: Off',
                             onPressed:
                             controller.toggleInputLocked,
+                          ),
+
+                          // LEGATO MODE — while on, tapping a note toggles
+                          // its own legato flag instead of opening the
+                          // note-edit dialog. Independent of Articulation
+                          // (a note can be legato and, say, sforzando at
+                          // the same time).
+                          IconButton(
+                            icon: Icon(
+                              Icons.timeline,
+                              color: controller.legatoMode
+                                  ? Colors.blue
+                                  : Colors.black,
+                            ),
+                            tooltip: controller.legatoMode
+                                ? 'Legato Mode: On'
+                                : 'Legato Mode: Off',
+                            onPressed:
+                            controller.toggleLegatoMode,
                           ),
 
 

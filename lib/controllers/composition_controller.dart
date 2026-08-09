@@ -1093,6 +1093,34 @@ class CompositionController extends ChangeNotifier {
   }
 
 
+  // =====================================================
+  // LEGATO MODE
+  // =====================================================
+
+  /// When on, tapping a note (in NoteBlockWidget) toggles that note's
+  /// [Note.legato] flag instead of opening the note-edit dialog — a
+  /// separate interaction mode, the same way Scroll Lock and paste
+  /// mode change what a tap does. Independent of
+  /// [Note.articulation]: legato used to be one of the mutually
+  /// exclusive Articulation values, but is now its own flag, so a
+  /// note can be legato AND carry an articulation (e.g. sforzando) at
+  /// the same time.
+  bool legatoMode = false;
+
+  void toggleLegatoMode() {
+    legatoMode = !legatoMode;
+    notifyListeners();
+  }
+
+  /// Flips [note]'s legato flag. Called from NoteBlockWidget's tap
+  /// handler while [legatoMode] is on.
+  void toggleNoteLegato(Note note) {
+    _replaceNote(
+      note.copyWith(legato: !note.legato),
+    );
+  }
+
+
   void setNoteOrnament(
       Note note,
       Ornament? ornament,
@@ -1206,6 +1234,46 @@ class CompositionController extends ChangeNotifier {
     return nearest?.accidental;
   }
 
+  /// Public wrapper around [_walkOrnamentShift], for callers (e.g.
+  /// NoteBlockWidget, when compensated notation is on) that need to
+  /// compute the walked row + leftover accidental for an ornament
+  /// ghost's RAW shift on demand, rather than having it pre-baked
+  /// into the ghost at [displayNotes] time. See [_walkOrnamentShift]
+  /// for the walking rules.
+  ({int row, int remainingShift}) resolveOrnamentWalk(int baseRow, int shift) {
+    return _walkOrnamentShift(baseRow, shift);
+  }
+
+  /// Public wrapper around [_signStringFor], for callers building a
+  /// merged ornament label from a walked leftover shift (see
+  /// [resolveOrnamentWalk]).
+  String signStringForShift(int remainingShift) => _signStringFor(remainingShift);
+
+  /// The exact frequency (Hz) an ornament ghost note should sound at:
+  /// [baseRow]'s own plain pitch (its scale degree's own alteration,
+  /// with no separate accidental — i.e. exactly as if it were an
+  /// unaltered note at that row) shifted by [shift] semitones
+  /// directly. Computed directly from the semitone count rather than
+  /// converting [shift] to an [Accidental] first, since a raw
+  /// shiftMap value can exceed what a single accidental sign can
+  /// represent (e.g. ±3) — going through an [Accidental] would
+  /// silently lose a semitone in that case. The DISPLAYED accidental
+  /// (see [displayNotes] / [resolveOrnamentWalk]) may be a simplified
+  /// or dropped representation of [shift], but the actual sound
+  /// always reflects it exactly.
+  double getOrnamentFrequencyHz({
+    required int baseRow,
+    required int startTick,
+    required int shift,
+  }) {
+    final baseFrequency = _frequencyForRowAndAccidental(
+      row: baseRow,
+      startTick: startTick,
+      accidental: null,
+    );
+    return baseFrequency * math.pow(2, shift / 12);
+  }
+
   /// The absolute frequency (Hz) [note] should sound at: the scale
   /// degree's own +/- alteration (from the measure's current scale
   /// pattern) combined with whichever accidental is actually in effect
@@ -1213,7 +1281,32 @@ class CompositionController extends ChangeNotifier {
   /// [getEffectiveAccidental]), then shifted by octave. See
   /// [_referenceFrequencyC4] for the tuning reference this is built on.
   double getNoteFrequencyHz(Note note) {
-    final measure = getMeasureAtTick(note.startTick);
+    return _frequencyForRowAndAccidental(
+      row: note.row,
+      startTick: note.startTick,
+      accidental: getEffectiveAccidental(note),
+    );
+  }
+
+  /// The exact frequency of an ornament ghost is now computed by
+  /// [getOrnamentFrequencyHz] directly from its base row and raw
+  /// shiftMap shift (see that method's doc) — a ghost no longer
+  /// carries a pre-baked, walked row/accidental of its own (see
+  /// [displayNotes]), so there's nothing left to read off the ghost
+  /// Note object itself for pitch purposes.
+
+  /// Shared pitch computation behind [getNoteFrequencyHz] and
+  /// [getOrnamentFrequencyHz]: the scale degree's own +/- alteration
+  /// at [row] (from whichever measure contains [startTick]) combined
+  /// with [accidental], then shifted by octave. See
+  /// [_referenceFrequencyC4] for the tuning reference this is built
+  /// on.
+  double _frequencyForRowAndAccidental({
+    required int row,
+    required int startTick,
+    required Accidental? accidental,
+  }) {
+    final measure = getMeasureAtTick(startTick);
     final shiftedScale = ScaleResolver.transposeScale(
       measure.scaleName,
       measure.pitchOffsetSemitones,
@@ -1223,18 +1316,16 @@ class CompositionController extends ChangeNotifier {
       return 0;
     }
 
-    final degreeIndex = note.row % scale.length;
+    final degreeIndex = row % scale.length;
     final degreeToken = scale[degreeIndex];
 
-    final effectiveAccidental = getEffectiveAccidental(note);
-
-    // A natural cancels ANY alteration in effect for this note — that
-    // includes one baked into the scale itself for this degree, not
-    // just a previous accidental. So unlike a normal +/- (which is
-    // additive on top of the scale's own sign), natural forces the
-    // scale's contribution to 0 rather than adding 0 to it.
+    // A natural cancels ANY alteration in effect — that includes one
+    // baked into the scale itself for this degree, not just a
+    // previous accidental. So unlike a normal +/- (which is additive
+    // on top of the scale's own sign), natural forces the scale's
+    // contribution to 0 rather than adding 0 to it.
     int scaleAlteration = 0;
-    if (effectiveAccidental != Accidental.natural) {
+    if (accidental != Accidental.natural) {
       if (degreeToken.endsWith('+')) {
         scaleAlteration = 1;
       } else if (degreeToken.endsWith('-')) {
@@ -1245,11 +1336,11 @@ class CompositionController extends ChangeNotifier {
     final naturalSemitone = _naturalDegreeSemitones[
     degreeIndex % _naturalDegreeSemitones.length];
 
-    final accidentalShift = effectiveAccidental != null
-        ? (_accidentalSemitoneShift[effectiveAccidental.sign] ?? 0)
-        : 0;
+    final accidentalShift =
+    accidental != null ? (_accidentalSemitoneShift[accidental.sign] ?? 0) : 0;
 
-    final octaveShift = (getOctave(note) - 4) * 12;
+    final octave = row ~/ 7;
+    final octaveShift = (octave - 4) * 12;
 
     final totalSemitonesFromC4 =
         naturalSemitone + scaleAlteration + accidentalShift + octaveShift;
@@ -1281,6 +1372,32 @@ class CompositionController extends ChangeNotifier {
     NoteSoundService.instance.playTone(
       frequencyHz: getNoteFrequencyHz(note),
       durationSeconds: getNoteDurationSeconds(note),
+    );
+  }
+
+  /// Plays an ornament "ghost" note's tone if sound is currently
+  /// enabled — same idea as [playNoteSound], but computing the exact
+  /// frequency via [getOrnamentFrequencyHz] (from [ghost]'s own base
+  /// row plus the raw semitone [shift] from its shiftMap entry)
+  /// rather than [getNoteFrequencyHz] (which would try to look up an
+  /// effective accidental for it via [notes], where a ghost was never
+  /// added — and which, going through an [Accidental], couldn't
+  /// represent a shift beyond ±2 semitones exactly anyway).
+  /// [getNoteDurationSeconds] itself only depends on
+  /// startTick/durationTicks/tempo, so it's reused as-is — a ghost's
+  /// own (much shorter) durationTicks already gives the right
+  /// sub-note length. Public so the playback loop
+  /// (composition_screen.dart) can trigger each note of an ornament's
+  /// sequence individually, at its own onset, as playback crosses it.
+  void playGhostNoteSound(Note ghost, int shift) {
+    if (!soundEnabled) return;
+    NoteSoundService.instance.playTone(
+      frequencyHz: getOrnamentFrequencyHz(
+        baseRow: ghost.row,
+        startTick: ghost.startTick,
+        shift: shift,
+      ),
+      durationSeconds: getNoteDurationSeconds(ghost),
     );
   }
 
@@ -1331,10 +1448,14 @@ class CompositionController extends ChangeNotifier {
   }
 
 
-  /// Whether notes are currently shown in "compensated" notation — see
-  /// [getCompensatedDisplay]. Purely a display switch: toggling this
-  /// never touches note.row or note.accidental, so switching back to
-  /// normal notation is instant and lossless.
+  /// Whether notes are currently shown in "compensated" notation — this
+  /// governs the pitch+accidental display of ORDINARY notes only (see
+  /// [getDisplayPitchLabel] / [getCompensatedDisplay]). It no longer
+  /// affects whether an ornament expands into its ghost sequence —
+  /// that now always happens (see [displayNotes]), since ornaments are
+  /// no longer drawn as a sign above the note. Purely a display switch:
+  /// toggling this never touches note.row or note.accidental, so
+  /// switching back to normal notation is instant and lossless.
   bool showCompensatedNotation = false;
 
   void toggleCompensatedNotation() {
@@ -1501,27 +1622,88 @@ class CompositionController extends ChangeNotifier {
   /// shifted by 1 semitone becomes the row above shown as "3-" (the
   /// 2->3 gap is a whole tone, so 1 of its 2 semitones is left over as
   /// a flat) -- not "2+" on the same row.
+  ///
+  /// The FIRST row-step is always taken, regardless of how it
+  /// compares to [shift]'s magnitude — that's the "always land on a
+  /// different row" rule above. After that forced first step, the
+  /// walk continues like [_walkToRow]: crossing further rows as long
+  /// as what's left still fully covers the next row's real semitone
+  /// gap. But a forced first step (or any step) can OVERSHOOT — e.g.
+  /// shift -1 from a degree whose neighbor below is a whole tone (2
+  /// semitones) away leaves a remainder of +1, since only 1 of the 2
+  /// semitones absorbed was actually wanted. Once that happens
+  /// (remaining's sign no longer matches the walk direction), the
+  /// walk stops immediately rather than continuing further in the
+  /// same direction — continuing would only push the leftover further
+  /// from zero, never toward it, since the correction now needed
+  /// points the opposite way. That leftover is exactly representable
+  /// as a single accidental sign on the row just reached.
   ({int row, int remainingShift}) _walkOrnamentShift(int startRow, int shift) {
     if (shift == 0) return (row: startRow, remainingShift: 0);
-    int direction = shift > 0 ? 1 : -1;
-    int nextRow = startRow + direction;
-    if (nextRow < 0 || nextRow >= totalRows) {
-      // Blocked at the edge of the grid in the requested direction —
-      // fall back to the opposite direction so the ornament still
-      // lands on a genuinely different row (with a correspondingly
-      // adjusted leftover accidental) instead of silently collapsing
-      // onto the same row as the un-shifted entries.
-      direction = -direction;
-      nextRow = startRow + direction;
-      if (nextRow < 0 || nextRow >= totalRows) {
-        // Truly nowhere to go either way (a degenerate 1-row grid).
-        return (row: startRow, remainingShift: shift);
+
+    final direction = shift > 0 ? 1 : -1;
+    int remaining = shift;
+    int currentRow = startRow;
+    bool firstStep = true;
+
+    while (remaining != 0) {
+      if (!firstStep) {
+        // A previous step already overshot — the leftover now points
+        // the OPPOSITE way from `direction`, so continuing to walk
+        // that way would only diverge further. Stop; the leftover
+        // belongs on the row we're already at.
+        final sameSignAsDirection = (remaining > 0) == (direction > 0);
+        if (!sameSignAsDirection) break;
       }
+
+      final nextRow = currentRow + direction;
+
+      if (nextRow < 0 || nextRow >= totalRows) {
+        if (!firstStep) {
+          // Ran out of grid partway through a multi-row walk — leave
+          // whatever's left on the row we'd already reached.
+          break;
+        }
+        // Blocked at the edge of the grid in the requested direction
+        // on the very first step — fall back to the opposite
+        // direction so the ornament still lands on a genuinely
+        // different row (with a correspondingly adjusted leftover
+        // accidental) instead of silently collapsing onto the same
+        // row as the un-shifted entries.
+        final oppositeDirection = -direction;
+        final oppositeRow = currentRow + oppositeDirection;
+        if (oppositeRow < 0 || oppositeRow >= totalRows) {
+          // Truly nowhere to go either way (a degenerate 1-row grid).
+          return (row: currentRow, remainingShift: remaining);
+        }
+        final stepInterval = (_naturalAbsoluteSemitone(oppositeRow) -
+            _naturalAbsoluteSemitone(currentRow))
+            .abs();
+        return (
+        row: oppositeRow,
+        remainingShift: remaining - oppositeDirection * stepInterval,
+        );
+      }
+
+      final stepInterval = (_naturalAbsoluteSemitone(nextRow) -
+          _naturalAbsoluteSemitone(currentRow))
+          .abs();
+      if (stepInterval == 0) break;
+
+      // Every step after the first only crosses if what's left still
+      // fully covers (or exceeds) this row's real gap — same
+      // condition [_walkToRow] uses. The first step ignores this and
+      // always crosses (see doc comment above).
+      if (!firstStep && remaining.abs() < stepInterval) {
+        break;
+      }
+
+      currentRow = nextRow;
+      remaining -= direction * stepInterval;
+      firstStep = false;
     }
-    final stepInterval = (_naturalAbsoluteSemitone(nextRow) -
-        _naturalAbsoluteSemitone(startRow))
-        .abs();
-    return (row: nextRow, remainingShift: shift - direction * stepInterval);
+
+    return (row: currentRow, remainingShift: remaining);
   }
 
   /// The +/- suffix for a leftover semitone amount after [_walkToRow]
@@ -1571,33 +1753,64 @@ class CompositionController extends ChangeNotifier {
     return octave * 12 + _naturalDegreeSemitones[degreeIndex];
   }
 
-  /// The notes to actually draw on the grid right now. Normally just
-  /// [notes] itself — but under compensated notation, any note
+  /// The notes to actually draw on the grid right now. Any note
   /// carrying an [Ornament] (see Ornament.shiftMap) is expanded into
   /// the short sequence of display-only "ghost" notes its shiftMap
-  /// describes: one ghost per shiftMap entry, `coeff` scaling that
-  /// ghost's slice of the original note's duration and `shift` giving
-  /// its pitch offset in semitones from the original (walked to a row
-  /// + leftover accidental the same way [getCompensatedDisplay] does).
+  /// describes — this ALWAYS happens, regardless of
+  /// [showCompensatedNotation]: ornaments are no longer drawn as a
+  /// sign above the note, so the shifted-pitch ghost sequence is the
+  /// only presentation an ornament gets.
+  ///
+  /// Each ghost keeps the underlying note's own, UNCHANGED row — the
+  /// shiftMap entry's raw semitone `shift` is carried alongside it in
+  /// the returned record rather than baked into a walked row/merged
+  /// accidental, so the caller (NoteBlockWidget) can walk it on
+  /// demand via [resolveOrnamentWalk] / [signStringForShift]. A ghost
+  /// ALWAYS displays on the genuinely different row that walk lands
+  /// on — e.g. pitch "3" shifted a semitone below shows as "2+" on
+  /// the row below, never "3-" on the same row — matching how
+  /// mordents/turns/etc. are actually notated (the auxiliary note
+  /// gets its own staff position, not an accidental on the same
+  /// line). This is independent of [showCompensatedNotation], which
+  /// only affects ORDINARY notes' display. The actual SOUND (see
+  /// [getOrnamentFrequencyHz]) is likewise unaffected by that toggle
+  /// — it's computed directly from the base row and raw shift,
+  /// exactly, regardless of how it's drawn.
+  ///
+  /// Within one note's ghost sequence, only ghosts whose raw shiftMap
+  /// `shift` is 0 (i.e. sitting at the ornament's unaltered/base
+  /// pitch) are clickable — every other ghost (any nonzero shift) is
+  /// display-only. A shiftMap can have more than one `shift: 0` entry
+  /// (e.g. the trill alternates back to it repeatedly); all of those
+  /// are clickable. Every clickable ghost's `interactionNote` points
+  /// back at the SAME real underlying note (not its own synthetic
+  /// copy, which was never added to [notes] and whose id nothing else
+  /// can look up), so tapping/dragging any of them actually edits the
+  /// real note.
+  ///
   /// Ghosts are marked (isGhost: true) so NoteBlockWidget can render
   /// them literally — using their own precomputed row/accidental
   /// directly — rather than running them back through the normal
   /// note/measure lookups, which wouldn't find them since they were
   /// never added to [notes]. The real note's own startTick/
   /// durationTicks/row/ornament are never touched; this is purely a
-  /// read-only view, same as every other compensated-notation
-  /// computation, and playback always uses the real [notes] list
+  /// read-only view. Playback always uses the real [notes] list
   /// regardless of this.
-  List<({Note note, bool isGhost})> get displayNotes {
-    if (!showCompensatedNotation) {
-      return [for (final n in notes) (note: n, isGhost: false)];
-    }
+  List<({Note note, bool isGhost, bool isClickable, Note? interactionNote, int shift})>
+  get displayNotes {
+    final result =
+    <({Note note, bool isGhost, bool isClickable, Note? interactionNote, int shift})>[];
 
-    final result = <({Note note, bool isGhost})>[];
     for (final note in notes) {
       final ornament = note.ornament;
       if (ornament == null || ornament.shiftMap.isEmpty) {
-        result.add((note: note, isGhost: false));
+        result.add((
+        note: note,
+        isGhost: false,
+        isClickable: true,
+        interactionNote: note,
+        shift: 0,
+        ));
         continue;
       }
 
@@ -1612,7 +1825,13 @@ class CompositionController extends ChangeNotifier {
             (sum, e) => sum + ((e as Map)['coeff'] as num).toDouble(),
       );
       if (totalCoeff <= 0) {
-        result.add((note: note, isGhost: false));
+        result.add((
+        note: note,
+        isGhost: false,
+        isClickable: true,
+        interactionNote: note,
+        shift: 0,
+        ));
         continue;
       }
 
@@ -1629,17 +1848,34 @@ class CompositionController extends ChangeNotifier {
         runningTick += rawDuration;
         if (subDuration <= 0) continue;
 
-        final walked = _walkOrnamentShift(note.row, shift);
-        result.add((
-        note: note.copyWith(
+        // Only the ornament's unaltered/base-pitch entries (raw
+        // shift == 0) are clickable — an ornament note actually
+        // altered in pitch (shift != 0) is display-only.
+        final isClickable = shift == 0;
+
+        // Row stays the note's own, UNCHANGED row — no walking here.
+        // The accidental is stored as the raw shift converted
+        // directly to a sign, mainly as a record of the raw value;
+        // NoteBlockWidget always walks the raw `shift` (carried
+        // separately below) to find the ghost's actual DISPLAY row
+        // and label, rather than reading this field back (see the
+        // getter's doc comment above) — this stored accidental isn't
+        // otherwise used for rendering.
+        final ghost = note.copyWith(
           id: note.id * 100 + i,
           startTick: startTickRounded,
           durationTicks: subDuration,
-          row: walked.row,
-          accidental: _accidentalForShift(walked.remainingShift),
+          row: note.row,
+          accidental: _accidentalForShift(shift),
           ornament: null,
-        ),
+        );
+
+        result.add((
+        note: ghost,
         isGhost: true,
+        isClickable: isClickable,
+        interactionNote: isClickable ? note : null,
+        shift: shift,
         ));
       }
     }

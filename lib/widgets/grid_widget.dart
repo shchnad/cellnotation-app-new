@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../controllers/composition_controller.dart';
+import '../dialogs/edit_measure_beat_dialog.dart';
+import '../dialogs/note_values_dialog.dart';
 import '../dialogs/tempo_dialog.dart';
 import '../dialogs/dynamic_dialog.dart';
 import '../dialogs/dynamic_change_dialog.dart';
@@ -45,6 +47,19 @@ class _LabelHit {
   final Rect rect;
   final bool isTempo; // true = tempo, false = dynamic
   _LabelHit(this.tick, this.rect, this.isTempo);
+}
+
+// Tap target for the scale name drawn at the top of the grid (see
+// GridPainter's SCALE NAME section). measureIndex is whichever
+// measure the label actually belongs to — the first measure, or
+// wherever the scale changes from the previous measure — matching
+// exactly which measures GridPainter draws a label for in the first
+// place (a label isn't repeated for every measure, only where it
+// changes).
+class _ScaleLabelHit {
+  final int measureIndex;
+  final Rect rect;
+  _ScaleLabelHit(this.measureIndex, this.rect);
 }
 
 // Tap target for a dynamic change (crescendo/diminuendo start/finish)
@@ -135,6 +150,37 @@ List<_LabelHit> _computeLabelHits(
   return hits;
 }
 
+/// Computes tap-target rects for the scale name drawn at the top of
+/// the grid — mirrors GridPainter's own SCALE NAME drawing exactly
+/// (same "first measure, or wherever the scale changes" condition,
+/// same position), so the tap target always lines up with what's
+/// actually visible.
+List<_ScaleLabelHit> _computeScaleLabelHits(
+    CompositionController controller,
+    double pixelsPerTick,
+    ) {
+  final hits = <_ScaleLabelHit>[];
+  final measures = controller.measures;
+
+  for (int i = 0; i < measures.length; i++) {
+    final measure = measures[i];
+    final scaleChanged =
+        i > 0 && measures[i - 1].scaleName != measure.scaleName;
+    if (i != 0 && !scaleChanged) continue;
+
+    final x = measure.startTick * pixelsPerTick;
+    final tp = _scaleTextPainter(measure.scaleName);
+    hits.add(
+      _ScaleLabelHit(
+        i,
+        Rect.fromLTWH(x + _labelOffsetX, _topMargin, tp.width, tp.height),
+      ),
+    );
+  }
+
+  return hits;
+}
+
 /// Computes tap-target rects for the green crescendo/diminuendo start &
 /// finish lines. Each line spans the full grid height, so the hit rect is
 /// just a thin vertical strip centered on the line's x position.
@@ -210,7 +256,21 @@ class GridWidget extends StatelessWidget {
                   Positioned.fill(
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
-                      onTapDown: (details) {
+                      // Deliberately onTapUp (fires only once a tap is
+                      // confirmed to NOT be the first half of a double
+                      // tap), not onTapDown (which fires immediately on
+                      // every touch regardless of what follows).
+                      // Providing both this and onDoubleTapDown below
+                      // makes Flutter insert the standard double-tap
+                      // disambiguation delay before this fires — the
+                      // tradeoff that buys double-tapping empty grid
+                      // space (onDoubleTapDown) without a note getting
+                      // created first. A double-tap directly ON an
+                      // existing note is unaffected by any of this — the
+                      // note's own GestureDetector (see NoteBlockWidget)
+                      // sits on top in the Stack and captures the touch
+                      // before it ever reaches this background detector.
+                      onTapUp: (details) {
                         if (controller.editingBlocked) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -235,7 +295,39 @@ class GridWidget extends StatelessWidget {
                           controller.selectMeasureAtTick(tappedTick);
                         }
 
-                        // 1. Check tempo/dynamic labels first — tapping a
+                        // 1. Check the scale name label at the top —
+                        //    tapping it opens a scale picker for that
+                        //    measure, not creating a note.
+                        final scaleLabelHits = _computeScaleLabelHits(
+                          controller,
+                          pixelsPerTick,
+                        );
+
+                        for (final hit in scaleLabelHits) {
+                          if (hit.rect.contains(details.localPosition)) {
+                            final measure =
+                            controller.measures[hit.measureIndex];
+                            noteValuesDialog<String>(
+                              context: context,
+                              currentValue: measure.scaleName,
+                              onSelected: (newScale) {
+                                controller.updateMeasureScale(
+                                  hit.measureIndex,
+                                  newScale,
+                                );
+                              },
+                              title: 'Select Scale',
+                              values: controller.availableScales,
+                              labelBuilder: (s) =>
+                                  ScaleResolver.normalizeScaleName(s),
+                              numberOfColumns: 2,
+                              allowToCloseNextWindow: false,
+                            );
+                            return; // don't fall through to note creation
+                          }
+                        }
+
+                        // 2. Check tempo/dynamic labels next — tapping a
                         //    label should open its edit dialog, not create
                         //    a note.
                         final labelHits = _computeLabelHits(
@@ -255,7 +347,7 @@ class GridWidget extends StatelessWidget {
                           }
                         }
 
-                        // 2. Check crescendo/diminuendo start & finish
+                        // 3. Check crescendo/diminuendo start & finish
                         //    lines next — tapping one opens the dynamic
                         //    change dialog instead of creating a note.
                         final dynamicChangeLineHits =
@@ -272,7 +364,7 @@ class GridWidget extends StatelessWidget {
                           }
                         }
 
-                        // 3. Otherwise, normal grid/note tap handling.
+                        // 4. Otherwise, normal grid/note tap handling.
                         // The tapped screen position is converted to a
                         // musical row: row 0 (lowest pitch) sits at the
                         // BOTTOM of the grid, so a tap near the bottom
@@ -300,6 +392,48 @@ class GridWidget extends StatelessWidget {
                           }
                         }
                       },
+                      // Double-tapping empty grid space (no note there —
+                      // a tap on an actual note is captured by that
+                      // note's own detector first, see the comment
+                      // above) opens the edit-measure-beat dialog
+                      // directly, computed straight from the tapped
+                      // position — no note is created as a side effect
+                      // first.
+                      onDoubleTapDown: (details) {
+                        if (controller.editingBlocked) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                controller.editingBlockedMessage,
+                                style: const TextStyle(fontSize: 22),
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+
+                        final rawTick =
+                        (details.localPosition.dx / pixelsPerTick)
+                            .floor()
+                            .clamp(0, controller.maxTicks - 1);
+
+                        if (controller.maxTicks > 0) {
+                          controller.selectMeasureAtTick(rawTick);
+                        }
+
+                        final measure = controller.getMeasureAtTick(rawTick);
+                        final measureIndex =
+                        controller.measures.indexOf(measure);
+                        final beatIndex = (rawTick - measure.startTick) ~/
+                            measure.timeSignature.ticksPerBeat;
+
+                        editMeasureBeatDialog(
+                          context: context,
+                          controller: controller,
+                          measureIndex: measureIndex,
+                          beatIndex: beatIndex,
+                        );
+                      },
                       child: CustomPaint(
                         painter: GridPainter(
                           controller: controller,
@@ -310,11 +444,16 @@ class GridWidget extends StatelessWidget {
                     ),
                   ),
 
-                  // NOTES — displayNotes is just controller.notes
-                  // unchanged outside compensated notation; under it,
-                  // a note with an ornament expands into its ghost
-                  // sequence (see Ornament.shiftMap /
-                  // CompositionController.displayNotes).
+                  // NOTES — displayNotes expands any note carrying an
+                  // ornament into its ghost sequence (see Ornament.shiftMap /
+                  // CompositionController.displayNotes). Only the ghost(s)
+                  // at the ornament's own unaltered/base pitch (raw
+                  // shift == 0) are clickable and carry an
+                  // interactionNote pointing back at the real note —
+                  // every other ghost in the sequence is display-only.
+                  // Each ghost's raw shift is passed through as
+                  // ornamentShift so NoteBlockWidget can interpret it
+                  // according to the compensated-notation toggle.
                   ...controller.displayNotes.map(
                         (entry) => NoteBlockWidget(
                       key: ValueKey(entry.note.id),
@@ -323,6 +462,9 @@ class GridWidget extends StatelessWidget {
                       cellHeight: cellHeight,
                       controller: controller,
                       isCompensatedGhost: entry.isGhost,
+                      isClickable: entry.isClickable,
+                      interactionNote: entry.interactionNote,
+                      ornamentShift: entry.shift,
                     ),
                   ),
                 ],

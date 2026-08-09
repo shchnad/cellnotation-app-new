@@ -18,6 +18,15 @@ class Note {
   final Articulation? articulation;
   final PlayingTechnique? playingTechnique;
 
+  /// Whether this note is played legato. Previously this lived as a
+  /// value inside the [Articulation] enum (mutually exclusive with
+  /// staccato/tenuto/marcato/accent/sforzando); it's now a separate,
+  /// independent flag, so a note can be legato AND carry an
+  /// articulation at the same time (e.g. a legato sforzando note).
+  /// Toggled via CompositionController.toggleNoteLegato while Legato
+  /// Mode is on (see CompositionController.legatoMode).
+  final bool legato;
+
   const Note({
     required this.id,
     required this.startTick,
@@ -29,6 +38,7 @@ class Note {
     this.ornament,
     this.articulation,
     this.playingTechnique,
+    this.legato = false,
   });
 
   // ================= COPY =================
@@ -44,6 +54,7 @@ class Note {
     Object? ornament = _keep,
     Object? articulation = _keep,
     Object? playingTechnique = _keep,
+    bool? legato,
   }) {
 
     return Note(
@@ -67,6 +78,7 @@ class Note {
       playingTechnique: playingTechnique == _keep
           ? this.playingTechnique
           : playingTechnique as PlayingTechnique?,
+      legato: legato ?? this.legato,
     );
   }
 
@@ -86,6 +98,7 @@ class Note {
       if (ornament != null) 'ornament': ornament!.name,
       if (articulation != null) 'articulation': articulation!.name,
       if (playingTechnique != null) 'playingTechnique': playingTechnique!.name,
+      'legato': legato,
     };
   }
 
@@ -94,6 +107,33 @@ class Note {
 
   // ================= FROM JSON =================
 
+  /// Looks up [raw] (expected to be the enum member's `.name` string,
+  /// as written by [toJson]) in [values], returning null instead of
+  /// throwing if it's missing or no longer matches any member —
+  /// e.g. after an enum member gets renamed or removed following a
+  /// code change, an OLDER saved composition may still reference the
+  /// old name. Without this, [Enum.values.byName] throws
+  /// ArgumentError for an unrecognized name, which — since this runs
+  /// inside a Firestore snapshot's .map() in CompositionService —
+  /// would crash the ENTIRE composition list stream, not just fail to
+  /// load the one bad note. Losing just that one field (falling back
+  /// to null/unset) is far preferable to that.
+  static T? _enumByNameOrNull<T extends Enum>(List<T> values, dynamic raw) {
+    if (raw == null) return null;
+    try {
+      return values.byName(raw as String);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Reads [key] as an int, tolerating it having been stored as a
+  /// double (Firestore's numeric type can vary depending on how a
+  /// value was originally written) rather than throwing a type-cast
+  /// error.
+  static int _readInt(Map<String, dynamic> json, String key) {
+    return (json[key] as num).toInt();
+  }
 
   factory Note.fromJson(
       Map<String, dynamic> json,
@@ -104,71 +144,56 @@ class Note {
 
 
       id:
-      json['id'] as int,
+      _readInt(json, 'id'),
 
 
       startTick:
-      json['startTick'] as int,
+      _readInt(json, 'startTick'),
 
 
       durationTicks:
-      json['durationTicks'] as int,
+      _readInt(json, 'durationTicks'),
 
 
       row:
-      json['row'] as int,
+      _readInt(json, 'row'),
 
 
 
       hand:
-      Hand.values.byName(
-        json['hand'],
-      ),
+      // hand is required/non-nullable, so an unrecognized or missing
+      // value falls back to a sane default (right hand) rather than
+      // having nothing to fall back to.
+      _enumByNameOrNull(Hand.values, json['hand']) ?? Hand.right,
 
 
 
       finger:
-      json['finger'] == null
-          ? null
-          : Finger.values.byName(
-        json['finger'],
-      ),
+      _enumByNameOrNull(Finger.values, json['finger']),
 
 
 
       accidental:
-      json['accidental'] == null
-          ? null
-          : Accidental.values.byName(
-        json['accidental'],
-      ),
+      _enumByNameOrNull(Accidental.values, json['accidental']),
 
 
 
       ornament:
-      json['ornament'] == null
-          ? null
-          : Ornament.values.byName(
-        json['ornament'],
-      ),
+      _enumByNameOrNull(Ornament.values, json['ornament']),
 
 
 
       articulation:
-      json['articulation'] == null
-          ? null
-          : Articulation.values.byName(
-        json['articulation'],
-      ),
+      _enumByNameOrNull(Articulation.values, json['articulation']),
 
 
 
       playingTechnique:
-      json['playingTechnique'] == null
-          ? null
-          : PlayingTechnique.values.byName(
-        json['playingTechnique'],
-      ),
+      _enumByNameOrNull(PlayingTechnique.values, json['playingTechnique']),
+
+
+      legato:
+      json['legato'] as bool? ?? false,
 
 
     );
@@ -177,7 +202,7 @@ class Note {
   }
 
 
- // The final tick position where the note ends.
+  // The final tick position where the note ends.
   int get endTick => startTick + durationTicks;
 
 }
