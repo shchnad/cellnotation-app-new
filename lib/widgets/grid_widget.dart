@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../controllers/composition_controller.dart';
 import '../dialogs/edit_measure_beat_dialog.dart';
-import '../dialogs/note_values_dialog.dart';
+import '../dialogs/scale_dialog.dart';
 import '../dialogs/tempo_dialog.dart';
 import '../dialogs/dynamic_dialog.dart';
 import '../dialogs/dynamic_change_dialog.dart';
@@ -26,9 +26,9 @@ const _dynamicLabelStyle = TextStyle(
 );
 
 /// scale name — drawn at the TOP of the grid, same size/weight as the
-/// tempo label at the bottom, in red.
+/// tempo label at the bottom, in blue.
 const _scaleLabelStyle = TextStyle(
-  color: Colors.red,
+  color: Colors.blue,
   fontSize: 22,
   fontWeight: FontWeight.bold,
 );
@@ -307,21 +307,16 @@ class GridWidget extends StatelessWidget {
                           if (hit.rect.contains(details.localPosition)) {
                             final measure =
                             controller.measures[hit.measureIndex];
-                            noteValuesDialog<String>(
+                            scaleDialog(
                               context: context,
-                              currentValue: measure.scaleName,
+                              controller: controller,
+                              currentScale: measure.scaleName,
                               onSelected: (newScale) {
                                 controller.updateMeasureScale(
                                   hit.measureIndex,
                                   newScale,
                                 );
                               },
-                              title: 'Select Scale',
-                              values: controller.availableScales,
-                              labelBuilder: (s) =>
-                                  ScaleResolver.normalizeScaleName(s),
-                              numberOfColumns: 2,
-                              allowToCloseNextWindow: false,
                             );
                             return; // don't fall through to note creation
                           }
@@ -710,7 +705,7 @@ class GridPainter extends CustomPainter {
       }
 
       // SCALE NAME — drawn at the top of the grid, same way the tempo
-      // label is drawn at the bottom, but red. Only shown for the
+      // label is drawn at the bottom, but blue. Only shown for the
       // first measure and wherever the scale actually changes (same
       // condition as the double measure-line above) — not repeated on
       // every single measure.

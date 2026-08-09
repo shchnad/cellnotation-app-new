@@ -39,7 +39,7 @@ class PitchColumnWidget extends StatelessWidget {
           width: widthOfPitchColumn,
           // color: Colors.grey.shade200,
           // color: Colors.white,
-          color: Colors.green.shade100,
+          color: Colors.grey.shade300,
           child: SingleChildScrollView(
             controller: scrollController,
             physics: const NeverScrollableScrollPhysics(),

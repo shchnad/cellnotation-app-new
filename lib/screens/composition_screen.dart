@@ -824,7 +824,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                       foregroundColor: Colors.black,
                     ),
                     icon: const Icon(
-                      Icons.playlist_add,
+                      Icons.copy,
                       size: 22,
                       // color: Colors.black,
                     ),
