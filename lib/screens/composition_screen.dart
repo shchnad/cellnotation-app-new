@@ -144,10 +144,13 @@ class _CompositionScreenState extends State<CompositionScreen>
     // CompositionController.displayNotes / Ornament.shiftMap) — so
     // instead of the ornamented note sounding as one long tone at its
     // base pitch, each ghost in the sequence triggers its own tone,
-    // at its own onset tick, at its own EXACT pitch (base row shifted
-    // by its raw semitone shift — see
-    // CompositionController.getOrnamentFrequencyHz), actually playing
-    // the ornament's pattern regardless of how it's currently drawn.
+    // at its own onset tick, at its own EXACT pitch (the real note's
+    // own actual pitch — accidental included — shifted by its raw
+    // semitone shift; see CompositionController.getOrnamentFrequencyHz),
+    // actually playing the ornament's pattern regardless of how it's
+    // currently drawn. entry.interactionNote is always the real
+    // underlying note for a ghost (not just when clickable), which is
+    // what supplies that actual pitch.
     if (controller.soundEnabled) {
       final newTickInt = _playbackTick.floor();
       if (newTickInt > previousTickInt) {
@@ -155,7 +158,11 @@ class _CompositionScreenState extends State<CompositionScreen>
           final n = entry.note;
           if (n.startTick >= previousTickInt && n.startTick < newTickInt) {
             if (entry.isGhost) {
-              controller.playGhostNoteSound(n, entry.shift);
+              controller.playGhostNoteSound(
+                n,
+                entry.interactionNote!,
+                entry.shift,
+              );
             } else {
               controller.playNoteSound(n);
             }

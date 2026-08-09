@@ -95,14 +95,17 @@ class NoteBlockWidget extends StatefulWidget {
   /// For a ghost only: the RAW semitone shift from its ornament's
   /// shiftMap entry (0 for the ornament's own unaltered/base-pitch
   /// ghosts, and for every non-ghost note). [note]'s own row is
-  /// always the underlying note's UNCHANGED row; this shift is what
-  /// build() walks (via [CompositionController.resolveOrnamentWalk])
-  /// to find the genuinely different row the ghost actually displays
-  /// on — e.g. pitch "3" shifted by a semitone below shows as "2+" on
-  /// the row below, not "3-" on the same row. This walking is always
-  /// applied for ghosts, regardless of
-  /// [CompositionController.showCompensatedNotation] (that toggle
-  /// only affects ORDINARY notes' display).
+  /// always the underlying note's UNCHANGED row. build() branches on
+  /// whether this is 0: a shift of 0 means this ghost IS the note's
+  /// own actual pitch, so it renders exactly like the real note would
+  /// (via [interactionNote], respecting
+  /// [CompositionController.showCompensatedNotation] and the note's
+  /// own accidental, same as an ordinary note); a nonzero shift walks
+  /// (via [CompositionController.getOrnamentGhostDisplay], which
+  /// starts from the note's own ACTUAL pitch — accidental included —
+  /// not the bare scale degree) to a genuinely different row
+  /// regardless of that toggle — e.g. pitch "3" shifted by a semitone
+  /// below shows as "2+" on the row below, not "3-" on the same row.
   final int ornamentShift;
 
   const NoteBlockWidget({
@@ -208,31 +211,52 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
     // regardless of which branch runs.
     int ghostWalkedRow = note.row;
     if (isGhost) {
-      // An ornament ghost ALWAYS shows its shift by moving to a
-      // genuinely different row (walking, via resolveOrnamentWalk)
-      // rather than staying on the base note's row with an
-      // accidental — this is how mordents/turns/etc. are actually
-      // notated: the auxiliary note gets its own staff position, not
-      // an accidental glued onto the same line. E.g. a note at
-      // pitch "3" with a semitone-below shift shows as "2+" on the
-      // row below, not "3-" on the same row. This is independent of
-      // the compensated-notation toggle, which only affects ORDINARY
-      // notes' display (see the else branch below) — a ghost's
-      // actual SOUND (see CompositionController.getOrnamentFrequencyHz)
-      // is unaffected either way, since it's computed directly from
-      // the base row and raw shift regardless of how it's drawn.
-      final measure = controller.getMeasureAtTick(note.startTick);
-      final walked =
-      controller.resolveOrnamentWalk(note.row, widget.ornamentShift);
-      final baseDigit = controller.getPitchNameForRow(walked.row, measure);
-      final strippedDigit =
-      baseDigit.endsWith('+') || baseDigit.endsWith('-')
-          ? baseDigit.substring(0, baseDigit.length - 1)
-          : baseDigit;
-      final leftoverSign = controller.signStringForShift(walked.remainingShift);
-      pitch = '$strippedDigit$leftoverSign';
-      accidental = '';
-      ghostWalkedRow = walked.row;
+      // `interactionNote` (computed above) is always the REAL
+      // underlying note for a ghost now — used here as the source of
+      // truth for pitch, not the ghost's own synthetic copy.
+      if (widget.ornamentShift == 0) {
+        // A shift of 0 means this ghost IS the note's own actual
+        // pitch (an ornament's "unaltered" entries — e.g. the notes
+        // either side of a mordent's auxiliary) — so it renders
+        // EXACTLY like the real note would on its own, respecting
+        // the compensated-notation toggle and the note's own
+        // accidental, the same as the non-ghost branch below.
+        if (controller.showCompensatedNotation) {
+          final compensated = controller.getCompensatedDisplay(interactionNote);
+          pitch = compensated.label;
+          accidental = '';
+          ghostWalkedRow = compensated.row;
+        } else {
+          final measure = controller.getMeasureAtTick(interactionNote.startTick);
+          pitch = controller.getPitchNameForRow(interactionNote.row, measure);
+          final effectiveAccidental =
+          controller.getEffectiveAccidental(interactionNote);
+          accidental = effectiveAccidental?.sign ?? '';
+          ghostWalkedRow = interactionNote.row;
+        }
+      } else {
+        // A genuinely shifted ornament note ALWAYS shows its shift by
+        // moving to a different row (walking) rather than staying on
+        // the base note's row with an accidental — this is how
+        // mordents/turns/etc. are actually notated: the auxiliary
+        // note gets its own staff position, not an accidental glued
+        // onto the same line. The walk starts from the real note's
+        // OWN ACTUAL pitch (its accidental included, not the bare
+        // scale degree — see getOrnamentGhostDisplay), so an ornament
+        // on an already-altered note still lands on the musically
+        // correct pitch. E.g. a note at pitch "3" with a semitone-
+        // below shift shows as "2+" on the row below, not "3-" on the
+        // same row. This is independent of the compensated-notation
+        // toggle, which only affects the shift==0 case above and
+        // ordinary notes (see the else branch below).
+        final result = controller.getOrnamentGhostDisplay(
+          interactionNote,
+          widget.ornamentShift,
+        );
+        pitch = result.label;
+        accidental = '';
+        ghostWalkedRow = result.row;
+      }
     } else {
       // Under normal notation, show the note's own effective
       // accidental as a separate glyph next to the pitch — "x"
