@@ -7,6 +7,7 @@ import 'package:music_composer/utils/default_values.dart';
 import '../enums/accidental.dart';
 import '../enums/dynamic_change.dart';
 import '../enums/finger.dart';
+import '../enums/glissando_direction.dart';
 import '../enums/musical_dynamic.dart';
 import '../enums/ornament.dart';
 import '../enums/playing_technique.dart';
@@ -1121,6 +1122,163 @@ class CompositionController extends ChangeNotifier {
   }
 
 
+  // =====================================================
+  // GLISSANDO
+  // =====================================================
+
+  // The note a glissando is currently being set up for, and which
+  // direction was chosen — non-null while waiting for the person to
+  // tap the grid to choose the end row (see [startGlissandoPick] /
+  // [finishGlissandoPick]). Mirrors the existing copy/paste pattern
+  // ([copiedNote]/[pasteMode]): a pending interaction that the next
+  // relevant grid tap completes.
+  Note? _pendingGlissandoNote;
+  GlissandoDirection? _pendingGlissandoDirection;
+
+  /// Whether the grid's next tap should be interpreted as choosing a
+  /// glissando's end row (see [finishGlissandoPick]) rather than its
+  /// normal behavior (creating a note, opening a label dialog, etc.).
+  bool get isPickingGlissandoEndRow => _pendingGlissandoNote != null;
+
+  /// Begins the "pick the end row" interaction for a glissando
+  /// starting at [note] in [direction] — call this from wherever the
+  /// direction is chosen (e.g. NoteDialog's Glissando field), then
+  /// close any dialogs so the person can tap the target row on the
+  /// grid. GridWidget checks [isPickingGlissandoEndRow] and routes
+  /// its next tap to [finishGlissandoPick] instead of normal tap
+  /// handling.
+  void startGlissandoPick(Note note, GlissandoDirection direction) {
+    _pendingGlissandoNote = note;
+    _pendingGlissandoDirection = direction;
+    notifyListeners();
+  }
+
+  /// Cancels a pending [startGlissandoPick] without generating
+  /// anything — e.g. if the person wants to back out before tapping
+  /// an end row.
+  void cancelGlissandoPick() {
+    _pendingGlissandoNote = null;
+    _pendingGlissandoDirection = null;
+    notifyListeners();
+  }
+
+  /// Completes a pending [startGlissandoPick]: generates the run of
+  /// 1/32-duration notes from [_pendingGlissandoNote]'s own row to
+  /// [endRow] and stamps the direction onto the anchor note. Called
+  /// by GridWidget with the row that was tapped while
+  /// [isPickingGlissandoEndRow] is true.
+  ///
+  /// The run starts at the row NEXT TO the anchor (not a duplicate
+  /// note at the anchor's own row/pitch, since the anchor itself
+  /// already sounds that pitch) and continues, one note per row, to
+  /// [endRow] INCLUSIVE. "Up" requires [endRow] to be above the
+  /// anchor's row and "down" requires it to be below — an [endRow] on
+  /// the wrong side (or equal to the anchor's own row) is rejected
+  /// without generating anything or clearing the pending pick, so the
+  /// person can just tap again. Returns a short message to show (e.g.
+  /// via a SnackBar) on rejection, or null on success.
+  ///
+  /// Each generated note's pitch always reads as the plain natural
+  /// degree number for its row (1-7, cycling — see
+  /// [getDisplayPitchLabel]) and sounds at the plain "white key"
+  /// pitch for that row (see [getWhiteKeyFrequencyHz]), deliberately
+  /// ignoring the composition's current scale — the same way a piano
+  /// glissando runs straight across the white keys regardless of key
+  /// signature. Generated notes are marked via
+  /// [Note.glissandoSourceId] pointing back at the anchor's id, so a
+  /// later [clearNoteGlissando] (or a re-pick, which calls it
+  /// internally first) can find and remove the whole run together.
+  ///
+  /// Overlaps with whatever notes already occupy that space aren't
+  /// checked for — the generated run is simply added on top.
+  String? finishGlissandoPick(int endRow) {
+    final pendingNote = _pendingGlissandoNote;
+    final direction = _pendingGlissandoDirection;
+    if (pendingNote == null || direction == null) return null;
+
+    if (endRow < 0 || endRow >= totalRows) {
+      return 'That row is outside the grid';
+    }
+
+    final isUp = direction == GlissandoDirection.up;
+    if (isUp && endRow <= pendingNote.row) {
+      return 'Glissando Up needs an end row above the note';
+    }
+    if (!isUp && endRow >= pendingNote.row) {
+      return 'Glissando Down needs an end row below the note';
+    }
+
+    final anchorIndex = notes.indexWhere((n) => n.id == pendingNote.id);
+    if (anchorIndex == -1) {
+      _pendingGlissandoNote = null;
+      _pendingGlissandoDirection = null;
+      notifyListeners();
+      return 'That note no longer exists';
+    }
+
+    // Work from the current, live copy of the anchor (it may have
+    // moved/changed since startGlissandoPick was called), and remove
+    // any previous run belonging to it first — covers both "clear and
+    // re-pick with a new direction/end row" and simple regeneration.
+    final anchor = notes[anchorIndex];
+    notes.removeWhere((n) => n.glissandoSourceId == anchor.id);
+    final refreshedIndex = notes.indexWhere((n) => n.id == anchor.id);
+    notes[refreshedIndex] = anchor.copyWith(glissando: direction);
+
+    final stepTicks = NoteDuration.thirtySecond.ticks;
+    int runningTick = notes[refreshedIndex].endTick;
+    final rows = isUp
+        ? [for (int r = anchor.row + 1; r <= endRow; r++) r]
+        : [for (int r = anchor.row - 1; r >= endRow; r--) r];
+
+    for (final row in rows) {
+      notes.add(Note(
+        id: generateNoteId(),
+        startTick: runningTick,
+        durationTicks: stepTicks,
+        row: row,
+        hand: anchor.hand,
+        glissandoSourceId: anchor.id,
+      ));
+      runningTick += stepTicks;
+    }
+
+    _pendingGlissandoNote = null;
+    _pendingGlissandoDirection = null;
+    notifyListeners();
+    return null;
+  }
+
+  /// Removes [note]'s glissando entirely: clears its
+  /// [Note.glissando] field and deletes every generated run note that
+  /// points back at it (see [Note.glissandoSourceId]). Called from
+  /// wherever the glissando field's dialog offers a "Delete"/clear
+  /// action.
+  void clearNoteGlissando(Note note) {
+    final index = notes.indexWhere((n) => n.id == note.id);
+    if (index == -1) return;
+    notes[index] = notes[index].copyWith(glissando: null);
+    notes.removeWhere((n) => n.glissandoSourceId == note.id);
+    notifyListeners();
+  }
+
+  /// The frequency (Hz) of the plain, unaltered "white key" pitch at
+  /// [row] — the scale's own alteration for that degree and any
+  /// accidental are both deliberately ignored, unlike
+  /// [getNoteFrequencyHz]. Used only for glissando run notes (see
+  /// [Note.glissandoSourceId]), which are meant to sound like a real
+  /// piano glissando sweeping straight across the white keys
+  /// regardless of the composition's current scale.
+  double getWhiteKeyFrequencyHz(int row) {
+    // _naturalAbsoluteSemitone is already absolute from octave 0
+    // degree 1 ("do"); _referenceFrequencyC4 anchors octave 4 degree
+    // 1 — i.e. absolute semitone 4*12 — so subtracting that lines the
+    // two up the same way getNoteFrequencyHz's octaveShift does.
+    final totalSemitonesFromC4 = _naturalAbsoluteSemitone(row) - 4 * 12;
+    return _referenceFrequencyC4 * math.pow(2, totalSemitonesFromC4 / 12);
+  }
+
+
   void setNoteOrnament(
       Note note,
       Ornament? ornament,
@@ -1351,11 +1509,20 @@ class CompositionController extends ChangeNotifier {
   /// Plays [note]'s tone if sound is currently enabled. Public so both
   /// this controller (on note creation) and the playback loop
   /// (composition_screen.dart, as it scrolls past each note's start
-  /// tick) can trigger it.
+  /// tick) can trigger it. A glissando run note (see
+  /// [Note.glissandoSourceId]) sounds at its plain "white key" pitch
+  /// (see [getWhiteKeyFrequencyHz]) rather than the scale-driven pitch
+  /// [getNoteFrequencyHz] would give it — this is what makes the
+  /// playback loop, which already calls this for every ordinary note
+  /// including generated glissando run notes, play them correctly
+  /// with no changes needed on the playback side itself.
   void playNoteSound(Note note) {
     if (!soundEnabled) return;
+    final frequencyHz = note.glissandoSourceId != null
+        ? getWhiteKeyFrequencyHz(note.row)
+        : getNoteFrequencyHz(note);
     NoteSoundService.instance.playTone(
-      frequencyHz: getNoteFrequencyHz(note),
+      frequencyHz: frequencyHz,
       durationSeconds: getNoteDurationSeconds(note),
     );
   }
@@ -1492,14 +1659,22 @@ class CompositionController extends ChangeNotifier {
     return 'Editing is currently disabled';
   }
 
-  /// The pitch label to actually display for [note]: under compensated
+  /// The pitch label to actually display for [note]: a glissando run
+  /// note (see [Note.glissandoSourceId]) always shows the plain
+  /// natural degree number for its row (1-7, cycling — via
+  /// [getDegree]), regardless of [showCompensatedNotation] or the
+  /// composition's scale — matching how a real piano glissando runs
+  /// straight across the white keys. Otherwise: under compensated
   /// notation this is the full computed word from
-  /// [getCompensatedDisplay] — e.g. scale sign "1+" plus accidental "+"
-  /// becomes "2", or "1+" plus accidental "-" stays "1" at the same
-  /// row. Outside compensated mode it's just the plain scale label for
-  /// the row (e.g. "4+"); the accidental itself is drawn separately by
-  /// the caller in that mode.
+  /// [getCompensatedDisplay] — e.g. scale sign "1+" plus accidental
+  /// "+" becomes "2", or "1+" plus accidental "-" stays "1" at the
+  /// same row. Outside compensated mode it's just the plain scale
+  /// label for the row (e.g. "4+"); the accidental itself is drawn
+  /// separately by the caller in that mode.
   String getDisplayPitchLabel(Note note) {
+    if (note.glissandoSourceId != null) {
+      return getDegree(note).toString();
+    }
     if (showCompensatedNotation) {
       return getCompensatedDisplay(note).label;
     }

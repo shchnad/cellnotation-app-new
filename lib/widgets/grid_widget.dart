@@ -283,7 +283,36 @@ class GridWidget extends StatelessWidget {
                           return;
                         }
 
-                        // 0. Whatever else this tap does, it also tells us
+                        // 0. If a glissando end-row pick is pending
+                        //    (see CompositionController.
+                        //    startGlissandoPick, kicked off from
+                        //    NoteDialog's Glissando field), this tap
+                        //    ONLY completes that — it doesn't select a
+                        //    measure, open a label dialog, or create a
+                        //    note. An invalid pick (wrong side of the
+                        //    note, or off-grid) shows a message and
+                        //    stays in picking mode so the person can
+                        //    just tap again.
+                        if (controller.isPickingGlissandoEndRow) {
+                          final visualRow =
+                          (details.localPosition.dy / cellHeight).floor();
+                          final row = controller.totalRows - 1 - visualRow;
+                          final errorMessage =
+                          controller.finishGlissandoPick(row);
+                          if (errorMessage != null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  errorMessage,
+                                  style: const TextStyle(fontSize: 22),
+                                ),
+                              ),
+                            );
+                          }
+                          return;
+                        }
+
+                        // 1. Whatever else this tap does, it also tells us
                         //    which measure the person is pointing at — so
                         //    the pitch column can switch to that measure's
                         //    scale.
@@ -295,7 +324,7 @@ class GridWidget extends StatelessWidget {
                           controller.selectMeasureAtTick(tappedTick);
                         }
 
-                        // 1. Check the scale name label at the top —
+                        // 2. Check the scale name label at the top —
                         //    tapping it opens a scale picker for that
                         //    measure, not creating a note.
                         final scaleLabelHits = _computeScaleLabelHits(
@@ -322,7 +351,7 @@ class GridWidget extends StatelessWidget {
                           }
                         }
 
-                        // 2. Check tempo/dynamic labels next — tapping a
+                        // 3. Check tempo/dynamic labels next — tapping a
                         //    label should open its edit dialog, not create
                         //    a note.
                         final labelHits = _computeLabelHits(
@@ -342,7 +371,7 @@ class GridWidget extends StatelessWidget {
                           }
                         }
 
-                        // 3. Check crescendo/diminuendo start & finish
+                        // 4. Check crescendo/diminuendo start & finish
                         //    lines next — tapping one opens the dynamic
                         //    change dialog instead of creating a note.
                         final dynamicChangeLineHits =
@@ -359,7 +388,7 @@ class GridWidget extends StatelessWidget {
                           }
                         }
 
-                        // 4. Otherwise, normal grid/note tap handling.
+                        // 5. Otherwise, normal grid/note tap handling.
                         // The tapped screen position is converted to a
                         // musical row: row 0 (lowest pitch) sits at the
                         // BOTTOM of the grid, so a tap near the bottom
@@ -404,6 +433,16 @@ class GridWidget extends StatelessWidget {
                               ),
                             ),
                           );
+                          return;
+                        }
+
+                        // While waiting for a glissando end-row tap
+                        // (see onTapUp above), a double-tap shouldn't
+                        // open the measure/beat dialog either — it's
+                        // still just an ordinary single tap as far as
+                        // that pending pick is concerned, and onTapUp
+                        // already handles it.
+                        if (controller.isPickingGlissandoEndRow) {
                           return;
                         }
 

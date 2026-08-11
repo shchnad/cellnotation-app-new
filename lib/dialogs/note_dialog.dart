@@ -4,6 +4,7 @@ import 'package:music_composer/enums/articulation.dart';
 import '../controllers/composition_controller.dart';
 import '../enums/accidental.dart';
 import '../enums/finger.dart';
+import '../enums/glissando_direction.dart';
 import '../enums/hand.dart';
 import '../enums/note_duration.dart';
 import '../enums/ornament.dart';
@@ -21,7 +22,7 @@ class NoteDialog extends StatelessWidget {
 //the latest version of the note
   Note get currentNote {
     return controller.composition.notes.firstWhere(
-      (n) => n.id == note.id,
+          (n) => n.id == note.id,
       orElse: () => note,
     );
   }
@@ -41,10 +42,10 @@ class NoteDialog extends StatelessWidget {
           backgroundColor: Colors.white,
           surfaceTintColor: Colors.white,
           contentPadding: const EdgeInsets.fromLTRB(
-              DefaultValues.dialogPaddingRightLeft,
-              DefaultValues.dialogPaddingBottomTop,
-              DefaultValues.dialogPaddingRightLeft,
-              DefaultValues.dialogPaddingBottomTop,
+            DefaultValues.dialogPaddingRightLeft,
+            DefaultValues.dialogPaddingBottomTop,
+            DefaultValues.dialogPaddingRightLeft,
+            DefaultValues.dialogPaddingBottomTop,
           ),
           title: Text(
             textAlign: TextAlign.center,
@@ -80,7 +81,7 @@ class NoteDialog extends StatelessWidget {
                       controller.getMeasureNumber(editedNote).toString(),
                     ),
                     SizedBox(
-                        width: DefaultValues.widthBetweenWidgets,
+                      width: DefaultValues.widthBetweenWidgets,
                     ),
                     _infoRow(
                       'Beat:',
@@ -91,10 +92,10 @@ class NoteDialog extends StatelessWidget {
 
                 Row(
                   children: [
-                      _infoRow(
-                          'Time Signature:',
-                          timeSignature,
-                      ),
+                    _infoRow(
+                      'Time Signature:',
+                      timeSignature,
+                    ),
                   ],
                 ),
 
@@ -123,8 +124,8 @@ class NoteDialog extends StatelessWidget {
                           // 'Scale Pitch: ${controller.getNotePitchName(editedNote)}',
                           'Degree: ${controller.getDegree(editedNote)}',
                           style: TextStyle(
-                              fontSize: 22,
-                              ),
+                            fontSize: 22,
+                          ),
                         ),
                       ],
                     ),
@@ -132,224 +133,269 @@ class NoteDialog extends StatelessWidget {
                 ),
 
 
-            const Divider(thickness: 1.0),
+                const Divider(thickness: 1.0),
 
-            ListTile(
-              // leading: const Icon(Icons.swap_vertical_circle_sharp),
-              leading: const Icon(Icons.open_in_full_sharp),
-              title: Text(
-                // 'Accidental: ${editedNote.accidental?.sign ?? 'none'}',
-                'Accidental: ${editedNote.accidental?.label ?? 'none'}',
-                style: const TextStyle(
-                  fontSize: 22,
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              onTap: () {
-                noteValuesDialog<Accidental>(
-                  context: context,
-                  allowToCloseNextWindow: true,
-                  currentValue: editedNote.accidental,
-                  title: 'Accidental',
-                  values: Accidental.values,
-                  numberOfColumns: 2,
-                  labelBuilder: (a) => a.sign,
-                  onSelected: (accidental) {
-                    controller.setNoteAccidental(
-                      editedNote,
-                      accidental,
-                    );
-                  },
-                  onClear: () {
-                    controller.setNoteAccidental(
-                      editedNote,
-                      null,
-                    );
-                  },
-                );
-              },
-            ),
-
-            ListTile(
-              // leading: const Icon(Icons.timelapse),
-              leading: const Icon(Icons.av_timer),
-              title: Text(
-                'Duration: ${controller.durationLabel(editedNote)}',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    color: Colors.black,
-                    fontWeight: FontWeight.bold,
+                ListTile(
+                  // leading: const Icon(Icons.swap_vertical_circle_sharp),
+                  leading: const Icon(Icons.open_in_full_sharp),
+                  title: Text(
+                    // 'Accidental: ${editedNote.accidental?.sign ?? 'none'}',
+                    'Accidental: ${editedNote.accidental?.label ?? 'none'}',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-              ),
-              onTap: () {
-                final duration = NoteDuration.values.firstWhere(
-                      (d) => d.ticks == editedNote.durationTicks,
-                  orElse: () => NoteDuration.quarter,
-                );
-                noteValuesDialog<NoteDuration>(
-                  context: context,
-                  allowToCloseNextWindow: true,
-                  currentValue: duration,
-                  title: 'Duration',
-                  values: NoteDuration.values,
-                  numberOfColumns: 3,
-                  labelBuilder: (d) => d.label,
-                  onSelected: (d) {
-                    controller.setNoteDuration(editedNote, d);
+                  onTap: () {
+                    noteValuesDialog<Accidental>(
+                      context: context,
+                      allowToCloseNextWindow: true,
+                      currentValue: editedNote.accidental,
+                      title: 'Accidental',
+                      values: Accidental.values,
+                      numberOfColumns: 2,
+                      labelBuilder: (a) => a.sign,
+                      onSelected: (accidental) {
+                        controller.setNoteAccidental(
+                          editedNote,
+                          accidental,
+                        );
+                      },
+                      onClear: () {
+                        controller.setNoteAccidental(
+                          editedNote,
+                          null,
+                        );
+                      },
+                    );
                   },
-                );
-              },
-            ),
+                ),
+
+                ListTile(
+                  // leading: const Icon(Icons.timelapse),
+                  leading: const Icon(Icons.av_timer),
+                  title: Text(
+                    'Duration: ${controller.durationLabel(editedNote)}',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  onTap: () {
+                    final duration = NoteDuration.values.firstWhere(
+                          (d) => d.ticks == editedNote.durationTicks,
+                      orElse: () => NoteDuration.quarter,
+                    );
+                    noteValuesDialog<NoteDuration>(
+                      context: context,
+                      allowToCloseNextWindow: true,
+                      currentValue: duration,
+                      title: 'Duration',
+                      values: NoteDuration.values,
+                      numberOfColumns: 3,
+                      labelBuilder: (d) => d.label,
+                      onSelected: (d) {
+                        controller.setNoteDuration(editedNote, d);
+                      },
+                    );
+                  },
+                ),
 
 
-          ListTile(
-            leading: const Icon(Icons.back_hand),
-            title: Text(
-              'Hand: ${editedNote.hand.name}',
-              style: const TextStyle(
-                fontSize: 22,
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            onTap: () {
-              noteValuesDialog<Hand>(
-                context: context,
-                allowToCloseNextWindow: true,
-                currentValue: editedNote.hand,
-                title: 'Hand',
-                values: Hand.values,
-                numberOfColumns: 2,
-                labelBuilder: (h) => h.name,
-                onSelected: (hand) {
-                  controller.setNoteHand(editedNote, hand);
-                },
-              );
-            },
-          ),
+                ListTile(
+                  leading: const Icon(Icons.back_hand),
+                  title: Text(
+                    'Hand: ${editedNote.hand.name}',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  onTap: () {
+                    noteValuesDialog<Hand>(
+                      context: context,
+                      allowToCloseNextWindow: true,
+                      currentValue: editedNote.hand,
+                      title: 'Hand',
+                      values: Hand.values,
+                      numberOfColumns: 2,
+                      labelBuilder: (h) => h.name,
+                      onSelected: (hand) {
+                        controller.setNoteHand(editedNote, hand);
+                      },
+                    );
+                  },
+                ),
 
-          ListTile(
-            leading: const Icon(Icons.touch_app),
-            title: Text(
-              'Finger: ${ editedNote.finger?.value.toString() ?? 'none'}',
-              style: const TextStyle(
-                fontSize: 22,
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            onTap: () {
-              noteValuesDialog<Finger>(
-                context: context,
-                allowToCloseNextWindow: true,
-                currentValue: editedNote.finger,
-                title: 'Finger',
-                values: Finger.values,
-                numberOfColumns: 5,
-                labelBuilder: (f) => f.value.toString(),
-                onSelected: (finger) {
-                  controller.setNoteFinger(editedNote, finger);
-                },
-                onClear: () {
-                  controller.setNoteFinger(editedNote, null);
-                },
-              );
-            },
-          ),
+                ListTile(
+                  leading: const Icon(Icons.touch_app),
+                  title: Text(
+                    'Finger: ${ editedNote.finger?.value.toString() ?? 'none'}',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  onTap: () {
+                    noteValuesDialog<Finger>(
+                      context: context,
+                      allowToCloseNextWindow: true,
+                      currentValue: editedNote.finger,
+                      title: 'Finger',
+                      values: Finger.values,
+                      numberOfColumns: 5,
+                      labelBuilder: (f) => f.value.toString(),
+                      onSelected: (finger) {
+                        controller.setNoteFinger(editedNote, finger);
+                      },
+                      onClear: () {
+                        controller.setNoteFinger(editedNote, null);
+                      },
+                    );
+                  },
+                ),
 
-          ListTile(
-            leading: const Icon(Icons.graphic_eq),
-            title: Text(
-              'Articulation: ${editedNote.articulation?.label ?? 'none'}',
-              style: const TextStyle(
-                fontSize: 22,
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            onTap: () {
-              noteValuesDialog<Articulation>(
-                context: context,
-                allowToCloseNextWindow: true,
-                currentValue: editedNote.articulation,
-                title: 'Articulation',
-                values: Articulation.values,
-                numberOfColumns: 2,
-                labelBuilder: (o) => o.label,
-                onSelected: (articulation) {
-                  controller.setNoteArticulation(
-                    editedNote,
-                    articulation,
-                  );
-                },
-                onClear: () {
-                  controller.setNoteArticulation(editedNote, null);
-                },
-              );
-            },
-          ),
+                ListTile(
+                  leading: const Icon(Icons.graphic_eq),
+                  title: Text(
+                    'Articulation: ${editedNote.articulation?.label ?? 'none'}',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  onTap: () {
+                    noteValuesDialog<Articulation>(
+                      context: context,
+                      allowToCloseNextWindow: true,
+                      currentValue: editedNote.articulation,
+                      title: 'Articulation',
+                      values: Articulation.values,
+                      numberOfColumns: 2,
+                      labelBuilder: (o) => o.label,
+                      onSelected: (articulation) {
+                        controller.setNoteArticulation(
+                          editedNote,
+                          articulation,
+                        );
+                      },
+                      onClear: () {
+                        controller.setNoteArticulation(editedNote, null);
+                      },
+                    );
+                  },
+                ),
 
-          ListTile(
-            leading: const Icon(Icons.auto_awesome),
-            title: Text(
-              'Ornament: ${editedNote.ornament?.label ?? 'none'}',
-              style: const TextStyle(
-                fontSize: 22,
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            onTap: () {
-              noteValuesDialog<Ornament>(
-                context: context,
-                allowToCloseNextWindow: true,
-                currentValue: editedNote.ornament,
-                title: 'Ornament',
-                values: Ornament.values,
-                numberOfColumns: 2,
-                labelBuilder: (o) => o.label,
-                onSelected: (ornament) {
-                  controller.setNoteOrnament(editedNote, ornament);
-                },
-                onClear: () {
-                  controller.setNoteOrnament(editedNote, null);
-                },
-              );
-            },
-          ),
+                ListTile(
+                  leading: const Icon(Icons.auto_awesome),
+                  title: Text(
+                    'Ornament: ${editedNote.ornament?.label ?? 'none'}',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  onTap: () {
+                    noteValuesDialog<Ornament>(
+                      context: context,
+                      allowToCloseNextWindow: true,
+                      currentValue: editedNote.ornament,
+                      title: 'Ornament',
+                      values: Ornament.values,
+                      numberOfColumns: 2,
+                      labelBuilder: (o) => o.label,
+                      onSelected: (ornament) {
+                        controller.setNoteOrnament(editedNote, ornament);
+                      },
+                      onClear: () {
+                        controller.setNoteOrnament(editedNote, null);
+                      },
+                    );
+                  },
+                ),
 
-          ListTile(
-            leading: const Icon(Icons.piano),
-            title: Text(
-              'Playing Technique: ${editedNote.playingTechnique?.label ?? 'none'}',
-              style: const TextStyle(
-                fontSize: 22,
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            onTap: () {
-              noteValuesDialog<PlayingTechnique>(
-                context: context,
-                allowToCloseNextWindow: true,
-                currentValue: editedNote.playingTechnique,
-                title: 'Playing Technique',
-                values: PlayingTechnique.values,
-                numberOfColumns: 3,
-                labelBuilder: (t) => t.label,
-                onSelected: (technique) {
-                  controller.setNotePlayingTechnique(
-                    editedNote,
-                    technique,
-                  );
-                },
-                onClear: () {
-                  controller.setNotePlayingTechnique(editedNote, null);
-                },
-              );
-            },
-          ),
+                ListTile(
+                  leading: const Icon(Icons.piano),
+                  title: Text(
+                    'Playing Technique: ${editedNote.playingTechnique?.label ?? 'none'}',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  onTap: () {
+                    noteValuesDialog<PlayingTechnique>(
+                      context: context,
+                      allowToCloseNextWindow: true,
+                      currentValue: editedNote.playingTechnique,
+                      title: 'Playing Technique',
+                      values: PlayingTechnique.values,
+                      numberOfColumns: 3,
+                      labelBuilder: (t) => t.label,
+                      onSelected: (technique) {
+                        controller.setNotePlayingTechnique(
+                          editedNote,
+                          technique,
+                        );
+                      },
+                      onClear: () {
+                        controller.setNotePlayingTechnique(editedNote, null);
+                      },
+                    );
+                  },
+                ),
+
+                ListTile(
+                  leading: const Icon(Icons.show_chart),
+                  title: Text(
+                    'Glissando: ${editedNote.glissando?.label ?? 'none'}',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  onTap: () {
+                    noteValuesDialog<GlissandoDirection>(
+                      context: context,
+                      allowToCloseNextWindow: true,
+                      currentValue: editedNote.glissando,
+                      title: 'Glissando',
+                      values: GlissandoDirection.values,
+                      numberOfColumns: 1,
+                      labelBuilder: (d) => d.label,
+                      onSelected: (direction) {
+                        // Closes this dialog too (allowToCloseNextWindow) so
+                        // the grid is ready for the end-row tap that
+                        // completes it — see
+                        // CompositionController.startGlissandoPick /
+                        // GridWidget's onTapUp.
+                        controller.startGlissandoPick(editedNote, direction);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Tap the grid to set the glissando end row',
+                              style: TextStyle(fontSize: 22),
+                            ),
+                          ),
+                        );
+                      },
+                      onClear: () {
+                        // Removes the glissando flag AND every generated
+                        // run note belonging to it — see
+                        // CompositionController.clearNoteGlissando.
+                        controller.clearNoteGlissando(editedNote);
+                      },
+                    );
+                  },
+                ),
 
               ],
             ),
@@ -434,7 +480,7 @@ class NoteDialog extends StatelessWidget {
           Text(
               '$title ',
               style: const TextStyle(
-                  fontSize: 22,
+                fontSize: 22,
               )
           ),
           Text(

@@ -1,6 +1,7 @@
 import '../enums/accidental.dart';
 import '../enums/articulation.dart';
 import '../enums/finger.dart';
+import '../enums/glissando_direction.dart';
 import '../enums/hand.dart';
 import '../enums/ornament.dart';
 import '../enums/playing_technique.dart';
@@ -27,6 +28,31 @@ class Note {
   /// Mode is on (see CompositionController.legatoMode).
   final bool legato;
 
+  /// Set on the "anchor" note a glissando starts from — null means no
+  /// glissando. Set via CompositionController.startGlissandoPick (which
+  /// begins the "tap the grid to choose the end row" interaction) and
+  /// CompositionController.finishGlissandoPick (which actually
+  /// generates the run of notes and stamps this field on the anchor).
+  /// Cleared (along with the generated run — see [glissandoSourceId])
+  /// via CompositionController.clearNoteGlissando.
+  final GlissandoDirection? glissando;
+
+  /// Set ONLY on the auto-generated notes that make up a glissando
+  /// run (see CompositionController.finishGlissandoPick) — never on
+  /// an ordinary note, and never on the anchor note itself (the
+  /// anchor instead carries [glissando]). Points back at the anchor
+  /// note's [id], so the whole run can be found and removed together
+  /// — e.g. when the glissando is cleared, or regenerated with a
+  /// different direction/end row. A run note's pitch is always shown
+  /// as the plain natural degree number (1-7) and sounds at the plain
+  /// "white key" pitch for its row (see
+  /// CompositionController.getWhiteKeyFrequencyHz /
+  /// getDisplayPitchLabel) — deliberately ignoring the composition's
+  /// scale and this note's own [accidental]/[row]'s scale-degree sign,
+  /// the same way a piano glissando runs straight across the white
+  /// keys regardless of key signature.
+  final int? glissandoSourceId;
+
   const Note({
     required this.id,
     required this.startTick,
@@ -39,6 +65,8 @@ class Note {
     this.articulation,
     this.playingTechnique,
     this.legato = false,
+    this.glissando,
+    this.glissandoSourceId,
   });
 
   // ================= COPY =================
@@ -55,6 +83,8 @@ class Note {
     Object? articulation = _keep,
     Object? playingTechnique = _keep,
     bool? legato,
+    Object? glissando = _keep,
+    Object? glissandoSourceId = _keep,
   }) {
 
     return Note(
@@ -79,6 +109,12 @@ class Note {
           ? this.playingTechnique
           : playingTechnique as PlayingTechnique?,
       legato: legato ?? this.legato,
+      glissando: glissando == _keep
+          ? this.glissando
+          : glissando as GlissandoDirection?,
+      glissandoSourceId: glissandoSourceId == _keep
+          ? this.glissandoSourceId
+          : glissandoSourceId as int?,
     );
   }
 
@@ -99,6 +135,8 @@ class Note {
       if (articulation != null) 'articulation': articulation!.name,
       if (playingTechnique != null) 'playingTechnique': playingTechnique!.name,
       'legato': legato,
+      if (glissando != null) 'glissando': glissando!.name,
+      if (glissandoSourceId != null) 'glissandoSourceId': glissandoSourceId,
     };
   }
 
@@ -130,7 +168,16 @@ class Note {
   /// Reads [key] as an int, tolerating it having been stored as a
   /// double (Firestore's numeric type can vary depending on how a
   /// value was originally written) rather than throwing a type-cast
-  /// error.
+  /// error. Returns null if [key] is absent/null.
+  static int? _readIntOrNull(Map<String, dynamic> json, String key) {
+    final raw = json[key];
+    if (raw == null) return null;
+    return (raw as num).toInt();
+  }
+
+  /// Same as [_readIntOrNull] but for a required field — throws (via
+  /// the underlying cast) if [key] is genuinely absent, same as the
+  /// original direct `as int` casts did.
   static int _readInt(Map<String, dynamic> json, String key) {
     return (json[key] as num).toInt();
   }
@@ -194,6 +241,14 @@ class Note {
 
       legato:
       json['legato'] as bool? ?? false,
+
+
+      glissando:
+      _enumByNameOrNull(GlissandoDirection.values, json['glissando']),
+
+
+      glissandoSourceId:
+      _readIntOrNull(json, 'glissandoSourceId'),
 
 
     );

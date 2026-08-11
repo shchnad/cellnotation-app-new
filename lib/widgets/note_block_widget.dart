@@ -258,19 +258,31 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
         ghostWalkedRow = result.row;
       }
     } else {
-      // Under normal notation, show the note's own effective
-      // accidental as a separate glyph next to the pitch — "x"
-      // included, so a natural note reads literally as e.g. "4+" next
-      // to "x". Under compensated notation the sign (if any) is
-      // already merged into the single computed word from
-      // getDisplayPitchLabel — and a natural collapses everything to
-      // a plain digit there — so no separate glyph is drawn in that
-      // mode.
-      final effectiveAccidental = controller.getEffectiveAccidental(note);
-      accidental = controller.showCompensatedNotation
-          ? ''
-          : (effectiveAccidental?.sign ?? '');
-      pitch = controller.getDisplayPitchLabel(note);
+      if (note.glissandoSourceId != null) {
+        // A glissando run note (see Note.glissandoSourceId) always
+        // shows its plain natural degree number with no accidental
+        // glyph at all — bypassing getEffectiveAccidental entirely,
+        // since that does a per-measure propagation lookup that could
+        // otherwise attach some unrelated earlier note's accidental
+        // to it. getDisplayPitchLabel already special-cases these
+        // notes to return the plain digit regardless of toggle.
+        accidental = '';
+        pitch = controller.getDisplayPitchLabel(note);
+      } else {
+        // Under normal notation, show the note's own effective
+        // accidental as a separate glyph next to the pitch — "x"
+        // included, so a natural note reads literally as e.g. "4+" next
+        // to "x". Under compensated notation the sign (if any) is
+        // already merged into the single computed word from
+        // getDisplayPitchLabel — and a natural collapses everything to
+        // a plain digit there — so no separate glyph is drawn in that
+        // mode.
+        final effectiveAccidental = controller.getEffectiveAccidental(note);
+        accidental = controller.showCompensatedNotation
+            ? ''
+            : (effectiveAccidental?.sign ?? '');
+        pitch = controller.getDisplayPitchLabel(note);
+      }
     }
 
     final left = note.startTick * widget.pixelsPerTick;
@@ -291,12 +303,17 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
     // only affects where the block is drawn. Ghost notes always walk
     // to their own genuinely-different row (see the pitch/accidental
     // computation above, and ghostWalkedRow), regardless of the
-    // compensated-notation toggle.
+    // compensated-notation toggle. A glissando run note always renders
+    // at its own literal row too — it's never walked/shifted by the
+    // compensated-notation toggle, matching how its pitch label
+    // ignores the scale entirely (see above).
     final displayRow = isGhost
         ? ghostWalkedRow
+        : (note.glissandoSourceId != null
+        ? note.row
         : (controller.showCompensatedNotation
         ? controller.getCompensatedDisplay(note).row
-        : note.row);
+        : note.row));
     final top = (controller.totalRows - 1 - displayRow) * widget.cellHeight;
 
     final drawMark = _hasDrawnMark(note.articulation);
