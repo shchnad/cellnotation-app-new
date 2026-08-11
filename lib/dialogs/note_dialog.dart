@@ -353,7 +353,7 @@ class NoteDialog extends StatelessWidget {
                 ),
 
                 ListTile(
-                  leading: const Icon(Icons.show_chart),
+                  leading: const Icon(Icons.trending_up),
                   title: Text(
                     'Glissando: ${editedNote.glissando?.label ?? 'none'}',
                     style: const TextStyle(

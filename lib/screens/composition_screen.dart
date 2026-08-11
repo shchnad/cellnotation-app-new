@@ -643,7 +643,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                           // the same time).
                           IconButton(
                             icon: Icon(
-                              Icons.timeline,
+                              Icons.airline_stops_outlined,
                               color: controller.legatoMode
                                   ? Colors.blue
                                   : Colors.black,

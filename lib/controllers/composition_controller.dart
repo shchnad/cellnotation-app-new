@@ -1163,7 +1163,7 @@ class CompositionController extends ChangeNotifier {
   }
 
   /// Completes a pending [startGlissandoPick]: generates the run of
-  /// 1/32-duration notes from [_pendingGlissandoNote]'s own row to
+  /// 1/64-duration notes from [_pendingGlissandoNote]'s own row to
   /// [endRow] and stamps the direction onto the anchor note. Called
   /// by GridWidget with the row that was tapped while
   /// [isPickingGlissandoEndRow] is true.
@@ -1225,7 +1225,7 @@ class CompositionController extends ChangeNotifier {
     final refreshedIndex = notes.indexWhere((n) => n.id == anchor.id);
     notes[refreshedIndex] = anchor.copyWith(glissando: direction);
 
-    final stepTicks = NoteDuration.thirtySecond.ticks;
+    final stepTicks = NoteDuration.sixtyFourth.ticks;
     int runningTick = notes[refreshedIndex].endTick;
     final rows = isUp
         ? [for (int r = anchor.row + 1; r <= endRow; r++) r]
