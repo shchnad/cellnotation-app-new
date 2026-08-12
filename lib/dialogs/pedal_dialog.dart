@@ -1,23 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:music_composer/enums/dynamic_change.dart';
 import '../controllers/composition_controller.dart';
-import '../enums/musical_dynamic.dart';
 import '../models/dynamic_change_event.dart';
-import '../models/dynamic_event.dart';
 
-
-void dynamicChangeDialog(
+/// Same shape as dynamicChangeDialog (grid of value buttons + Delete
+/// + Close), scoped to just [DynamicChange.pedalDown] and
+/// [DynamicChange.pedalUp] — pedal shares the same
+/// DynamicChangeEvent/timeline.dynamicChangeEvents storage as
+/// crescendo/diminuendo, but is set through this separate dialog
+/// (opened from editMeasureBeatDialog's "Set Pedal") rather than
+/// dynamicChangeDialog, which excludes pedal values from its own
+/// picker for exactly this reason.
+void pedalDialog(
     BuildContext context,
     CompositionController controller,
     int tick,
     ) {
-
   showDialog(
     context: context,
     builder: (_) {
-
-      final screen = MediaQuery.of(context).size;
-
       DynamicChangeEvent? currentEvent;
 
       for (final event in controller.timeline.dynamicChangeEvents) {
@@ -27,25 +28,17 @@ void dynamicChangeDialog(
         }
       }
 
-      // Pedal marks (pedalDown/pedalUp) share this same enum/event
-      // storage but are set exclusively via the single toggle button
-      // in editMeasureBeatDialog (see
-      // CompositionController.togglePedalAtTick) — they're excluded
-      // here so there's exactly one way to set pedal, with no risk of
-      // this dialog and that toggle disagreeing about the current
-      // state.
-      final pickableValues = DynamicChange.values
-          .where((d) =>
-      d != DynamicChange.pedalDown && d != DynamicChange.pedalUp)
-          .toList();
+      const pedalValues = [
+        DynamicChange.pedalDown,
+        DynamicChange.pedalUp,
+      ];
 
       return AlertDialog(
-
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
 
         title: const Text(
-          "Select Dynamic Change",
+          "Set Pedal",
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 22,
@@ -58,12 +51,12 @@ void dynamicChangeDialog(
           width: 320,
 
           child: GridView.count(
-            crossAxisCount: 2, // number of columns
+            crossAxisCount: 2,
             shrinkWrap: true,
             mainAxisSpacing: 6,
             crossAxisSpacing: 6,
             childAspectRatio: 2,
-            children: pickableValues.map(
+            children: pedalValues.map(
                     (dChange) {
 
                   final selected =

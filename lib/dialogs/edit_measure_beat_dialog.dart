@@ -5,6 +5,7 @@ import '../controllers/composition_controller.dart';
 import '../utils/scale_resolver.dart';
 import 'dynamic_change_dialog.dart';
 import 'dynamic_dialog.dart';
+import 'pedal_dialog.dart';
 import 'scale_dialog.dart';
 
 
@@ -99,6 +100,7 @@ void editMeasureBeatDialog({
 
                       ListTile(
                         leading: const Icon(Icons.delete_outline),
+                        iconColor: Colors.red,
                         title: const Text(
                           "Delete Measure",
                           style: TextStyle(
@@ -117,6 +119,7 @@ void editMeasureBeatDialog({
 
                       ListTile(
                         leading: const Icon(Icons.lock_clock),
+                        iconColor: Colors.blue,
                         title: const Text(
                           "Set Tempo",
                           style: TextStyle(
@@ -140,6 +143,7 @@ void editMeasureBeatDialog({
 
                       ListTile(
                         leading: const Icon(Icons.music_note),
+                        iconColor: Colors.blue,
                         title: const Text(
                           "Set Scale",
                           style: TextStyle(
@@ -239,6 +243,7 @@ void editMeasureBeatDialog({
 
                       ListTile(
                         leading: const Icon(Icons.delete_outline),
+                        iconColor: Colors.red,
                         title: const Text(
                           "Delete Beat",
                           style: TextStyle(
@@ -261,6 +266,7 @@ void editMeasureBeatDialog({
 
                       ListTile(
                         leading: const Icon(Icons.campaign_outlined),
+                        iconColor: Colors.green,
                         title: const Text(
                           "Set Dynamic",
                           style: TextStyle(
@@ -284,7 +290,8 @@ void editMeasureBeatDialog({
 
 
                       ListTile(
-                        leading: const Icon(Icons.trending_up),
+                        leading: const Icon(Icons.bar_chart_outlined),
+                        iconColor: Colors.green,
                         title: const Text(
                           "Set Dynamic Change",
                           style: TextStyle(
@@ -306,6 +313,34 @@ void editMeasureBeatDialog({
                         },
                       ),
 
+                      // PEDAL — same pattern as "Set Dynamic Change"
+                      // above: opens a dedicated grid-of-options
+                      // dialog (pedalDialog) with Delete/Close
+                      // actions, rather than toggling in place.
+                      ListTile(
+                        leading: const Icon(Icons.arrow_circle_down),
+                        iconColor: Colors.green,
+                        title: const Text(
+                          "Set Pedal",
+                          style: TextStyle(
+                            fontSize: 22,
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        onTap: () {
+                          Navigator.pop(context);
+                          pedalDialog(
+                            context,
+                            controller,
+                            controller.getBeatTick(
+                              measureIndex,
+                              beatIndex,
+                            ),
+                          );
+                        },
+                      ),
+
 
                     ],
                   ),
@@ -315,12 +350,6 @@ void editMeasureBeatDialog({
           ),
         ),
 
-        // actionsPadding: const EdgeInsets.fromLTRB(
-        // DefaultValues.dialogPaddingRightLeft,
-        // DefaultValues.dialogPaddingBottomTop,
-        // DefaultValues.dialogPaddingRightLeft,
-        // DefaultValues.dialogPaddingBottomTop,
-        // ),
         actions: [
           const Divider(thickness: 1.0),
           Center(

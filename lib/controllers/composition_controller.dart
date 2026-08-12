@@ -735,6 +735,54 @@ class CompositionController extends ChangeNotifier {
   }
 
   // =====================================================
+  // SUSTAIN PEDAL
+  // =====================================================
+  //
+  // Pedal marks (pedalDown/pedalUp) share the same
+  // DynamicChangeEvent/timeline.dynamicChangeEvents storage as
+  // crescendo/diminuendo above — same shape (a tick + a DynamicChange
+  // value), same persistence semantics (a state holds from its event
+  // forward until the next one). They're kept independent everywhere
+  // they're READ or DRAWN, though: GridPainter draws them as their
+  // own thin red connecting line rather than the green crescendo/
+  // diminuendo line, and dynamicChangeDialog's picker excludes them
+  // entirely — pedal is only ever set via the single toggle button in
+  // editMeasureBeatDialog (see [togglePedalAtTick]), never via that
+  // dialog, so there's exactly one way to set it and no risk of the
+  // two getting out of sync with each other.
+
+  /// Whether the sustain pedal is currently held down AT [tick] — the
+  /// latest pedal event (pedalDown or pedalUp) at or before [tick] is
+  /// pedalDown. Crescendo/diminuendo events are ignored entirely.
+  bool isPedalDownAtTick(int tick) {
+    DynamicChangeEvent? latest;
+    for (final event in timeline.dynamicChangeEvents) {
+      if (event.dynamic_change != DynamicChange.pedalDown &&
+          event.dynamic_change != DynamicChange.pedalUp) {
+        continue;
+      }
+      if (event.tick > tick) continue;
+      if (latest == null || event.tick > latest.tick) {
+        latest = event;
+      }
+    }
+    return latest?.dynamic_change == DynamicChange.pedalDown;
+  }
+
+  /// Toggles the sustain pedal at [tick]: writes pedalUp if it's
+  /// currently down there (per [isPedalDownAtTick]), or pedalDown
+  /// otherwise. Reuses [updateDynamicChangeEvent], which already
+  /// inserts a new event or updates one already sitting at this exact
+  /// tick (e.g. flipping an existing pedal marker at this beat rather
+  /// than duplicating it).
+  void togglePedalAtTick(int tick) {
+    final newState = isPedalDownAtTick(tick)
+        ? DynamicChange.pedalUp
+        : DynamicChange.pedalDown;
+    updateDynamicChangeEvent(tick, newState);
+  }
+
+  // =====================================================
   // GRID / SNAP
   // =====================================================
 

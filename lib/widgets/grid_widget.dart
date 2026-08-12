@@ -7,6 +7,7 @@ import '../dialogs/tempo_dialog.dart';
 import '../dialogs/dynamic_dialog.dart';
 import '../dialogs/dynamic_change_dialog.dart';
 import '../enums/dynamic_change.dart';
+import '../enums/note_duration.dart';
 import '../models/dynamic_change_event.dart';
 import '../utils/scale_resolver.dart';
 import 'note_block_widget.dart';
@@ -25,6 +26,15 @@ const _dynamicLabelStyle = TextStyle(
   fontWeight: FontWeight.bold,
 );
 
+/// sustain pedal — "ped" sign plus the thin connecting line drawn
+/// from a pedalDown event to its matching pedalUp (see
+/// _drawPedalMarks), in red.
+const _pedalLabelStyle = TextStyle(
+  color: Colors.green,
+  fontSize: 22,
+  fontWeight: FontWeight.bold,
+);
+
 /// scale name — drawn at the TOP of the grid, same size/weight as the
 /// tempo label at the bottom, in blue.
 const _scaleLabelStyle = TextStyle(
@@ -33,8 +43,16 @@ const _scaleLabelStyle = TextStyle(
   fontWeight: FontWeight.bold,
 );
 
+/// measure number + time signature — drawn at the very BOTTOM of the
+/// grid (below tempo/dynamic, which stack above it), in blue.
+const _measureLabelStyle = TextStyle(
+  color: Colors.blue,
+  fontSize: 22,
+  fontWeight: FontWeight.bold,
+);
+
 const double _labelOffsetX = 5;
-const double _bottomMargin = 5; // distance from bottom of grid to tempo label
+const double _bottomMargin = 5; // distance from bottom of grid to the measure/time-signature label
 const double _topMargin = 5; // distance from top of grid to scale label
 const double _labelGap = 4; // gap between tempo label and dynamic label above it
 
@@ -90,6 +108,16 @@ TextPainter _dynamicTextPainter(dynamic dynamicEvent) {
   )..layout();
 }
 
+TextPainter _pedalTextPainter() {
+  return TextPainter(
+    text: const TextSpan(
+      text: 'ped',
+      style: _pedalLabelStyle,
+    ),
+    textDirection: TextDirection.ltr,
+  )..layout();
+}
+
 TextPainter _scaleTextPainter(String scaleName) {
   return TextPainter(
     text: TextSpan(
@@ -100,21 +128,57 @@ TextPainter _scaleTextPainter(String scaleName) {
   )..layout();
 }
 
+TextPainter _measureLabelTextPainter(String text) {
+  return TextPainter(
+    text: TextSpan(
+      text: text,
+      style: _measureLabelStyle,
+    ),
+    textDirection: TextDirection.ltr,
+  )..layout();
+}
+
+/// The denominator to show for a beat's NoteDuration when writing a
+/// time signature as e.g. "5/4" — derived from how many of
+/// [beatDuration] fit into a whole note, using NoteDuration.quarter
+/// as the reference point (a quarter note is a denominator of 4, by
+/// definition), so this works for any NoteDuration without needing to
+/// hardcode every enum member's own denominator individually.
+int _beatDenominator(dynamic beatDuration) {
+  final wholeNoteTicks = NoteDuration.quarter.ticks * 4;
+  return (wholeNoteTicks / beatDuration.ticks).round();
+}
+
+/// e.g. "3: 5/4" for the 3rd measure (1-based) in 5/4 time.
+String _measureLabelText(int measureNumber, dynamic timeSignature) {
+  final denominator = _beatDenominator(timeSignature.beatDuration);
+  return '$measureNumber: ${timeSignature.beats}/$denominator';
+}
+
+/// Line-height of the measure/time-signature label — content-
+/// independent for single-line text at a fixed style, so any sample
+/// string works as a consistent reference for stacking the tempo/
+/// dynamic labels above it (same idea as the existing
+/// referenceTempoHeight/referenceDynamicHeight pattern below).
+double _measureLabelReferenceHeight() =>
+    _measureLabelTextPainter('0: 0/0').height;
+
 /// Computes tap-target rects for both tempo and dynamic labels.
-/// Both sit at the bottom of the grid: tempo on the very bottom row,
-/// dynamic stacked directly above it. [gridHeight] is needed to place
-/// them correctly.
+/// Both stack above the measure/time-signature label at the very
+/// bottom of the grid: tempo directly above it, dynamic above tempo.
+/// [gridHeight] is needed to place them correctly.
 List<_LabelHit> _computeLabelHits(
     CompositionController controller,
     double pixelsPerTick,
     double gridHeight,
     ) {
   final hits = <_LabelHit>[];
+  final measureLabelHeight = _measureLabelReferenceHeight();
 
   for (final tempoEvent in controller.timeline.tempoEvents) {
     final x = tempoEvent.tick * pixelsPerTick;
     final tp = _tempoTextPainter(tempoEvent);
-    final y = gridHeight - tp.height - _bottomMargin;
+    final y = gridHeight - measureLabelHeight - _bottomMargin - _labelGap - tp.height;
     hits.add(
       _LabelHit(
         tempoEvent.tick,
@@ -136,7 +200,13 @@ List<_LabelHit> _computeLabelHits(
           controller.timeline.tempoEvents.first,
     ).height;
 
-    final y = gridHeight - tempoLineHeight - _bottomMargin - _labelGap - dynamicTp.height;
+    final y = gridHeight -
+        measureLabelHeight -
+        _bottomMargin -
+        _labelGap -
+        tempoLineHeight -
+        _labelGap -
+        dynamicTp.height;
 
     hits.add(
       _LabelHit(
@@ -184,6 +254,11 @@ List<_ScaleLabelHit> _computeScaleLabelHits(
 /// Computes tap-target rects for the green crescendo/diminuendo start &
 /// finish lines. Each line spans the full grid height, so the hit rect is
 /// just a thin vertical strip centered on the line's x position.
+/// Excludes pedalDown/pedalUp events — pedal marks share the same
+/// DynamicChangeEvent storage but are drawn and edited entirely
+/// separately (see _drawPedalMarks and CompositionController.
+/// togglePedalAtTick) — so they don't get this green line/tap target
+/// or the crescendo/diminuendo dialog it opens.
 List<_DynamicChangeLineHit> _computeDynamicChangeLineHits(
     CompositionController controller,
     double pixelsPerTick,
@@ -192,6 +267,10 @@ List<_DynamicChangeLineHit> _computeDynamicChangeLineHits(
   final hits = <_DynamicChangeLineHit>[];
 
   for (final event in controller.timeline.dynamicChangeEvents) {
+    if (event.dynamic_change == DynamicChange.pedalDown ||
+        event.dynamic_change == DynamicChange.pedalUp) {
+      continue;
+    }
     final x = event.tick * pixelsPerTick;
     hits.add(
       _DynamicChangeLineHit(
@@ -615,11 +694,15 @@ class GridPainter extends CustomPainter {
     ).height
         : 0.0;
 
+    final measureLabelHeight = _measureLabelReferenceHeight();
+
     const hairpinOffset = 18.0;
 
     final y = size.height
-        - referenceTempoHeight
+        - measureLabelHeight
         - _bottomMargin
+        - _labelGap
+        - referenceTempoHeight
         - _labelGap
         - referenceDynamicHeight
         - hairpinOffset;
@@ -661,19 +744,103 @@ class GridPainter extends CustomPainter {
             diminuendoBegin = null;
           }
           break;
+
+      // Pedal marks share this same event list/enum but are drawn
+      // entirely separately — see _drawPedalMarks below.
+        case DynamicChange.pedalDown:
+        case DynamicChange.pedalUp:
+          break;
+      }
+    }
+  }
+
+  /// Draws every pedalDown → pedalUp pair (see
+  /// CompositionController.togglePedalAtTick) as a red "ped" sign at
+  /// the pedalDown tick plus a thin red horizontal line connecting it
+  /// to the matching pedalUp tick. An unmatched trailing pedalDown
+  /// (no pedalUp yet — the pedal is still "held" through the rest of
+  /// the composition) draws just the sign, no line, same as
+  /// _drawHairpins leaves an unmatched crescendo/diminuendo start
+  /// undrawn.
+  ///
+  /// Stacked in its own row directly above the hairpin row (which
+  /// itself sits above the tempo/dynamic/measure-label stack at the
+  /// bottom of the grid), so none of these annotation rows overlap.
+  void _drawPedalMarks(Canvas canvas, Size size) {
+    final linePaint = Paint()
+      ..color = Colors.green
+      ..strokeWidth = 1.5;
+
+    final referenceTempoHeight = controller.timeline.tempoEvents.isNotEmpty
+        ? _tempoTextPainter(controller.timeline.tempoEvents.first).height
+        : 0.0;
+
+    final referenceDynamicHeight = controller.timeline.dynamicEvents.isNotEmpty
+        ? _dynamicTextPainter(controller.timeline.dynamicEvents.first).height
+        : 0.0;
+
+    final measureLabelHeight = _measureLabelReferenceHeight();
+
+    const hairpinOffset = 18.0;
+    // Approximate visual height of a crescendo/diminuendo hairpin
+    // (see _drawCrescendo/_drawDiminuendo's own "h" constant, which
+    // spans this much above AND below the hairpin's own y) — used
+    // only to stack the pedal row above that zigzag without
+    // overlapping it.
+    const hairpinRowHeight = 20.0;
+    const pedalGap = 10.0;
+
+    final pedalY = size.height
+        - measureLabelHeight
+        - _bottomMargin
+        - _labelGap
+        - referenceTempoHeight
+        - _labelGap
+        - referenceDynamicHeight
+        - hairpinOffset
+        - hairpinRowHeight
+        - pedalGap;
+
+    DynamicChangeEvent? pedalBegin;
+
+    for (final event in controller.timeline.dynamicChangeEvents) {
+      if (event.dynamic_change == DynamicChange.pedalDown) {
+        pedalBegin = event;
+        final tp = _pedalTextPainter();
+        final x = event.tick * pixelsPerTick;
+        tp.paint(canvas, Offset(x, pedalY - tp.height / 2));
+      } else if (event.dynamic_change == DynamicChange.pedalUp) {
+        if (pedalBegin != null) {
+          final tp = _pedalTextPainter();
+          final startX = pedalBegin.tick * pixelsPerTick + tp.width + 4;
+          final endX = event.tick * pixelsPerTick;
+          if (endX > startX) {
+            canvas.drawLine(
+              Offset(startX, pedalY),
+              Offset(endX, pedalY),
+              linePaint,
+            );
+          }
+          pedalBegin = null;
+        }
       }
     }
   }
 
   // Draws a full-height green vertical line at every crescendo/diminuendo
   // start & finish tick — these are the tap targets handled in
-  // _computeDynamicChangeLineHits above.
+  // _computeDynamicChangeLineHits above. Excludes pedalDown/pedalUp —
+  // see that function's doc comment.
   void _drawDynamicChangeLines(Canvas canvas, Size size) {
     final linePaint = Paint()
       ..color = Colors.green
       ..strokeWidth = 2;
 
     for (final event in controller.timeline.dynamicChangeEvents) {
+      if (event.dynamic_change == DynamicChange.pedalDown ||
+          event.dynamic_change == DynamicChange.pedalUp) {
+        continue;
+      }
       final x = event.tick * pixelsPerTick;
       canvas.drawLine(
         Offset(x, 0),
@@ -756,6 +923,20 @@ class GridPainter extends CustomPainter {
         );
       }
 
+      // MEASURE NUMBER + TIME SIGNATURE — drawn at the very BOTTOM of
+      // the grid, below the tempo/dynamic labels (which stack above
+      // it — see the reshuffled Y math throughout this file). Unlike
+      // the scale name, this is shown for EVERY measure, not just
+      // where something changes, since the measure number itself is
+      // different each time regardless.
+      final measureLabelText = _measureLabelText(i + 1, measure.timeSignature);
+      final measureLabelPainter = _measureLabelTextPainter(measureLabelText);
+      final measureLabelY = size.height - measureLabelPainter.height - _bottomMargin;
+      measureLabelPainter.paint(
+        canvas,
+        Offset(measureX + _labelOffsetX, measureLabelY),
+      );
+
       final beatTicks = measure.timeSignature.beatDuration.ticks;
       for (
       int tick = measure.startTick + beatTicks;
@@ -777,11 +958,14 @@ class GridPainter extends CustomPainter {
     }
 
 
-    // TEMPO EVENTS — line full height, label at bottom of grid
+    // TEMPO EVENTS — line full height, label stacked above the
+    // measure/time-signature label at the bottom of the grid
 
     final tempoLinePaint = Paint()
       ..color = Colors.blue
       ..strokeWidth = 2;
+
+    final measureLabelHeightForTempo = _measureLabelReferenceHeight();
 
     for (final tempoEvent in controller.timeline.tempoEvents) {
       final x = tempoEvent.tick * pixelsPerTick;
@@ -793,7 +977,11 @@ class GridPainter extends CustomPainter {
       );
 
       final textPainter = _tempoTextPainter(tempoEvent);
-      final y = size.height - textPainter.height - _bottomMargin;
+      final y = size.height -
+          measureLabelHeightForTempo -
+          _bottomMargin -
+          _labelGap -
+          textPainter.height;
       textPainter.paint(canvas, Offset(x + _labelOffsetX, y));
     }
 
@@ -808,8 +996,10 @@ class GridPainter extends CustomPainter {
       final textPainter = _dynamicTextPainter(dynamicEvent);
 
       final y = size.height -
-          referenceTempoHeight -
+          measureLabelHeightForTempo -
           _bottomMargin -
+          _labelGap -
+          referenceTempoHeight -
           _labelGap -
           textPainter.height;
 
@@ -821,6 +1011,9 @@ class GridPainter extends CustomPainter {
 
 // DRAW ALL CRESCENDO/DIMINUENDO AT ONE FIXED HEIGHT
     _drawHairpins(canvas, size);
+
+// SUSTAIN PEDAL — red "ped" sign + connecting line, stacked above the hairpins
+    _drawPedalMarks(canvas, size);
   }
 
   @override
