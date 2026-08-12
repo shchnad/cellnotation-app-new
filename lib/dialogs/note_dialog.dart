@@ -5,6 +5,7 @@ import '../controllers/composition_controller.dart';
 import '../enums/accidental.dart';
 import '../enums/finger.dart';
 import '../enums/glissando_direction.dart';
+import '../enums/grace_note_type.dart';
 import '../enums/hand.dart';
 import '../enums/note_duration.dart';
 import '../enums/ornament.dart';
@@ -176,7 +177,22 @@ class NoteDialog extends StatelessWidget {
                   // leading: const Icon(Icons.timelapse),
                   leading: const Icon(Icons.av_timer),
                   title: Text(
-                    'Duration: ${controller.durationLabel(editedNote)}',
+                    // A grace note's own duration, and its anchor's once
+                    // it has grace notes, is computed automatically (see
+                    // CompositionController._redistributeGraceNotes) from
+                    // an arbitrary tick count — never one of the standard
+                    // NoteDuration values. durationLabel would otherwise
+                    // silently fall back to showing "Quarter" for any
+                    // non-matching tick count, which is misleading here,
+                    // so the raw tick count is shown directly instead.
+                    // graceOfNoteId marks a grace note itself; a note
+                    // that instead HAS grace notes (the anchor) is marked
+                    // by graceOriginalDurationTicks — graceNoteType is
+                    // only ever set on grace notes, never the anchor.
+                    (editedNote.graceOfNoteId != null ||
+                        editedNote.graceOriginalDurationTicks != null)
+                        ? 'Duration: ${editedNote.durationTicks} ticks (auto)'
+                        : 'Duration: ${controller.durationLabel(editedNote)}',
                     style: const TextStyle(
                       fontSize: 22,
                       color: Colors.black,
@@ -184,6 +200,28 @@ class NoteDialog extends StatelessWidget {
                     ),
                   ),
                   onTap: () {
+                    // Setting a grace note's (or its anchor's) duration
+                    // directly to a standard NoteDuration value would
+                    // silently corrupt the whole group — the anchor and
+                    // its grace notes only stay consistent with each
+                    // other via CompositionController.
+                    // _redistributeGraceNotes, which this picker knows
+                    // nothing about. Duration for these notes is only
+                    // ever changed by adding/removing grace notes (see
+                    // the Grace Notes field below), never set directly.
+                    if (editedNote.graceOfNoteId != null ||
+                        editedNote.graceOriginalDurationTicks != null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            "Grace note durations are set automatically "
+                                "and can't be edited directly here.",
+                            style: TextStyle(fontSize: 22),
+                          ),
+                        ),
+                      );
+                      return;
+                    }
                     final duration = NoteDuration.values.firstWhere(
                           (d) => d.ticks == editedNote.durationTicks,
                       orElse: () => NoteDuration.quarter,
@@ -392,6 +430,86 @@ class NoteDialog extends StatelessWidget {
                         // run note belonging to it — see
                         // CompositionController.clearNoteGlissando.
                         controller.clearNoteGlissando(editedNote);
+                      },
+                    );
+                  },
+                ),
+
+                ListTile(
+                  leading: const Icon(Icons.speed),
+                  title: Builder(
+                    builder: (context) {
+                      final graceNotes = controller.notes
+                          .where((n) => n.graceOfNoteId == editedNote.id)
+                          .toList();
+                      // Only one type is ever active on a note at a time
+                      // (see CompositionController.startAddingGraceNotes),
+                      // so every entry here shares the same graceNoteType.
+                      final currentType =
+                      graceNotes.isNotEmpty ? graceNotes.first.graceNoteType : null;
+                      return Text(
+                        graceNotes.isEmpty
+                            ? 'Grace Notes: none'
+                            : 'Grace Notes: ${graceNotes.length} '
+                            '(${currentType?.label ?? '?'})',
+                        style: const TextStyle(
+                          fontSize: 22,
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      );
+                    },
+                  ),
+                  onTap: () {
+                    final graceNotes = controller.notes
+                        .where((n) => n.graceOfNoteId == editedNote.id)
+                        .toList();
+                    final currentType =
+                    graceNotes.isNotEmpty ? graceNotes.first.graceNoteType : null;
+                    noteValuesDialog<GraceNoteType>(
+                      context: context,
+                      allowToCloseNextWindow: true,
+                      currentValue: currentType,
+                      title: 'Add Grace Note',
+                      values: GraceNoteType.values,
+                      numberOfColumns: 1,
+                      labelBuilder: (t) => t.label,
+                      onSelected: (type) {
+                        // Closes this dialog too (allowToCloseNextWindow) so
+                        // the grid is ready for tapping — every tap adds one
+                        // more grace note of this type, up to
+                        // CompositionController.maxGraceNotesForType (which
+                        // depends on this note's own duration — shorter
+                        // notes allow fewer), until the mode is turned off
+                        // from the app bar — see CompositionController.
+                        // startAddingGraceNotes / GridWidget's onTapUp. A
+                        // note can only have ONE type of grace note active
+                        // at a time — picking a DIFFERENT type than
+                        // whatever's already there deletes the existing
+                        // ones first.
+                        final maxForType =
+                        controller.maxGraceNotesForType(editedNote, type);
+                        controller.startAddingGraceNotes(editedNote, type);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              maxForType == 0
+                                  ? 'This note is too short for '
+                                  '${type.label} grace notes.'
+                                  : 'Add Grace Note mode is on — tap the '
+                                  'grid to add ${type.label} grace notes '
+                                  '(max $maxForType for this note). Toggle '
+                                  'it off from the app bar when done.',
+                              style: const TextStyle(fontSize: 22),
+                            ),
+                          ),
+                        );
+                      },
+                      onClear: () {
+                        // Removes every grace note belonging to this note
+                        // and reverts it back to its original duration —
+                        // see CompositionController.clearAllGraceNotes.
+                        controller.clearAllGraceNotes(editedNote);
                       },
                     );
                   },

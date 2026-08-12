@@ -2,6 +2,7 @@ import '../enums/accidental.dart';
 import '../enums/articulation.dart';
 import '../enums/finger.dart';
 import '../enums/glissando_direction.dart';
+import '../enums/grace_note_type.dart';
 import '../enums/hand.dart';
 import '../enums/ornament.dart';
 import '../enums/playing_technique.dart';
@@ -53,6 +54,48 @@ class Note {
   /// keys regardless of key signature.
   final int? glissandoSourceId;
 
+  /// Set ONLY on grace notes themselves (never on an ordinary note,
+  /// and never on the anchor note they precede). All of one anchor's
+  /// grace notes share the SAME type at any given time — switching to
+  /// a different type (see CompositionController.startAddingGraceNotes)
+  /// deletes whatever grace notes were already there first, since a
+  /// note can only have one type of grace note active at once. This
+  /// grace note's own duration is always exactly
+  /// [GraceNoteType.durationTicks] — a FIXED, absolute value (not a
+  /// fraction of the anchor's own duration) — see
+  /// CompositionController._redistributeGraceNotes /
+  /// maxGraceNotesForType for the full placement and count-limiting
+  /// logic.
+  final GraceNoteType? graceNoteType;
+
+  /// Set ONLY on the anchor note that grace notes precede — null
+  /// means this note currently has no grace notes. This note's own
+  /// [durationTicks] as it was BEFORE any grace notes existed,
+  /// captured once the first time a grace note is added (see
+  /// CompositionController.startAddingGraceNotes) and never touched
+  /// again afterward, even as [durationTicks] itself keeps shrinking
+  /// with each grace note added. This is the fixed reference every
+  /// grace note's own [GraceNoteType.durationDivisor] divides, and —
+  /// combined with this note's current, always-unchanged end tick —
+  /// is what lets CompositionController._redistributeGraceNotes
+  /// derive exactly where this note's original start tick was, so
+  /// removing all its grace notes shifts it back left with no drift.
+  /// Cleared (along with every grace note — see [graceOfNoteId]) via
+  /// CompositionController.clearAllGraceNotes, or automatically once
+  /// the last grace note is individually deleted.
+  final int? graceOriginalDurationTicks;
+
+  /// Set ONLY on grace notes themselves (never on an ordinary note,
+  /// and never on the anchor note — the anchor instead carries
+  /// [graceOriginalDurationTicks]). Points back at the anchor note's
+  /// [id], so all of one note's grace notes can be found,
+  /// redistributed, or removed together. A grace note is otherwise an
+  /// entirely ordinary [Note] — same fields, same
+  /// [note_dialog.dart] for editing — only its position/duration are
+  /// managed automatically (see [graceNoteType]'s doc) rather than
+  /// set directly by the person.
+  final int? graceOfNoteId;
+
   const Note({
     required this.id,
     required this.startTick,
@@ -67,6 +110,9 @@ class Note {
     this.legato = false,
     this.glissando,
     this.glissandoSourceId,
+    this.graceNoteType,
+    this.graceOriginalDurationTicks,
+    this.graceOfNoteId,
   });
 
   // ================= COPY =================
@@ -85,6 +131,9 @@ class Note {
     bool? legato,
     Object? glissando = _keep,
     Object? glissandoSourceId = _keep,
+    Object? graceNoteType = _keep,
+    Object? graceOriginalDurationTicks = _keep,
+    Object? graceOfNoteId = _keep,
   }) {
 
     return Note(
@@ -115,6 +164,15 @@ class Note {
       glissandoSourceId: glissandoSourceId == _keep
           ? this.glissandoSourceId
           : glissandoSourceId as int?,
+      graceNoteType: graceNoteType == _keep
+          ? this.graceNoteType
+          : graceNoteType as GraceNoteType?,
+      graceOriginalDurationTicks: graceOriginalDurationTicks == _keep
+          ? this.graceOriginalDurationTicks
+          : graceOriginalDurationTicks as int?,
+      graceOfNoteId: graceOfNoteId == _keep
+          ? this.graceOfNoteId
+          : graceOfNoteId as int?,
     );
   }
 
@@ -137,6 +195,10 @@ class Note {
       'legato': legato,
       if (glissando != null) 'glissando': glissando!.name,
       if (glissandoSourceId != null) 'glissandoSourceId': glissandoSourceId,
+      if (graceNoteType != null) 'graceNoteType': graceNoteType!.name,
+      if (graceOriginalDurationTicks != null)
+        'graceOriginalDurationTicks': graceOriginalDurationTicks,
+      if (graceOfNoteId != null) 'graceOfNoteId': graceOfNoteId,
     };
   }
 
@@ -249,6 +311,18 @@ class Note {
 
       glissandoSourceId:
       _readIntOrNull(json, 'glissandoSourceId'),
+
+
+      graceNoteType:
+      _enumByNameOrNull(GraceNoteType.values, json['graceNoteType']),
+
+
+      graceOriginalDurationTicks:
+      _readIntOrNull(json, 'graceOriginalDurationTicks'),
+
+
+      graceOfNoteId:
+      _readIntOrNull(json, 'graceOfNoteId'),
 
 
     );

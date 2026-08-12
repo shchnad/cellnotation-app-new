@@ -655,6 +655,31 @@ class _CompositionScreenState extends State<CompositionScreen>
                             controller.toggleLegatoMode,
                           ),
 
+                          // ADD GRACE NOTE MODE — only ever turned ON
+                          // from a note's own dialog (choosing a grace
+                          // note type there needs a specific note to
+                          // attach to — see
+                          // CompositionController.startAddingGraceNotes),
+                          // but can always be turned OFF from here.
+                          // While on, every grid tap adds another
+                          // grace note to whichever note started it
+                          // (see CompositionController.
+                          // addGraceNoteAtRow), up to
+                          // maxGraceNotesPerNote.
+                          IconButton(
+                            icon: Icon(
+                              Icons.grain,
+                              color: controller.isAddingGraceNotes
+                                  ? Colors.blue
+                                  : Colors.black,
+                            ),
+                            tooltip: controller.isAddingGraceNotes
+                                ? 'Add Grace Note Mode: On'
+                                : 'Add Grace Note Mode: Off',
+                            onPressed:
+                            controller.stopAddingGraceNotes,
+                          ),
+
 
                           // DURATION
                           IconButton(

@@ -8,6 +8,7 @@ import '../enums/accidental.dart';
 import '../enums/dynamic_change.dart';
 import '../enums/finger.dart';
 import '../enums/glissando_direction.dart';
+import '../enums/grace_note_type.dart';
 import '../enums/musical_dynamic.dart';
 import '../enums/ornament.dart';
 import '../enums/playing_technique.dart';
@@ -902,6 +903,23 @@ class CompositionController extends ChangeNotifier {
     composition.notes.removeWhere(
           (n)=>n.id == note.id,
     );
+    // If the removed note itself HAD grace notes (was an anchor —
+    // see Note.graceOriginalDurationTicks, the anchor-only marker),
+    // they no longer have a main note to precede — a grace note
+    // without its main note doesn't make musical sense, so remove
+    // them too rather than leaving them orphaned.
+    if (note.graceOriginalDurationTicks != null) {
+      composition.notes.removeWhere(
+            (n) => n.graceOfNoteId == note.id,
+      );
+    }
+    // If the removed note WAS a grace note, its remaining siblings
+    // need to re-expand to fill the time that's now freed up (the
+    // group's fixed total span is divided across however many
+    // currently exist — see _redistributeGraceNotes).
+    if (note.graceOfNoteId != null) {
+      _redistributeGraceNotes(note.graceOfNoteId!);
+    }
     notifyListeners();
   }
 
@@ -1324,6 +1342,281 @@ class CompositionController extends ChangeNotifier {
     // two up the same way getNoteFrequencyHz's octaveShift does.
     final totalSemitonesFromC4 = _naturalAbsoluteSemitone(row) - 4 * 12;
     return _referenceFrequencyC4 * math.pow(2, totalSemitonesFromC4 / 12);
+  }
+
+
+  // =====================================================
+  // GRACE NOTES
+  // =====================================================
+
+  /// An outer sanity ceiling regardless of duration — the REAL limit
+  /// is duration-based (see [maxGraceNotesForType]); this just guards
+  /// against a pathological case (a very long note combined with a
+  /// very short grace type) producing an unreasonably large count.
+  static const int maxGraceNotesPerNote = 32;
+
+  // The note "Add Grace Note" mode is currently adding grace notes
+  // for, and which type each new tap creates — both non-null while
+  // the mode is on (see [isAddingGraceNotes]). Mirrors the glissando
+  // pending-pick pattern, except this stays active across MANY grid
+  // taps (each one adds another grace note) rather than being
+  // consumed by a single tap, so it needs an explicit stop rather
+  // than auto-clearing.
+  Note? _graceNoteAnchor;
+  GraceNoteType? _graceNoteTypeBeingAdded;
+
+  /// Whether the grid's next tap(s) should add grace notes to
+  /// whichever note [startAddingGraceNotes] was last called with,
+  /// rather than their normal behavior (creating an ordinary note,
+  /// opening a label dialog, etc.). Checked by GridWidget.
+  bool get isAddingGraceNotes => _graceNoteAnchor != null;
+
+  /// How many grace notes of [type] can fit in [note]'s own ORIGINAL
+  /// duration (see [Note.graceOriginalDurationTicks], falling back to
+  /// the note's current duration if grace notes haven't been started
+  /// yet on it) without their fixed total exceeding it — i.e. the
+  /// anchor's own remaining duration must never end up less than the
+  /// sum of all its grace notes' durations. A longer note allows
+  /// more; a shorter note allows fewer (zero, if the note is shorter
+  /// than even a single grace note of this type). Also respects the
+  /// type's own [GraceNoteType.maxCountOverride] (Appoggiatura: only
+  /// 1 ever, regardless of what the duration math alone would allow)
+  /// — whichever of the two limits is stricter wins.
+  int maxGraceNotesForType(Note note, GraceNoteType type) {
+    final originalDuration =
+        note.graceOriginalDurationTicks ?? note.durationTicks;
+    final perNote = type.durationTicksFor(originalDuration);
+    if (perNote <= 0) return 0;
+    final durationBasedMax = (originalDuration / perNote).floor();
+    final cap = type.maxCountOverride ?? maxGraceNotesPerNote;
+    return durationBasedMax.clamp(0, cap);
+  }
+
+  /// Begins "Add Grace Note" mode for [note], with every subsequent
+  /// grid tap adding one grace note of [type] (see
+  /// [addGraceNoteAtRow]) — call this from wherever the type is
+  /// chosen (NoteDialog's Grace Notes field), then close any dialogs
+  /// so the person can start tapping the grid. The mode stays on
+  /// until [stopAddingGraceNotes] is called (the app-bar toggle).
+  ///
+  /// A note can only have ONE type of grace note active at a time —
+  /// if [note] already has grace notes of a DIFFERENT type than
+  /// [type], they're deleted first (which also reverts [note] back
+  /// toward its original duration, via [_redistributeGraceNotes]'s
+  /// zero-remaining case) before the new type takes over. Calling
+  /// this again with the SAME type [note] already has just continues
+  /// adding more of it — nothing is deleted in that case.
+  ///
+  /// The first time a grace note is EVER added to [note] (or
+  /// immediately after switching types, since that clears it), its
+  /// CURRENT durationTicks is captured into
+  /// [Note.graceOriginalDurationTicks] and never touched again
+  /// afterward — this is the fixed reference [maxGraceNotesForType]
+  /// and [_redistributeGraceNotes] both use.
+  void startAddingGraceNotes(Note note, GraceNoteType type) {
+    final index = notes.indexWhere((n) => n.id == note.id);
+    if (index == -1) return;
+
+    final existingGraceNotes =
+    notes.where((n) => n.graceOfNoteId == note.id).toList();
+    final existingType =
+    existingGraceNotes.isNotEmpty ? existingGraceNotes.first.graceNoteType : null;
+
+    if (existingType != null && existingType != type) {
+      // Only one type of grace note allowed per note at a time —
+      // switching types deletes whatever was there before. This also
+      // reverts the note's own start/duration back toward its
+      // original span, since there's nothing left of the old type to
+      // make room for.
+      notes.removeWhere((n) => n.graceOfNoteId == note.id);
+      _redistributeGraceNotes(note.id);
+    }
+
+    final refreshedIndex = notes.indexWhere((n) => n.id == note.id);
+    final refreshed = notes[refreshedIndex];
+    if (refreshed.graceOriginalDurationTicks == null) {
+      notes[refreshedIndex] = refreshed.copyWith(
+        graceOriginalDurationTicks: refreshed.durationTicks,
+      );
+    }
+    _graceNoteAnchor = notes[refreshedIndex];
+    _graceNoteTypeBeingAdded = type;
+    notifyListeners();
+  }
+
+  /// Turns "Add Grace Note" mode off without touching any notes —
+  /// whatever grace notes already exist stay exactly as they are.
+  /// This is the only way to leave the mode (see the app-bar toggle);
+  /// it does NOT get triggered automatically by any single tap, since
+  /// the mode is meant to stay on across many taps.
+  void stopAddingGraceNotes() {
+    _graceNoteAnchor = null;
+    _graceNoteTypeBeingAdded = null;
+    notifyListeners();
+  }
+
+  /// Adds one new grace note, at [row], of whichever type
+  /// [startAddingGraceNotes] was last called with, for whichever note
+  /// "Add Grace Note" mode is currently active for — its hand is
+  /// copied from the anchor; its own start/duration are placeholders,
+  /// immediately overwritten by [_redistributeGraceNotes] (called at
+  /// the end of this method) along with every sibling's and the
+  /// anchor's own. Returns a short message to show (e.g. via a
+  /// SnackBar) if nothing was added — already at
+  /// [maxGraceNotesForType] for this note's duration and the current
+  /// type (including the note being too short for even one), the
+  /// anchor no longer exists, or [row] is off-grid — or null on
+  /// success. A no-op (returns null) if the mode isn't currently on
+  /// at all.
+  String? addGraceNoteAtRow(int row) {
+    final anchorRef = _graceNoteAnchor;
+    final type = _graceNoteTypeBeingAdded;
+    if (anchorRef == null || type == null) return null;
+
+    final anchorIndex = notes.indexWhere((n) => n.id == anchorRef.id);
+    if (anchorIndex == -1) {
+      _graceNoteAnchor = null;
+      _graceNoteTypeBeingAdded = null;
+      notifyListeners();
+      return 'That note no longer exists';
+    }
+    final anchor = notes[anchorIndex];
+
+    if (row < 0 || row >= totalRows) {
+      return 'That row is outside the grid';
+    }
+
+    final existingCount =
+        notes.where((n) => n.graceOfNoteId == anchor.id).length;
+    final maxForType = maxGraceNotesForType(anchor, type);
+    if (existingCount >= maxForType) {
+      return maxForType == 0
+          ? 'This note is too short for ${type.label} grace notes'
+          : 'Maximum of $maxForType ${type.label} grace notes for this note';
+    }
+
+    // startTick/durationTicks here are placeholders only —
+    // _redistributeGraceNotes below overwrites them (along with every
+    // sibling's, AND the anchor's own) immediately.
+    notes.add(Note(
+      id: generateNoteId(),
+      startTick: anchor.startTick,
+      durationTicks: 1,
+      row: row,
+      hand: anchor.hand,
+      graceOfNoteId: anchor.id,
+      graceNoteType: type,
+    ));
+
+    _redistributeGraceNotes(anchor.id);
+    notifyListeners();
+    return null;
+  }
+
+  /// Recomputes the anchor note's own start/duration AND every one of
+  /// its grace notes', for the note with id [anchorId].
+  ///
+  /// The grace region is carved out of the START of the anchor's own
+  /// ORIGINAL span (see [Note.graceOriginalDurationTicks]) rather
+  /// than the space before it: the anchor's end tick
+  /// (startTick + durationTicks) never moves, no matter how many
+  /// grace notes exist — only its start tick (and thus its own
+  /// duration) shifts to make room, later as grace notes are added,
+  /// back toward its original position as they're removed. The
+  /// anchor's original start tick is DERIVED rather than stored
+  /// separately: `(current end tick) - graceOriginalDurationTicks` —
+  /// this is exactly right because the end tick is the one thing this
+  /// method itself guarantees never changes, so it's always safe to
+  /// read back from the anchor's current values, however many times
+  /// this has already run.
+  ///
+  /// Every grace note's duration is always exactly its own
+  /// [GraceNoteType.durationTicks] — a FIXED, absolute value that is
+  /// NEVER shrunk or scaled, unlike an earlier design. Grace notes
+  /// are placed back-to-back in the order they appear in [notes]
+  /// (i.e. the order they were tapped in), earliest-tapped placed
+  /// earliest in time. The anchor is still guaranteed at least 1 tick
+  /// of its own duration — but if the grace notes' fixed total would
+  /// leave less than that (which [maxGraceNotesForType] is meant to
+  /// prevent at add-time, but this stays robust even if it somehow
+  /// happens, e.g. the anchor's own duration changing by some other
+  /// means afterward), the anchor's start is clamped rather than any
+  /// grace note's duration being compressed — the last grace note(s)
+  /// may then end after that clamped start, overlapping the anchor,
+  /// which is accepted rather than fought.
+  ///
+  /// If NO grace notes remain (the last one was just removed), the
+  /// anchor reverts exactly to its original start tick and duration,
+  /// and [Note.graceOriginalDurationTicks] is cleared — there's
+  /// nothing left for it to describe. A no-op if the anchor no longer
+  /// exists or has no [Note.graceOriginalDurationTicks] (already
+  /// fully reverted, or never had grace notes in the first place).
+  void _redistributeGraceNotes(int anchorId) {
+    final anchorIndex = notes.indexWhere((n) => n.id == anchorId);
+    if (anchorIndex == -1) return;
+    final anchor = notes[anchorIndex];
+    final originalDuration = anchor.graceOriginalDurationTicks;
+    if (originalDuration == null) return;
+
+    final graceIndices = <int>[];
+    for (int i = 0; i < notes.length; i++) {
+      if (notes[i].graceOfNoteId == anchorId) graceIndices.add(i);
+    }
+    final count = graceIndices.length;
+
+    // Never moves, by construction of this very method — safe to
+    // treat as the fixed reference point regardless of how many times
+    // this has already run for this anchor.
+    final fixedEndTick = anchor.startTick + anchor.durationTicks;
+    final originalStartTick = fixedEndTick - originalDuration;
+
+    if (count == 0) {
+      // Nothing left to make room for — revert fully and clear the
+      // marker, since there's no longer any grace-note state to
+      // track.
+      notes[anchorIndex] = anchor.copyWith(
+        startTick: originalStartTick,
+        durationTicks: originalDuration,
+        graceOriginalDurationTicks: null,
+      );
+      return;
+    }
+
+    int runningTick = originalStartTick;
+    for (int k = 0; k < count; k++) {
+      final idx = graceIndices[k];
+      final graceType = notes[idx].graceNoteType;
+      final fixedDuration =
+          graceType?.durationTicksFor(originalDuration) ?? 1;
+      notes[idx] = notes[idx].copyWith(
+        startTick: runningTick,
+        durationTicks: fixedDuration,
+      );
+      runningTick += fixedDuration;
+    }
+
+    final newAnchorStart =
+    runningTick.clamp(originalStartTick, fixedEndTick - 1);
+
+    notes[anchorIndex] = anchor.copyWith(
+      startTick: newAnchorStart,
+      durationTicks: fixedEndTick - newAnchorStart,
+    );
+  }
+
+  /// Removes [note]'s grace notes entirely: deletes every grace note
+  /// that points back at it (see [Note.graceOfNoteId]), which — via
+  /// [_redistributeGraceNotes] hitting its zero-remaining case — also
+  /// reverts [note] itself back to its original start tick/duration
+  /// and clears its [Note.graceOriginalDurationTicks]. Called from
+  /// wherever the Grace Notes field's dialog offers a "Delete"/clear
+  /// action.
+  void clearAllGraceNotes(Note note) {
+    final index = notes.indexWhere((n) => n.id == note.id);
+    if (index == -1) return;
+    notes.removeWhere((n) => n.graceOfNoteId == note.id);
+    _redistributeGraceNotes(note.id);
+    notifyListeners();
   }
 
 

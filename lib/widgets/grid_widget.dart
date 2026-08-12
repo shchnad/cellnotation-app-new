@@ -391,7 +391,41 @@ class GridWidget extends StatelessWidget {
                           return;
                         }
 
-                        // 1. Whatever else this tap does, it also tells us
+                        // 1. If "Add Grace Note" mode is on (see
+                        //    CompositionController.
+                        //    startAddingGraceNotes, kicked off from
+                        //    NoteDialog's Grace Notes field), this tap
+                        //    ONLY adds one more grace note — it
+                        //    doesn't select a measure, open a label
+                        //    dialog, or create an ordinary note.
+                        //    Unlike glissando's pick, this mode stays
+                        //    on for MANY taps — it's only turned off
+                        //    via the app-bar toggle (see
+                        //    CompositionController.
+                        //    stopAddingGraceNotes), not automatically
+                        //    after one tap. A failed add (already at
+                        //    the max, or off-grid) just shows a
+                        //    message; the mode stays on either way.
+                        if (controller.isAddingGraceNotes) {
+                          final visualRow =
+                          (details.localPosition.dy / cellHeight).floor();
+                          final row = controller.totalRows - 1 - visualRow;
+                          final errorMessage =
+                          controller.addGraceNoteAtRow(row);
+                          if (errorMessage != null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  errorMessage,
+                                  style: const TextStyle(fontSize: 22),
+                                ),
+                              ),
+                            );
+                          }
+                          return;
+                        }
+
+                        // 2. Whatever else this tap does, it also tells us
                         //    which measure the person is pointing at — so
                         //    the pitch column can switch to that measure's
                         //    scale.
@@ -403,7 +437,7 @@ class GridWidget extends StatelessWidget {
                           controller.selectMeasureAtTick(tappedTick);
                         }
 
-                        // 2. Check the scale name label at the top —
+                        // 3. Check the scale name label at the top —
                         //    tapping it opens a scale picker for that
                         //    measure, not creating a note.
                         final scaleLabelHits = _computeScaleLabelHits(
@@ -430,7 +464,7 @@ class GridWidget extends StatelessWidget {
                           }
                         }
 
-                        // 3. Check tempo/dynamic labels next — tapping a
+                        // 4. Check tempo/dynamic labels next — tapping a
                         //    label should open its edit dialog, not create
                         //    a note.
                         final labelHits = _computeLabelHits(
@@ -450,7 +484,7 @@ class GridWidget extends StatelessWidget {
                           }
                         }
 
-                        // 4. Check crescendo/diminuendo start & finish
+                        // 5. Check crescendo/diminuendo start & finish
                         //    lines next — tapping one opens the dynamic
                         //    change dialog instead of creating a note.
                         final dynamicChangeLineHits =
@@ -467,7 +501,7 @@ class GridWidget extends StatelessWidget {
                           }
                         }
 
-                        // 5. Otherwise, normal grid/note tap handling.
+                        // 6. Otherwise, normal grid/note tap handling.
                         // The tapped screen position is converted to a
                         // musical row: row 0 (lowest pitch) sits at the
                         // BOTTOM of the grid, so a tap near the bottom
@@ -522,6 +556,14 @@ class GridWidget extends StatelessWidget {
                         // that pending pick is concerned, and onTapUp
                         // already handles it.
                         if (controller.isPickingGlissandoEndRow) {
+                          return;
+                        }
+
+                        // Same idea while "Add Grace Note" mode is on
+                        // — a double-tap is still just an ordinary
+                        // single tap as far as adding a grace note is
+                        // concerned, and onTapUp already handles it.
+                        if (controller.isAddingGraceNotes) {
                           return;
                         }
 
