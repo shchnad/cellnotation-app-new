@@ -373,22 +373,28 @@ class _CompositionScreenState extends State<CompositionScreen>
             children: [
 
               // =====================================================
-              // TITLE COLUMN
+              // TITLE COLUMN — tap to edit title/composer/style/
+              // instrument (see _showEditDialog); this replaces the
+              // toolbar's old separate "Edit Info" button.
               // =====================================================
 
-              Container(
-                width: 45,
-                color: Colors.black,
-                child: Center(
-                  child: RotatedBox(
-                    quarterTurns: 3,
-                    child: Text(
-                      '${controller.composition.composer} - ${controller.composition.title}',
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _showEditDialog(context),
+                child: Container(
+                  width: 45,
+                  color: Colors.black,
+                  child: Center(
+                    child: RotatedBox(
+                      quarterTurns: 3,
+                      child: Text(
+                        '${controller.composition.composer} - ${controller.composition.title}',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
@@ -461,17 +467,6 @@ class _CompositionScreenState extends State<CompositionScreen>
                             },
                           ),
 
-                          // EDIT INFO
-                          IconButton(
-                            icon: const Icon(Icons.title,
-                              color: Colors.black,
-                            ),
-                            tooltip: 'Edit Title / Composer / Style / Instrument',
-                            onPressed: () {
-                              _showEditDialog(context);
-                            },
-                          ),
-
                           // NEW COMPOSITION
                           IconButton(
                             icon: const Icon(Icons.library_add,
@@ -494,6 +489,179 @@ class _CompositionScreenState extends State<CompositionScreen>
                             },
                           ),
 
+                          const SizedBox(
+                            width: 50,
+                            child: Divider(
+                              color: Colors.white24,
+                            ),
+                          ),
+
+                          // HAND
+                          IconButton(
+                            icon: Icon(Icons.pan_tool,
+                              color:  controller.currentHand == Hand.right
+                                  ? Colors.black
+                                  : Colors.blue,
+                            ),
+                            tooltip: 'Hand',
+                            onPressed:
+                            controller.toggleHand,
+                          ),
+
+
+                          // DURATION
+                          IconButton(
+                            icon: const Icon(Icons.av_timer,
+                              color: Colors.black,
+                            ),
+                            tooltip: 'Note Duration',
+                            onPressed: () {
+                              globalDurationDialog(
+                                context,
+                                controller,
+                              );
+                            },
+                          ),
+
+                          // ADD GRACE NOTE MODE — only ever turned ON
+                          // from a note's own dialog (choosing a grace
+                          // note type there needs a specific note to
+                          // attach to — see
+                          // CompositionController.startAddingGraceNotes),
+                          // but can always be turned OFF from here.
+                          // While on, every grid tap adds another
+                          // grace note to whichever note started it
+                          // (see CompositionController.
+                          // addGraceNoteAtRow), up to
+                          // maxGraceNotesPerNote.
+                          IconButton(
+                            icon: Icon(
+                              Icons.grain,
+                              color: controller.isAddingGraceNotes
+                                  ? Colors.blue
+                                  : Colors.black,
+                            ),
+                            tooltip: controller.isAddingGraceNotes
+                                ? 'Add Grace Note Mode: On'
+                                : 'Add Grace Note Mode: Off',
+                            onPressed:
+                            controller.stopAddingGraceNotes,
+                          ),
+
+                          // LEGATO MODE — while on, tapping a note toggles
+                          // its own legato flag instead of opening the
+                          // note-edit dialog. Independent of Articulation
+                          // (a note can be legato and, say, sforzando at
+                          // the same time).
+                          IconButton(
+                            icon: Icon(
+                              Icons.airline_stops_outlined,
+                              color: controller.legatoMode
+                                  ? Colors.blue
+                                  : Colors.black,
+                            ),
+                            tooltip: controller.legatoMode
+                                ? 'Legato Mode: On'
+                                : 'Legato Mode: Off',
+                            onPressed:
+                            controller.toggleLegatoMode,
+                          ),
+
+
+                          // PASTE
+                          if (controller.canPaste)
+                            IconButton(
+                              icon: Icon(Icons.control_point_duplicate,
+                                color: controller.pasteMode
+                                    ? Colors.blue
+                                    : Colors.black,
+                              ),
+                              tooltip: 'Paste',
+                              onPressed: () {
+                                if (controller.pasteMode) {
+                                  controller.exitPasteMode();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                          DefaultValues.snackBarMessageForCopying.toString()
+                                      ),
+                                    ),
+                                  );
+                                } else {
+                                  simpleMessageDialog(
+                                    context,
+                                    DefaultValues.titleOfMessageForCopying.toString(),
+                                    DefaultValues.messageForCopying.toString(),
+                                  );
+                                }
+
+                              },
+                            ),
+
+                          const SizedBox(
+                            width: 50,
+                            child: Divider(
+                              color: Colors.white24,
+                            ),
+                          ),
+
+                          // SCROLL LOCK — blocks tapping the grid from
+                          // creating/editing notes, so the composition can
+                          // be scrolled around without accidentally adding
+                          // a note on every tap.
+                          IconButton(
+                            icon: Icon(
+                              controller.inputLocked
+                                  ? Icons.lock
+                                  : Icons.lock_open,
+                              color: controller.inputLocked
+                                  ? Colors.blue
+                                  : Colors.black,
+                            ),
+                            tooltip: controller.inputLocked
+                                ? 'Scroll Lock: On'
+                                : 'Scroll Lock: Off',
+                            onPressed:
+                            controller.toggleInputLocked,
+                          ),
+
+
+                          // COMPENSATED NOTATION TOGGLE — switches between
+                          // normal notation (scale sign + accidental shown
+                          // separately, e.g. "4+" plus a "-") and a
+                          // simplified view where opposing signs cancel to
+                          // a plain note and matching signs respell as the
+                          // next degree over. Purely a display switch —
+                          // note.row/note.accidental never change, so this
+                          // toggles back instantly with no data loss.
+                          IconButton(
+                            icon: Icon(Icons.auto_fix_high,
+                              color: controller.showCompensatedNotation
+                                  ? Colors.blue
+                                  : Colors.black,
+                            ),
+                            tooltip: controller.showCompensatedNotation
+                                ? 'Compensated Notation: On'
+                                : 'Compensated Notation: Off',
+                            onPressed:
+                            controller.toggleCompensatedNotation,
+                          ),
+
+                          // ROTATE PITCH TEXT — purely cosmetic; rotates
+                          // the pitch label drawn inside each note cell,
+                          // handy when cells are narrow.
+                          IconButton(
+                            icon: Icon(Icons.rotate_left,
+                              color: controller.rotatePitchText
+                                  ? Colors.blue
+                                  : Colors.black,
+                            ),
+                            tooltip: controller.rotatePitchText
+                                ? 'Rotate Pitch Text: On'
+                                : 'Rotate Pitch Text: Off',
+                            onPressed:
+                            controller.toggleRotatePitchText,
+                          ),
 
                           // PLAY / PAUSE — auto-scrolls the grid left to
                           // right at a speed derived from tempo and beat
@@ -578,144 +746,12 @@ class _CompositionScreenState extends State<CompositionScreen>
                           ),
 
 
-                          // COMPENSATED NOTATION TOGGLE — switches between
-                          // normal notation (scale sign + accidental shown
-                          // separately, e.g. "4+" plus a "-") and a
-                          // simplified view where opposing signs cancel to
-                          // a plain note and matching signs respell as the
-                          // next degree over. Purely a display switch —
-                          // note.row/note.accidental never change, so this
-                          // toggles back instantly with no data loss.
-                          IconButton(
-                            icon: Icon(Icons.auto_fix_high,
-                              color: controller.showCompensatedNotation
-                                  ? Colors.blue
-                                  : Colors.black,
-                            ),
-                            tooltip: controller.showCompensatedNotation
-                                ? 'Compensated Notation: On'
-                                : 'Compensated Notation: Off',
-                            onPressed:
-                            controller.toggleCompensatedNotation,
-                          ),
-
-                          // ROTATE PITCH TEXT — purely cosmetic; rotates
-                          // the pitch label drawn inside each note cell,
-                          // handy when cells are narrow.
-                          IconButton(
-                            icon: Icon(Icons.rotate_left,
-                              color: controller.rotatePitchText
-                                  ? Colors.blue
-                                  : Colors.black,
-                            ),
-                            tooltip: controller.rotatePitchText
-                                ? 'Rotate Pitch Text: On'
-                                : 'Rotate Pitch Text: Off',
-                            onPressed:
-                            controller.toggleRotatePitchText,
-                          ),
-
-
-                          // SCROLL LOCK — blocks tapping the grid from
-                          // creating/editing notes, so the composition can
-                          // be scrolled around without accidentally adding
-                          // a note on every tap.
-                          IconButton(
-                            icon: Icon(
-                              controller.inputLocked
-                                  ? Icons.lock
-                                  : Icons.lock_open,
-                              color: controller.inputLocked
-                                  ? Colors.blue
-                                  : Colors.black,
-                            ),
-                            tooltip: controller.inputLocked
-                                ? 'Scroll Lock: On'
-                                : 'Scroll Lock: Off',
-                            onPressed:
-                            controller.toggleInputLocked,
-                          ),
-
-                          // LEGATO MODE — while on, tapping a note toggles
-                          // its own legato flag instead of opening the
-                          // note-edit dialog. Independent of Articulation
-                          // (a note can be legato and, say, sforzando at
-                          // the same time).
-                          IconButton(
-                            icon: Icon(
-                              Icons.airline_stops_outlined,
-                              color: controller.legatoMode
-                                  ? Colors.blue
-                                  : Colors.black,
-                            ),
-                            tooltip: controller.legatoMode
-                                ? 'Legato Mode: On'
-                                : 'Legato Mode: Off',
-                            onPressed:
-                            controller.toggleLegatoMode,
-                          ),
-
-                          // ADD GRACE NOTE MODE — only ever turned ON
-                          // from a note's own dialog (choosing a grace
-                          // note type there needs a specific note to
-                          // attach to — see
-                          // CompositionController.startAddingGraceNotes),
-                          // but can always be turned OFF from here.
-                          // While on, every grid tap adds another
-                          // grace note to whichever note started it
-                          // (see CompositionController.
-                          // addGraceNoteAtRow), up to
-                          // maxGraceNotesPerNote.
-                          IconButton(
-                            icon: Icon(
-                              Icons.grain,
-                              color: controller.isAddingGraceNotes
-                                  ? Colors.blue
-                                  : Colors.black,
-                            ),
-                            tooltip: controller.isAddingGraceNotes
-                                ? 'Add Grace Note Mode: On'
-                                : 'Add Grace Note Mode: Off',
-                            onPressed:
-                            controller.stopAddingGraceNotes,
-                          ),
-
-
-                          // DURATION
-                          IconButton(
-                            icon: const Icon(Icons.av_timer,
-                              color: Colors.black,
-                            ),
-                            tooltip: 'Note Duration',
-                            onPressed: () {
-                              globalDurationDialog(
-                                context,
-                                controller,
-                              );
-                            },
-                          ),
-
-
-                          // HAND
-                          IconButton(
-                            icon: Icon(Icons.pan_tool,
-                              color:  controller.currentHand == Hand.right
-                                  ? Colors.black
-                                  : Colors.blue,
-                            ),
-                            tooltip: 'Hand',
-                            onPressed:
-                            controller.toggleHand,
-                          ),
-
-
                           const SizedBox(
                             width: 50,
                             child: Divider(
                               color: Colors.white24,
                             ),
                           ),
-
 
                           // GRID SIZE
                           IconButton(
@@ -729,45 +765,6 @@ class _CompositionScreenState extends State<CompositionScreen>
                                 controller,
                               );
                             },
-                          ),
-
-
-                          // PASTE
-                          if (controller.canPaste)
-                            IconButton(
-                              icon: Icon(Icons.control_point_duplicate,
-                                color: controller.pasteMode
-                                    ? Colors.blue
-                                    : Colors.black,
-                              ),
-                              tooltip: 'Paste',
-                              onPressed: () {
-                                if (controller.pasteMode) {
-                                  controller.exitPasteMode();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                          DefaultValues.snackBarMessageForCopying.toString()
-                                      ),
-                                    ),
-                                  );
-                                } else {
-                                  simpleMessageDialog(
-                                    context,
-                                    DefaultValues.titleOfMessageForCopying.toString(),
-                                    DefaultValues.messageForCopying.toString(),
-                                  );
-                                }
-
-                              },
-                            ),
-
-
-                          const SizedBox(
-                            width: 50,
-                            child: Divider(
-                              color: Colors.white24,
-                            ),
                           ),
 
                           // ZOOM IN
