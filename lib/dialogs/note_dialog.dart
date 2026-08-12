@@ -494,12 +494,10 @@ class NoteDialog extends StatelessWidget {
                           SnackBar(
                             content: Text(
                               maxForType == 0
-                                  ? 'This note is too short for '
-                                  '${type.label} grace notes.'
-                                  : 'Add Grace Note mode is on — tap the '
-                                  'grid to add ${type.label} grace notes '
-                                  '(max $maxForType for this note). Toggle '
-                                  'it off from the app bar when done.',
+                                  ? 'This note is too short for ${type.label}'
+                                  : 'Tap the grid to add ${type.label}'
+                                  ' (max $maxForType for this note), '
+                                  'to stop click lighted button on app bar.',
                               style: const TextStyle(fontSize: 22),
                             ),
                           ),
