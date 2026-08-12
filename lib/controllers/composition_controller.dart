@@ -398,7 +398,11 @@ class CompositionController extends ChangeNotifier {
 
   /// Removes all notes inside the given measure WITHOUT deleting the
   /// measure itself (unlike [deleteMeasure]). Use this for a "Clean
-  /// Measure" action.
+  /// Measure" action. Also removes any dynamic events (piano/forte/
+  /// etc.) and dynamic-change events — crescendo/diminuendo start &
+  /// finish markers AND pedal down/up markers, which share that same
+  /// storage (see DynamicChange.pedalDown/pedalUp) — that fall within
+  /// the measure. Tempo events are left untouched.
   void clearMeasureNotes(
       int measureIndex,
       ) {
@@ -410,6 +414,16 @@ class CompositionController extends ChangeNotifier {
           (note) =>
       note.startTick >= measure.startTick &&
           note.startTick < measure.endTick,
+    );
+    timeline.dynamicEvents.removeWhere(
+          (event) =>
+      event.tick >= measure.startTick &&
+          event.tick < measure.endTick,
+    );
+    timeline.dynamicChangeEvents.removeWhere(
+          (event) =>
+      event.tick >= measure.startTick &&
+          event.tick < measure.endTick,
     );
     notifyListeners();
   }
@@ -488,6 +502,137 @@ class CompositionController extends ChangeNotifier {
     );
     timeline.rebuild();
     notifyListeners();
+  }
+
+
+  /// Duplicates every measure from [fromIndex] through [toIndex]
+  /// (inclusive, 0-based) as one new contiguous block appended at the
+  /// end of the composition — generalizes [copyMeasure] to a whole
+  /// range instead of a single measure. [fromIndex]/[toIndex] are
+  /// treated as (min, max) regardless of which is actually larger, so
+  /// callers don't need to sort them first; out-of-range indices (or
+  /// an empty composition) make this a no-op.
+  ///
+  /// Each measure in the range keeps its own time signature/scale and
+  /// its own beatEvents (shifted by the same total offset as
+  /// everything else). Every note whose startTick falls anywhere
+  /// within the ORIGINAL range is copied too, shifted by that same
+  /// offset, so the whole block lands intact at the end. Unlike
+  /// [copyMeasure], this ALSO remaps [Note.glissandoSourceId] /
+  /// [Note.graceOfNoteId] so that an anchor note and its own
+  /// glissando run / grace notes — when BOTH are duplicated together
+  /// within the same range — end up correctly pointing at each
+  /// other's NEW copies rather than dangling back to the originals.
+  /// (If only one half of such a pair falls inside the range, the
+  /// copy's reference is left pointing at the original outside note,
+  /// same as it always did — there's no other note in the new block
+  /// for it to point at instead.)
+  ///
+  /// Like [copyMeasure], this does NOT duplicate any tempo/dynamic/
+  /// dynamic-change events that happen to fall within the range.
+  void duplicateMeasureRange(int fromIndex, int toIndex) {
+    if (measures.isEmpty) return;
+    final start = fromIndex <= toIndex ? fromIndex : toIndex;
+    final end = fromIndex <= toIndex ? toIndex : fromIndex;
+    if (start < 0 || end >= measures.length) return;
+
+    final rangeStartTick = measures[start].startTick;
+    final rangeEndTick = measures[end].endTick;
+    // Computed once, before any measures are appended below — those
+    // appends grow timeline.totalTicks, which this offset is derived
+    // from, so it must be captured up front rather than recomputed
+    // mid-loop.
+    final offset = timeline.totalTicks - rangeStartTick;
+
+    // Snapshot the range before mutating `measures` — appending to it
+    // below would otherwise shift indices out from under an in-place
+    // iteration.
+    final originalRange = measures.sublist(start, end + 1).toList();
+    for (final original in originalRange) {
+      final newStart = original.startTick + offset;
+      measures.add(original.copyWith(
+        id: measures.length,
+        startTick: newStart,
+        beatEvents: original.beatEvents
+            .map((e) => e.copyWith(tick: e.tick + offset))
+            .toList(),
+      ));
+    }
+
+    final originalNotesInRange = notes
+        .where((note) =>
+    note.startTick >= rangeStartTick && note.startTick < rangeEndTick)
+        .toList();
+
+    // Maps each duplicated note's OLD id to its brand-new copy's id
+    // — used below to correctly relink glissando/grace-note
+    // relationships that fall entirely within this range (see the
+    // method doc above).
+    final idMap = <int, int>{
+      for (final note in originalNotesInRange) note.id: generateNoteId(),
+    };
+
+    final copiedNotes = originalNotesInRange.map((note) {
+      final newGlissandoSourceId = note.glissandoSourceId == null
+          ? null
+          : (idMap[note.glissandoSourceId] ?? note.glissandoSourceId);
+      final newGraceOfNoteId = note.graceOfNoteId == null
+          ? null
+          : (idMap[note.graceOfNoteId] ?? note.graceOfNoteId);
+      return note.copyWith(
+        id: idMap[note.id],
+        startTick: note.startTick + offset,
+        glissandoSourceId: newGlissandoSourceId,
+        graceOfNoteId: newGraceOfNoteId,
+      );
+    }).toList();
+
+    notes.addAll(copiedNotes);
+
+    timeline.rebuild();
+    notifyListeners();
+  }
+
+
+  /// Deletes every measure from [fromIndex] through [toIndex]
+  /// (inclusive, 0-based) — [fromIndex]/[toIndex] are treated as
+  /// (min, max) regardless of which is actually larger, so callers
+  /// don't need to sort them first; out-of-range indices (or an empty
+  /// composition) make this a no-op. Implemented as repeated calls to
+  /// the existing single-measure [deleteMeasure], working from the
+  /// HIGHEST index down to the lowest — deleting a measure shifts
+  /// every LATER measure's index down by one, so working backward
+  /// means indices still to be deleted never move out from under this
+  /// loop. Reuses [deleteMeasure]'s own note-removal/tick-shifting/
+  /// selectedMeasureIndex-clamping logic exactly as-is for each
+  /// measure, rather than duplicating it here.
+  void deleteMeasureRange(int fromIndex, int toIndex) {
+    if (measures.isEmpty) return;
+    final start = fromIndex <= toIndex ? fromIndex : toIndex;
+    final end = fromIndex <= toIndex ? toIndex : fromIndex;
+    if (start < 0 || end >= measures.length) return;
+    for (int i = end; i >= start; i--) {
+      deleteMeasure(i);
+    }
+  }
+
+
+  /// Removes all notes (and dynamic/dynamic-change/pedal events — see
+  /// [clearMeasureNotes]) inside every measure from [fromIndex]
+  /// through [toIndex] (inclusive, 0-based), WITHOUT deleting any of
+  /// the measures themselves — generalizes [clearMeasureNotes] to a
+  /// whole range, the same way [duplicateMeasureRange] generalizes
+  /// [copyMeasure]. [fromIndex]/[toIndex] are treated as (min, max)
+  /// regardless of which is actually larger; out-of-range indices (or
+  /// an empty composition) make this a no-op.
+  void clearMeasureRangeNotes(int fromIndex, int toIndex) {
+    if (measures.isEmpty) return;
+    final start = fromIndex <= toIndex ? fromIndex : toIndex;
+    final end = fromIndex <= toIndex ? toIndex : fromIndex;
+    if (start < 0 || end >= measures.length) return;
+    for (int i = start; i <= end; i++) {
+      clearMeasureNotes(i);
+    }
   }
 
 

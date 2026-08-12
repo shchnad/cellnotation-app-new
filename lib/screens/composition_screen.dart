@@ -383,7 +383,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                 onTap: () => _showEditDialog(context),
                 child: Container(
                   width: 45,
-                  color: Colors.black,
+                  color: Colors.grey.shade300,
                   child: Center(
                     child: RotatedBox(
                       quarterTurns: 3,
@@ -391,7 +391,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                         '${controller.composition.composer} - ${controller.composition.title}',
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: Colors.black,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
@@ -405,412 +405,422 @@ class _CompositionScreenState extends State<CompositionScreen>
 
               // =====================================================
               // LEFT TOOLBAR — compact IconButtons via a local Theme
-              // override, laid out with Wrap(direction: vertical) so
-              // it automatically spills into a second column once a
-              // column's height runs out, instead of needing to
-              // scroll. Width is widened in landscape to make room for
-              // that second column; portrait stays single-column,
-              // since typical portrait heights fit everything already.
+              // override, laid out as a single vertical Column at a
+              // small FIXED width (see below) and scrolling if there
+              // isn't room for every button. Earlier attempts tried a
+              // multi-column Wrap sized either via IntrinsicWidth or
+              // an estimated column count — both approaches guessed
+              // at each button's true rendered size and consistently
+              // got it wrong (too wide, or overflowing) in one
+              // direction or the other. A single fixed-width column
+              // has no guessing involved at all.
               // =====================================================
 
               Builder(
                 builder: (context) {
-                  final isLandscape = MediaQuery.of(context).orientation ==
-                      Orientation.landscape;
-                  final toolbarWidth = isLandscape ? 84.0 : 42.0;
+                  final buttons = <Widget>[
+                    const SizedBox(height: 10),
+
+                    // HOME
+                    IconButton(
+                      icon: const Icon(
+                        Icons.arrow_back,
+                        color: Colors.black,
+                      ),
+                      tooltip: 'Home',
+                      onPressed: () {
+                        saveExitDialog(
+                          context,
+                          onSave: () => _saveComposition(context),
+                        );
+                      },
+                    ),
+
+                    // SAVE
+                    IconButton(
+                      icon: const Icon(Icons.save,
+                        color: Colors.black,
+                      ),
+                      tooltip: 'Save Composition',
+                      onPressed: () {
+                        _saveComposition(context);
+                      },
+                    ),
+
+                    // NEW COMPOSITION
+                    IconButton(
+                      icon: const Icon(Icons.library_add,
+                        color: Colors.black,
+                      ),
+                      tooltip: 'New Composition',
+                      onPressed: () {
+                        _showCreateDialog(context);
+                      },
+                    ),
+
+                    // ADD MEASURES
+                    IconButton(
+                      icon: const Icon(Icons.copy,
+                        color: Colors.black,
+                      ),
+                      tooltip: 'Add Measures',
+                      onPressed: () {
+                        _openAppendMeasuresForm(context);
+                      },
+                    ),
+
+                    const SizedBox(
+                      width: 50,
+                      child: Divider(
+                        color: Colors.white24,
+                      ),
+                    ),
+
+                    // HAND
+                    IconButton(
+                      icon: Icon(Icons.pan_tool,
+                        color:  controller.currentHand == Hand.right
+                            ? Colors.black
+                            : Colors.blue,
+                      ),
+                      tooltip: 'Hand',
+                      onPressed:
+                      controller.toggleHand,
+                    ),
+
+
+                    // DURATION
+                    IconButton(
+                      icon: const Icon(Icons.av_timer,
+                        color: Colors.black,
+                      ),
+                      tooltip: 'Note Duration',
+                      onPressed: () {
+                        globalDurationDialog(
+                          context,
+                          controller,
+                        );
+                      },
+                    ),
+
+                    // ADD GRACE NOTE MODE — only ever turned ON
+                    // from a note's own dialog (choosing a grace
+                    // note type there needs a specific note to
+                    // attach to — see
+                    // CompositionController.startAddingGraceNotes),
+                    // but can always be turned OFF from here.
+                    // While on, every grid tap adds another
+                    // grace note to whichever note started it
+                    // (see CompositionController.
+                    // addGraceNoteAtRow), up to
+                    // maxGraceNotesPerNote.
+                    IconButton(
+                      icon: Icon(
+                        Icons.grain,
+                        color: controller.isAddingGraceNotes
+                            ? Colors.blue
+                            : Colors.black,
+                      ),
+                      tooltip: controller.isAddingGraceNotes
+                          ? 'Add Grace Note Mode: On'
+                          : 'Add Grace Note Mode: Off',
+                      onPressed:
+                      controller.stopAddingGraceNotes,
+                    ),
+
+                    // LEGATO MODE — while on, tapping a note toggles
+                    // its own legato flag instead of opening the
+                    // note-edit dialog. Independent of Articulation
+                    // (a note can be legato and, say, sforzando at
+                    // the same time).
+                    IconButton(
+                      icon: Icon(
+                        Icons.airline_stops_outlined,
+                        color: controller.legatoMode
+                            ? Colors.blue
+                            : Colors.black,
+                      ),
+                      tooltip: controller.legatoMode
+                          ? 'Legato Mode: On'
+                          : 'Legato Mode: Off',
+                      onPressed:
+                      controller.toggleLegatoMode,
+                    ),
+
+
+                    // PASTE
+                    if (controller.canPaste)
+                      IconButton(
+                        icon: Icon(Icons.control_point_duplicate,
+                          color: controller.pasteMode
+                              ? Colors.blue
+                              : Colors.black,
+                        ),
+                        tooltip: 'Paste',
+                        onPressed: () {
+                          if (controller.pasteMode) {
+                            controller.exitPasteMode();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                    DefaultValues.snackBarMessageForCopying.toString()
+                                ),
+                              ),
+                            );
+                          } else {
+                            simpleMessageDialog(
+                              context,
+                              DefaultValues.titleOfMessageForCopying.toString(),
+                              DefaultValues.messageForCopying.toString(),
+                            );
+                          }
+
+                        },
+                      ),
+
+                    const SizedBox(
+                      width: 50,
+                      child: Divider(
+                        color: Colors.white24,
+                      ),
+                    ),
+
+                    // SCROLL LOCK — blocks tapping the grid from
+                    // creating/editing notes, so the composition can
+                    // be scrolled around without accidentally adding
+                    // a note on every tap.
+                    IconButton(
+                      icon: Icon(
+                        controller.inputLocked
+                            ? Icons.lock
+                            : Icons.lock_open,
+                        color: controller.inputLocked
+                            ? Colors.blue
+                            : Colors.black,
+                      ),
+                      tooltip: controller.inputLocked
+                          ? 'Scroll Lock: On'
+                          : 'Scroll Lock: Off',
+                      onPressed:
+                      controller.toggleInputLocked,
+                    ),
+
+
+                    // COMPENSATED NOTATION TOGGLE — switches between
+                    // normal notation (scale sign + accidental shown
+                    // separately, e.g. "4+" plus a "-") and a
+                    // simplified view where opposing signs cancel to
+                    // a plain note and matching signs respell as the
+                    // next degree over. Purely a display switch —
+                    // note.row/note.accidental never change, so this
+                    // toggles back instantly with no data loss.
+                    IconButton(
+                      icon: Icon(Icons.auto_fix_high,
+                        color: controller.showCompensatedNotation
+                            ? Colors.blue
+                            : Colors.black,
+                      ),
+                      tooltip: controller.showCompensatedNotation
+                          ? 'Compensated Notation: On'
+                          : 'Compensated Notation: Off',
+                      onPressed:
+                      controller.toggleCompensatedNotation,
+                    ),
+
+                    // ROTATE PITCH TEXT — purely cosmetic; rotates
+                    // the pitch label drawn inside each note cell,
+                    // handy when cells are narrow.
+                    IconButton(
+                      icon: Icon(Icons.rotate_left,
+                        color: controller.rotatePitchText
+                            ? Colors.blue
+                            : Colors.black,
+                      ),
+                      tooltip: controller.rotatePitchText
+                          ? 'Rotate Pitch Text: On'
+                          : 'Rotate Pitch Text: Off',
+                      onPressed:
+                      controller.toggleRotatePitchText,
+                    ),
+
+                    // PLAY / PAUSE — auto-scrolls the grid left to
+                    // right at a speed derived from tempo and beat
+                    // duration. Pausing keeps the current position,
+                    // so Play resumes right where it left off.
+                    IconButton(
+                      icon: Icon(
+                        _isPlaying ? Icons.pause : Icons.play_arrow,
+                        color: _isPlaying ? Colors.blue : Colors.black,
+                      ),
+                      tooltip: _isPlaying ? 'Pause' : 'Play',
+                      onPressed: hasMeasures ? _togglePlayback : null,
+                    ),
+
+                    // SCROLL TO START — jumps the horizontal view
+                    // back to the very beginning of the composition.
+                    IconButton(
+                      icon: const Icon(
+                        Icons.first_page,
+                        color: Colors.black,
+                      ),
+                      tooltip: 'Scroll to Start',
+                      onPressed: hasMeasures ? _scrollToStart : null,
+                    ),
+
+                    // SOUND ON/OFF — notes play a synthesized tone
+                    // when created (by tapping the grid) and while
+                    // scroll playback passes them; this toggles that
+                    // off without affecting anything else.
+                    IconButton(
+                      icon: Icon(
+                        controller.soundEnabled
+                            ? Icons.volume_up
+                            : Icons.volume_off,
+                        color: Colors.black,
+                      ),
+                      tooltip: controller.soundEnabled
+                          ? 'Sound On'
+                          : 'Sound Off',
+                      onPressed: controller.toggleSound,
+                    ),
+
+
+                    const SizedBox(
+                      width: 50,
+                      child: Divider(
+                        color: Colors.white24,
+                      ),
+                    ),
+
+
+                    // RAISE SCALE
+                    IconButton(
+                      icon: const Icon(Icons.arrow_upward,
+                        color: Colors.black,
+                      ),
+                      tooltip: 'Raise scales',
+                      onPressed:
+                      controller.raiseAllScales,
+                    ),
+
+
+                    // RESET SCALE
+                    IconButton(
+                      icon: const Icon(Icons.adjust,
+                        color: Colors.black,
+                      ),
+                      tooltip: 'Reset scales',
+                      onPressed:
+                      controller.resetAllScales,
+                    ),
+
+
+                    // LOWER SCALE
+                    IconButton(
+                      icon: const Icon(Icons.arrow_downward,
+                        color: Colors.black,
+                      ),
+                      tooltip: 'Lower scales',
+                      onPressed:
+                      controller.lowerAllScales,
+                    ),
+
+
+                    const SizedBox(
+                      width: 50,
+                      child: Divider(
+                        color: Colors.white24,
+                      ),
+                    ),
+
+                    // GRID SIZE
+                    IconButton(
+                      icon: const Icon(Icons.grid_on,
+                        color: Colors.black,
+                      ),
+                      tooltip: 'Cell Width',
+                      onPressed: () {
+                        cellWidthDialog(
+                          context,
+                          controller,
+                        );
+                      },
+                    ),
+
+                    // ZOOM IN
+                    IconButton(
+                      icon: const Icon(
+                        Icons.zoom_in,
+                        color: Colors.black,
+                      ),
+                      tooltip: 'Zoom In',
+                      onPressed: () {
+                        controller.setZoom(
+                          controller.zoomX + 1,
+                          controller.zoomY + 0.1,
+                        );
+                      },
+                    ),
+
+
+                    // ZOOM OUT
+                    IconButton(
+                      icon: const Icon(
+                        Icons.zoom_out,
+                        color: Colors.black,
+                      ),
+                      tooltip: 'Zoom Out',
+                      onPressed: () {
+                        controller.setZoom(
+                          controller.zoomX - 1,
+                          controller.zoomY - 0.1,
+                        );
+                      },
+                    ),
+
+                    // RESET
+                    IconButton(
+                      icon: const Icon(
+                        Icons.center_focus_strong,
+                        color: Colors.black,
+                      ),
+                      tooltip: 'Reset Zoom',
+                      onPressed:
+                      controller.resetZoom,
+                    ),
+
+                  ];
 
                   return Theme(
                     data: Theme.of(context).copyWith(
                       iconButtonTheme: IconButtonThemeData(
                         style: IconButton.styleFrom(
                           padding: const EdgeInsets.all(4),
-                          minimumSize: const Size(32, 32),
+                          minimumSize: const Size(36, 36),
+                          iconSize: 22,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
                         ),
                       ),
                     ),
+                    // Single column, small FIXED width (exactly one
+                    // button's worth + a couple pixels), scrolling
+                    // vertically if there isn't room for every button
+                    // on screen — deliberately NOT trying to estimate
+                    // how many columns/pixels are needed (that
+                    // required guessing each button's true rendered
+                    // height, which never quite matched reality and
+                    // kept making the toolbar either too wide or
+                    // overflowing). A fixed single-column width has no
+                    // guesswork at all: it's always exactly as thin as
+                    // one button can be.
                     child: Container(
-                      width: toolbarWidth,
+                      width: 40,
                       color: Colors.grey.shade300,
-                      child: Wrap(
-                        direction: Axis.vertical,
-                        alignment: WrapAlignment.start,
-                        runAlignment: WrapAlignment.start,
-                        spacing: 0,
-                        runSpacing: 0,
-                        children: [
-                          const SizedBox(height: 10),
-
-                          // HOME
-                          IconButton(
-                            icon: const Icon(
-                              Icons.arrow_back,
-                              color: Colors.black,
-                            ),
-                            tooltip: 'Home',
-                            onPressed: () {
-                              saveExitDialog(
-                                context,
-                                onSave: () => _saveComposition(context),
-                              );
-                            },
-                          ),
-
-                          // SAVE
-                          IconButton(
-                            icon: const Icon(Icons.save,
-                              color: Colors.black,
-                            ),
-                            tooltip: 'Save Composition',
-                            onPressed: () {
-                              _saveComposition(context);
-                            },
-                          ),
-
-                          // NEW COMPOSITION
-                          IconButton(
-                            icon: const Icon(Icons.library_add,
-                              color: Colors.black,
-                            ),
-                            tooltip: 'New Composition',
-                            onPressed: () {
-                              _showCreateDialog(context);
-                            },
-                          ),
-
-                          // ADD MEASURES
-                          IconButton(
-                            icon: const Icon(Icons.copy,
-                              color: Colors.black,
-                            ),
-                            tooltip: 'Add Measures',
-                            onPressed: () {
-                              _openAppendMeasuresForm(context);
-                            },
-                          ),
-
-                          const SizedBox(
-                            width: 50,
-                            child: Divider(
-                              color: Colors.white24,
-                            ),
-                          ),
-
-                          // HAND
-                          IconButton(
-                            icon: Icon(Icons.pan_tool,
-                              color:  controller.currentHand == Hand.right
-                                  ? Colors.black
-                                  : Colors.blue,
-                            ),
-                            tooltip: 'Hand',
-                            onPressed:
-                            controller.toggleHand,
-                          ),
-
-
-                          // DURATION
-                          IconButton(
-                            icon: const Icon(Icons.av_timer,
-                              color: Colors.black,
-                            ),
-                            tooltip: 'Note Duration',
-                            onPressed: () {
-                              globalDurationDialog(
-                                context,
-                                controller,
-                              );
-                            },
-                          ),
-
-                          // ADD GRACE NOTE MODE — only ever turned ON
-                          // from a note's own dialog (choosing a grace
-                          // note type there needs a specific note to
-                          // attach to — see
-                          // CompositionController.startAddingGraceNotes),
-                          // but can always be turned OFF from here.
-                          // While on, every grid tap adds another
-                          // grace note to whichever note started it
-                          // (see CompositionController.
-                          // addGraceNoteAtRow), up to
-                          // maxGraceNotesPerNote.
-                          IconButton(
-                            icon: Icon(
-                              Icons.grain,
-                              color: controller.isAddingGraceNotes
-                                  ? Colors.blue
-                                  : Colors.black,
-                            ),
-                            tooltip: controller.isAddingGraceNotes
-                                ? 'Add Grace Note Mode: On'
-                                : 'Add Grace Note Mode: Off',
-                            onPressed:
-                            controller.stopAddingGraceNotes,
-                          ),
-
-                          // LEGATO MODE — while on, tapping a note toggles
-                          // its own legato flag instead of opening the
-                          // note-edit dialog. Independent of Articulation
-                          // (a note can be legato and, say, sforzando at
-                          // the same time).
-                          IconButton(
-                            icon: Icon(
-                              Icons.airline_stops_outlined,
-                              color: controller.legatoMode
-                                  ? Colors.blue
-                                  : Colors.black,
-                            ),
-                            tooltip: controller.legatoMode
-                                ? 'Legato Mode: On'
-                                : 'Legato Mode: Off',
-                            onPressed:
-                            controller.toggleLegatoMode,
-                          ),
-
-
-                          // PASTE
-                          if (controller.canPaste)
-                            IconButton(
-                              icon: Icon(Icons.control_point_duplicate,
-                                color: controller.pasteMode
-                                    ? Colors.blue
-                                    : Colors.black,
-                              ),
-                              tooltip: 'Paste',
-                              onPressed: () {
-                                if (controller.pasteMode) {
-                                  controller.exitPasteMode();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                          DefaultValues.snackBarMessageForCopying.toString()
-                                      ),
-                                    ),
-                                  );
-                                } else {
-                                  simpleMessageDialog(
-                                    context,
-                                    DefaultValues.titleOfMessageForCopying.toString(),
-                                    DefaultValues.messageForCopying.toString(),
-                                  );
-                                }
-
-                              },
-                            ),
-
-                          const SizedBox(
-                            width: 50,
-                            child: Divider(
-                              color: Colors.white24,
-                            ),
-                          ),
-
-                          // SCROLL LOCK — blocks tapping the grid from
-                          // creating/editing notes, so the composition can
-                          // be scrolled around without accidentally adding
-                          // a note on every tap.
-                          IconButton(
-                            icon: Icon(
-                              controller.inputLocked
-                                  ? Icons.lock
-                                  : Icons.lock_open,
-                              color: controller.inputLocked
-                                  ? Colors.blue
-                                  : Colors.black,
-                            ),
-                            tooltip: controller.inputLocked
-                                ? 'Scroll Lock: On'
-                                : 'Scroll Lock: Off',
-                            onPressed:
-                            controller.toggleInputLocked,
-                          ),
-
-
-                          // COMPENSATED NOTATION TOGGLE — switches between
-                          // normal notation (scale sign + accidental shown
-                          // separately, e.g. "4+" plus a "-") and a
-                          // simplified view where opposing signs cancel to
-                          // a plain note and matching signs respell as the
-                          // next degree over. Purely a display switch —
-                          // note.row/note.accidental never change, so this
-                          // toggles back instantly with no data loss.
-                          IconButton(
-                            icon: Icon(Icons.auto_fix_high,
-                              color: controller.showCompensatedNotation
-                                  ? Colors.blue
-                                  : Colors.black,
-                            ),
-                            tooltip: controller.showCompensatedNotation
-                                ? 'Compensated Notation: On'
-                                : 'Compensated Notation: Off',
-                            onPressed:
-                            controller.toggleCompensatedNotation,
-                          ),
-
-                          // ROTATE PITCH TEXT — purely cosmetic; rotates
-                          // the pitch label drawn inside each note cell,
-                          // handy when cells are narrow.
-                          IconButton(
-                            icon: Icon(Icons.rotate_left,
-                              color: controller.rotatePitchText
-                                  ? Colors.blue
-                                  : Colors.black,
-                            ),
-                            tooltip: controller.rotatePitchText
-                                ? 'Rotate Pitch Text: On'
-                                : 'Rotate Pitch Text: Off',
-                            onPressed:
-                            controller.toggleRotatePitchText,
-                          ),
-
-                          // PLAY / PAUSE — auto-scrolls the grid left to
-                          // right at a speed derived from tempo and beat
-                          // duration. Pausing keeps the current position,
-                          // so Play resumes right where it left off.
-                          IconButton(
-                            icon: Icon(
-                              _isPlaying ? Icons.pause : Icons.play_arrow,
-                              color: _isPlaying ? Colors.blue : Colors.black,
-                            ),
-                            tooltip: _isPlaying ? 'Pause' : 'Play',
-                            onPressed: hasMeasures ? _togglePlayback : null,
-                          ),
-
-                          // SCROLL TO START — jumps the horizontal view
-                          // back to the very beginning of the composition.
-                          IconButton(
-                            icon: const Icon(
-                              Icons.first_page,
-                              color: Colors.black,
-                            ),
-                            tooltip: 'Scroll to Start',
-                            onPressed: hasMeasures ? _scrollToStart : null,
-                          ),
-
-                          // SOUND ON/OFF — notes play a synthesized tone
-                          // when created (by tapping the grid) and while
-                          // scroll playback passes them; this toggles that
-                          // off without affecting anything else.
-                          IconButton(
-                            icon: Icon(
-                              controller.soundEnabled
-                                  ? Icons.volume_up
-                                  : Icons.volume_off,
-                              color: Colors.black,
-                            ),
-                            tooltip: controller.soundEnabled
-                                ? 'Sound On'
-                                : 'Sound Off',
-                            onPressed: controller.toggleSound,
-                          ),
-
-
-                          const SizedBox(
-                            width: 50,
-                            child: Divider(
-                              color: Colors.white24,
-                            ),
-                          ),
-
-
-                          // RAISE SCALE
-                          IconButton(
-                            icon: const Icon(Icons.arrow_upward,
-                              color: Colors.black,
-                            ),
-                            tooltip: 'Raise scales',
-                            onPressed:
-                            controller.raiseAllScales,
-                          ),
-
-
-                          // RESET SCALE
-                          IconButton(
-                            icon: const Icon(Icons.adjust,
-                              color: Colors.black,
-                            ),
-                            tooltip: 'Reset scales',
-                            onPressed:
-                            controller.resetAllScales,
-                          ),
-
-
-                          // LOWER SCALE
-                          IconButton(
-                            icon: const Icon(Icons.arrow_downward,
-                              color: Colors.black,
-                            ),
-                            tooltip: 'Lower scales',
-                            onPressed:
-                            controller.lowerAllScales,
-                          ),
-
-
-                          const SizedBox(
-                            width: 50,
-                            child: Divider(
-                              color: Colors.white24,
-                            ),
-                          ),
-
-                          // GRID SIZE
-                          IconButton(
-                            icon: const Icon(Icons.grid_on,
-                              color: Colors.black,
-                            ),
-                            tooltip: 'Cell Width',
-                            onPressed: () {
-                              cellWidthDialog(
-                                context,
-                                controller,
-                              );
-                            },
-                          ),
-
-                          // ZOOM IN
-                          IconButton(
-                            icon: const Icon(
-                              Icons.zoom_in,
-                              color: Colors.black,
-                            ),
-                            tooltip: 'Zoom In',
-                            onPressed: () {
-                              controller.setZoom(
-                                controller.zoomX + 1,
-                                controller.zoomY + 0.1,
-                              );
-                            },
-                          ),
-
-
-                          // ZOOM OUT
-                          IconButton(
-                            icon: const Icon(
-                              Icons.zoom_out,
-                              color: Colors.black,
-                            ),
-                            tooltip: 'Zoom Out',
-                            onPressed: () {
-                              controller.setZoom(
-                                controller.zoomX - 1,
-                                controller.zoomY - 0.1,
-                              );
-                            },
-                          ),
-
-                          // RESET
-                          IconButton(
-                            icon: const Icon(
-                              Icons.center_focus_strong,
-                              color: Colors.black,
-                            ),
-                            tooltip: 'Reset Zoom',
-                            onPressed:
-                            controller.resetZoom,
-                          ),
-
-                        ],
-
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: buttons,
+                        ),
                       ),
                     ),
                   );

@@ -5,6 +5,7 @@ import '../controllers/composition_controller.dart';
 import '../utils/scale_resolver.dart';
 import 'dynamic_change_dialog.dart';
 import 'dynamic_dialog.dart';
+import 'measure_range_dialog.dart';
 import 'pedal_dialog.dart';
 import 'scale_dialog.dart';
 
@@ -22,17 +23,33 @@ void editMeasureBeatDialog({
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
 
-        content: SizedBox(
-          width: MediaQuery.of(context).size.width * 0.75,
-          height: MediaQuery.of(context).size.height * 0.55,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        // No fixed height and no SingleChildScrollView around either
+        // column below (unlike before) — every action must be
+        // visible without scrolling, so both columns are just left to
+        // size naturally to their own content (via
+        // mainAxisSize: MainAxisSize.min) instead of being squeezed
+        // into a fixed fraction of the screen height. The ListTile
+        // Theme override below keeps each row compact so everything
+        // still comfortably fits on a normal screen even with the
+        // extra Delete Range / Clean Range actions.
+        content: Theme(
+          data: Theme.of(context).copyWith(
+            listTileTheme: const ListTileThemeData(
+              dense: true,
+              visualDensity: VisualDensity.compact,
+              contentPadding: EdgeInsets.symmetric(horizontal: 8),
+            ),
+          ),
+          child: SizedBox(
+            width: MediaQuery.of(context).size.width * 0.75,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
 
-              // LEFT COLUMN
-              Expanded(
-                child: SingleChildScrollView(
+                // LEFT COLUMN
+                Expanded(
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
 
@@ -83,6 +100,31 @@ void editMeasureBeatDialog({
                       ),
 
                       ListTile(
+                        leading: const Icon(Icons.library_books_outlined),
+                        title: const Text(
+                          "Duplicate Range",
+                          style: TextStyle(
+                            fontSize: 22,
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        onTap: () {
+                          Navigator.pop(context);
+                          measureRangeDialog(
+                            context: context,
+                            controller: controller,
+                            title: 'Duplicate Measures',
+                            actionLabel: 'Duplicate',
+                            actionColor: Colors.blue,
+                            onConfirm: (from, to) {
+                              controller.duplicateMeasureRange(from, to);
+                            },
+                          );
+                        },
+                      ),
+
+                      ListTile(
                         leading: const Icon(Icons.cleaning_services_outlined),
                         title: const Text(
                           "Clean Measure",
@@ -95,6 +137,31 @@ void editMeasureBeatDialog({
                         onTap: () {
                           controller.clearMeasureNotes(measureIndex);
                           Navigator.pop(context);
+                        },
+                      ),
+
+                      ListTile(
+                        leading: const Icon(Icons.cleaning_services),
+                        title: const Text(
+                          "Clean Range",
+                          style: TextStyle(
+                            fontSize: 22,
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        onTap: () {
+                          Navigator.pop(context);
+                          measureRangeDialog(
+                            context: context,
+                            controller: controller,
+                            title: 'Clean Measures',
+                            actionLabel: 'Clean',
+                            actionColor: Colors.black,
+                            onConfirm: (from, to) {
+                              controller.clearMeasureRangeNotes(from, to);
+                            },
+                          );
                         },
                       ),
 
@@ -112,6 +179,32 @@ void editMeasureBeatDialog({
                         onTap: () {
                           controller.deleteMeasure(measureIndex);
                           Navigator.pop(context);
+                        },
+                      ),
+
+                      ListTile(
+                        leading: const Icon(Icons.delete_sweep_outlined),
+                        iconColor: Colors.red,
+                        title: const Text(
+                          "Delete Range",
+                          style: TextStyle(
+                            fontSize: 22,
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        onTap: () {
+                          Navigator.pop(context);
+                          measureRangeDialog(
+                            context: context,
+                            controller: controller,
+                            title: 'Delete Measures',
+                            actionLabel: 'Delete',
+                            actionColor: Colors.red,
+                            onConfirm: (from, to) {
+                              controller.deleteMeasureRange(from, to);
+                            },
+                          );
                         },
                       ),
 
@@ -173,14 +266,13 @@ void editMeasureBeatDialog({
                     ],
                   ),
                 ),
-              ),
 
-              const VerticalDivider(thickness: 1),
+                const VerticalDivider(thickness: 1),
 
-              // RIGHT COLUMN
-              Expanded(
-                child: SingleChildScrollView(
+                // RIGHT COLUMN
+                Expanded(
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
 
@@ -345,8 +437,8 @@ void editMeasureBeatDialog({
                     ],
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
 
