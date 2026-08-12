@@ -38,6 +38,11 @@ class NoteDialog extends StatelessWidget {
         final timeSignature =
             '${measure.timeSignature.beats} * '
             '${measure.timeSignature.beatDuration.label}';
+        final activeTempo =
+        controller.getActiveTempoAtTick(editedNote.startTick);
+        final tempoLabel = activeTempo == null
+            ? 'none'
+            : '${activeTempo.tempo.label} = ${activeTempo.tempo.value}';
 
         return AlertDialog(
           backgroundColor: Colors.white,
@@ -87,6 +92,15 @@ class NoteDialog extends StatelessWidget {
                     _infoRow(
                       'Beat:',
                       controller.getBeatNumber(editedNote).toString(),
+                    ),
+                  ],
+                ),
+
+                Row(
+                  children: [
+                    _infoRow(
+                      'Tempo:',
+                      tempoLabel,
                     ),
                   ],
                 ),

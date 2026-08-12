@@ -6,9 +6,7 @@ enum PlayingTechnique {
   vibrato('vibrato', 'vb'),
   flageolet('flageolet', 'fl'),
   slapping('slapping', 'sl'),
-  portamento('portamento', 'pt'),
-  pedalDown('pedal down','ped'),
-  pedalUp('pedal up','*');
+  portamento('portamento', 'pt');
 
   final String label;
   final String abbreviation;

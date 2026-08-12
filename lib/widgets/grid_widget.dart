@@ -35,7 +35,8 @@ const _pedalLabelStyle = TextStyle(
   fontWeight: FontWeight.bold,
 );
 
-/// scale name — drawn at the TOP of the grid, same size/weight as the
+/// scale name — drawn at the TOP of the grid, below the measure
+/// number (see _measureNumberLabelStyle), same size/weight as the
 /// tempo label at the bottom, in blue.
 const _scaleLabelStyle = TextStyle(
   color: Colors.blue,
@@ -43,8 +44,20 @@ const _scaleLabelStyle = TextStyle(
   fontWeight: FontWeight.bold,
 );
 
-/// measure number + time signature — drawn at the very BOTTOM of the
-/// grid (below tempo/dynamic, which stack above it), in blue.
+/// measure number — drawn at the very TOP of the grid, above the
+/// scale name, for EVERY measure (unlike the scale name, which only
+/// repeats where the scale actually changes).
+const _measureNumberLabelStyle = TextStyle(
+  color: Colors.blue,
+  fontSize: 22,
+  fontWeight: FontWeight.bold,
+);
+
+/// time signature — drawn at the very BOTTOM of the grid (below
+/// tempo/dynamic, which stack above it), in blue. Used to also show
+/// the measure number too (e.g. "1: 4/4") — that moved to the TOP of
+/// the grid instead (see _measureNumberLabelStyle), so this is just
+/// the fraction now (e.g. "4/4").
 const _measureLabelStyle = TextStyle(
   color: Colors.blue,
   fontSize: 22,
@@ -52,8 +65,9 @@ const _measureLabelStyle = TextStyle(
 );
 
 const double _labelOffsetX = 5;
-const double _bottomMargin = 5; // distance from bottom of grid to the measure/time-signature label
-const double _topMargin = 5; // distance from top of grid to scale label
+const double _bottomMargin = 5; // distance from bottom of grid to the time-signature label
+const double _topMargin = 5; // distance from top of grid to the measure number label
+const double _topLabelGap = 4; // gap between measure number and scale name, both at the top
 const double _labelGap = 4; // gap between tempo label and dynamic label above it
 
 // How many pixels wide (on each side of the line) count as a hit when
@@ -128,6 +142,16 @@ TextPainter _scaleTextPainter(String scaleName) {
   )..layout();
 }
 
+TextPainter _measureNumberTextPainter(String text) {
+  return TextPainter(
+    text: TextSpan(
+      text: text,
+      style: _measureNumberLabelStyle,
+    ),
+    textDirection: TextDirection.ltr,
+  )..layout();
+}
+
 TextPainter _measureLabelTextPainter(String text) {
   return TextPainter(
     text: TextSpan(
@@ -149,19 +173,32 @@ int _beatDenominator(dynamic beatDuration) {
   return (wholeNoteTicks / beatDuration.ticks).round();
 }
 
-/// e.g. "3: 5/4" for the 3rd measure (1-based) in 5/4 time.
-String _measureLabelText(int measureNumber, dynamic timeSignature) {
+/// e.g. "1" for the 1st measure (1-based) — shown at the TOP of the
+/// grid for every measure (see the measure number label style).
+String _measureNumberText(int measureNumber) => '$measureNumber';
+
+/// e.g. "5/4" for a time signature of 5 beats of a quarter note each
+/// — shown at the BOTTOM of the grid. No longer includes the measure
+/// number (that moved to the top — see [_measureNumberText]).
+String _measureLabelText(dynamic timeSignature) {
   final denominator = _beatDenominator(timeSignature.beatDuration);
-  return '$measureNumber: ${timeSignature.beats}/$denominator';
+  return '${timeSignature.beats}/$denominator';
 }
 
-/// Line-height of the measure/time-signature label — content-
+/// Line-height of the measure number label at the top — content-
+/// independent for single-line text at a fixed style, so any sample
+/// string works as a consistent reference for stacking the scale name
+/// below it.
+double _measureNumberReferenceHeight() =>
+    _measureNumberTextPainter('0').height;
+
+/// Line-height of the time-signature label at the bottom — content-
 /// independent for single-line text at a fixed style, so any sample
 /// string works as a consistent reference for stacking the tempo/
 /// dynamic labels above it (same idea as the existing
 /// referenceTempoHeight/referenceDynamicHeight pattern below).
 double _measureLabelReferenceHeight() =>
-    _measureLabelTextPainter('0: 0/0').height;
+    _measureLabelTextPainter('0/0').height;
 
 /// Computes tap-target rects for both tempo and dynamic labels.
 /// Both stack above the measure/time-signature label at the very
@@ -231,6 +268,8 @@ List<_ScaleLabelHit> _computeScaleLabelHits(
     ) {
   final hits = <_ScaleLabelHit>[];
   final measures = controller.measures;
+  final measureNumberHeight = _measureNumberReferenceHeight();
+  final scaleY = _topMargin + measureNumberHeight + _topLabelGap;
 
   for (int i = 0; i < measures.length; i++) {
     final measure = measures[i];
@@ -243,7 +282,7 @@ List<_ScaleLabelHit> _computeScaleLabelHits(
     hits.add(
       _ScaleLabelHit(
         i,
-        Rect.fromLTWH(x + _labelOffsetX, _topMargin, tp.width, tp.height),
+        Rect.fromLTWH(x + _labelOffsetX, scaleY, tp.width, tp.height),
       ),
     );
   }
@@ -952,26 +991,40 @@ class GridPainter extends CustomPainter {
         );
       }
 
-      // SCALE NAME — drawn at the top of the grid, same way the tempo
-      // label is drawn at the bottom, but blue. Only shown for the
-      // first measure and wherever the scale actually changes (same
-      // condition as the double measure-line above) — not repeated on
-      // every single measure.
+      // MEASURE NUMBER — drawn at the very TOP of the grid, for EVERY
+      // measure (unlike the scale name below it, which only repeats
+      // where the scale actually changes).
+      final measureNumberPainter = _measureNumberTextPainter(
+        _measureNumberText(i + 1),
+      );
+      measureNumberPainter.paint(
+        canvas,
+        Offset(measureX + _labelOffsetX, _topMargin),
+      );
+
+      // SCALE NAME — drawn just below the measure number, same way
+      // the tempo label is drawn at the bottom, but blue. Only shown
+      // for the first measure and wherever the scale actually changes
+      // (same condition as the double measure-line above) — not
+      // repeated on every single measure.
       if (i == 0 || scaleChanged) {
         final scaleTextPainter = _scaleTextPainter(measure.scaleName);
+        final scaleY = _topMargin +
+            _measureNumberReferenceHeight() +
+            _topLabelGap;
         scaleTextPainter.paint(
           canvas,
-          Offset(measureX + _labelOffsetX, _topMargin),
+          Offset(measureX + _labelOffsetX, scaleY),
         );
       }
 
-      // MEASURE NUMBER + TIME SIGNATURE — drawn at the very BOTTOM of
-      // the grid, below the tempo/dynamic labels (which stack above
-      // it — see the reshuffled Y math throughout this file). Unlike
-      // the scale name, this is shown for EVERY measure, not just
-      // where something changes, since the measure number itself is
-      // different each time regardless.
-      final measureLabelText = _measureLabelText(i + 1, measure.timeSignature);
+      // TIME SIGNATURE — drawn at the very BOTTOM of the grid, below
+      // the tempo/dynamic labels (which stack above it — see the
+      // reshuffled Y math throughout this file). Shown for EVERY
+      // measure, not just where something changes, since the time
+      // signature can differ measure to measure. The measure number
+      // itself is drawn at the TOP instead (see above).
+      final measureLabelText = _measureLabelText(measure.timeSignature);
       final measureLabelPainter = _measureLabelTextPainter(measureLabelText);
       final measureLabelY = size.height - measureLabelPainter.height - _bottomMargin;
       measureLabelPainter.paint(
