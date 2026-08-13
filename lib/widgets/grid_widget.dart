@@ -753,6 +753,42 @@ class GridPainter extends CustomPainter {
     );
   }
 
+  /// The pedal row's own y baseline — directly above the dynamic
+  /// label's own top edge (matches the DYNAMIC EVENTS loop in
+  /// paint()), with just enough clearance for the pedal text's own
+  /// height plus a small buffer. Per request, pedal now sits on the
+  /// row directly above Dynamic — CLOSER to the bottom than the
+  /// hairpin/Dynamic Change row, which is the reverse of how these
+  /// two used to stack. Shared by [_drawPedalMarks] (draws AT this y)
+  /// and [_drawHairpins] (draws its own row further ABOVE this one,
+  /// so the two never overlap) so both stay in sync from one source
+  /// of truth.
+  double _pedalRowY(Size size) {
+    final referenceTempoHeight = controller.timeline.tempoEvents.isNotEmpty
+        ? _tempoTextPainter(controller.timeline.tempoEvents.first).height
+        : 0.0;
+    final referenceDynamicHeight = controller.timeline.dynamicEvents.isNotEmpty
+        ? _dynamicTextPainter(controller.timeline.dynamicEvents.first).height
+        : 0.0;
+    final measureLabelHeight = _measureLabelReferenceHeight();
+
+    final dynamicLabelY = size.height
+        - measureLabelHeight
+        - _bottomMargin
+        - _labelGap
+        - referenceTempoHeight
+        - _labelGap
+        - referenceDynamicHeight;
+
+    // Small gap above the dynamic label's own top edge.
+    const pedalBuffer = 4.0;
+    final pedalTextHeight = _pedalTextPainter().height;
+    // Pedal text is painted CENTERED on its own y (see
+    // `pedalY - tp.height / 2` in _drawPedalMarks), so half its height
+    // needs to be reserved above dynamicLabelY too.
+    return dynamicLabelY - pedalBuffer - pedalTextHeight / 2;
+  }
+
   void _drawHairpins(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = Colors.green
@@ -762,31 +798,21 @@ class GridPainter extends CustomPainter {
     DynamicChangeEvent? crescendoBegin;
     DynamicChangeEvent? diminuendoBegin;
 
-    final referenceTempoHeight =
-    controller.timeline.tempoEvents.isNotEmpty
-        ? _tempoTextPainter(
-      controller.timeline.tempoEvents.first,
-    ).height
-        : 0.0;
+    // How far the hairpin's own zigzag swings above (and below) its
+    // own y baseline — matches _drawCrescendo/_drawDiminuendo's "h"
+    // constant exactly.
+    const hairpinSwing = 10.0;
+    // Small safety margin between the hairpin's lower swing point and
+    // the pedal row's own top edge.
+    const hairpinBuffer = 2.0;
 
-    final referenceDynamicHeight = controller.timeline.dynamicEvents.isNotEmpty
-        ? _dynamicTextPainter(
-      controller.timeline.dynamicEvents.first,
-    ).height
-        : 0.0;
-
-    final measureLabelHeight = _measureLabelReferenceHeight();
-
-    const hairpinOffset = 18.0;
-
-    final y = size.height
-        - measureLabelHeight
-        - _bottomMargin
-        - _labelGap
-        - referenceTempoHeight
-        - _labelGap
-        - referenceDynamicHeight
-        - hairpinOffset;
+    final pedalY = _pedalRowY(size);
+    final pedalTextHeight = _pedalTextPainter().height;
+    // The hairpin's row now sits ABOVE the pedal row (reversed from
+    // how these two used to stack — see _pedalRowY's doc) — its own
+    // lower swing point (y + hairpinSwing) must clear the pedal
+    // text's own top edge (pedalY - pedalTextHeight / 2).
+    final y = pedalY - pedalTextHeight / 2 - hairpinBuffer - hairpinSwing;
 
 
     for (final event in controller.timeline.dynamicChangeEvents) {
@@ -844,43 +870,17 @@ class GridPainter extends CustomPainter {
   /// _drawHairpins leaves an unmatched crescendo/diminuendo start
   /// undrawn.
   ///
-  /// Stacked in its own row directly above the hairpin row (which
-  /// itself sits above the tempo/dynamic/measure-label stack at the
-  /// bottom of the grid), so none of these annotation rows overlap.
+  /// Stacked directly above the dynamic label — the hairpin/Dynamic
+  /// Change row (see [_drawHairpins]) sits further above THIS row now
+  /// (reversed from how these two used to stack — pedal is now closer
+  /// to the bottom, per request), so none of these annotation rows
+  /// overlap.
   void _drawPedalMarks(Canvas canvas, Size size) {
     final linePaint = Paint()
       ..color = Colors.green
       ..strokeWidth = 1.5;
 
-    final referenceTempoHeight = controller.timeline.tempoEvents.isNotEmpty
-        ? _tempoTextPainter(controller.timeline.tempoEvents.first).height
-        : 0.0;
-
-    final referenceDynamicHeight = controller.timeline.dynamicEvents.isNotEmpty
-        ? _dynamicTextPainter(controller.timeline.dynamicEvents.first).height
-        : 0.0;
-
-    final measureLabelHeight = _measureLabelReferenceHeight();
-
-    const hairpinOffset = 18.0;
-    // Approximate visual height of a crescendo/diminuendo hairpin
-    // (see _drawCrescendo/_drawDiminuendo's own "h" constant, which
-    // spans this much above AND below the hairpin's own y) — used
-    // only to stack the pedal row above that zigzag without
-    // overlapping it.
-    const hairpinRowHeight = 20.0;
-    const pedalGap = 10.0;
-
-    final pedalY = size.height
-        - measureLabelHeight
-        - _bottomMargin
-        - _labelGap
-        - referenceTempoHeight
-        - _labelGap
-        - referenceDynamicHeight
-        - hairpinOffset
-        - hairpinRowHeight
-        - pedalGap;
+    final pedalY = _pedalRowY(size);
 
     DynamicChangeEvent? pedalBegin;
 

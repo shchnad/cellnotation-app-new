@@ -317,7 +317,11 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
     final top = (controller.totalRows - 1 - displayRow) * widget.cellHeight;
 
     final drawMark = _hasDrawnMark(note.articulation);
-    final hasFinger = note.finger != null;
+    // CompositionController.hideFingerNumbers — a purely visual
+    // toggle that hides every finger number regardless of the note's
+    // own Note.finger value, and reverts instantly (no data change)
+    // when toggled off.
+    final hasFinger = note.finger != null && !controller.hideFingerNumbers;
     final hasTechnique = note.playingTechnique != null;
 
     // Reserve extra room above the note box: finger number at the
@@ -335,7 +339,19 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
 
     final noteContainer = Container(
       decoration: BoxDecoration(
-        color: _handColor(note.hand),
+        // CompositionController.highlightAccidentalNotes — a purely
+        // visual toggle that overrides the normal hand-based color
+        // with green for any note carrying a non-null accidental,
+        // and reverts instantly (no data change) when toggled off.
+        // Uses interactionNote (not note) so ornament ghosts reflect
+        // the REAL underlying note's accidental — a ghost's own
+        // .accidental is deliberately left null elsewhere in this
+        // file (see the class doc above), since ghost pitch/
+        // accidental display is computed differently.
+        color: (controller.highlightAccidentalNotes &&
+            interactionNote.accidental != null)
+            ? Colors.green
+            : _handColor(note.hand),
         borderRadius: BorderRadius.circular(4),
         border: _combinedBorder(),
       ),

@@ -392,7 +392,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Colors.black,
-                          fontSize: 18,
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -484,8 +484,19 @@ class _CompositionScreenState extends State<CompositionScreen>
                             : Colors.blue,
                       ),
                       tooltip: 'Hand',
-                      onPressed:
-                      controller.toggleHand,
+                      onPressed: () {
+                        controller.toggleHand();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              controller.currentHand == Hand.right
+                                  ? 'The right hand is set.'
+                                  : 'The left hand is set.',
+                              style: const TextStyle(fontSize: 22),
+                            ),
+                          ),
+                        );
+                      },
                     ),
 
 
@@ -524,8 +535,26 @@ class _CompositionScreenState extends State<CompositionScreen>
                       tooltip: controller.isAddingGraceNotes
                           ? 'Add Grace Note Mode: On'
                           : 'Add Grace Note Mode: Off',
-                      onPressed:
-                      controller.stopAddingGraceNotes,
+                      onPressed: () {
+                        // This button can only ever turn the mode
+                        // OFF (see the comment above) — if it was
+                        // already off, there's nothing to toggle,
+                        // so the message instead explains the
+                        // only way to actually turn it ON.
+                        final wasOn = controller.isAddingGraceNotes;
+                        controller.stopAddingGraceNotes();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              wasOn
+                                  ? 'Add Grace Note mode is off.'
+                                  : 'To add grace notes, tap the '
+                                  'note and choose Grace Notes.',
+                              style: const TextStyle(fontSize: 22),
+                            ),
+                          ),
+                        );
+                      },
                     ),
 
                     // LEGATO MODE — while on, tapping a note toggles
@@ -537,14 +566,65 @@ class _CompositionScreenState extends State<CompositionScreen>
                       icon: Icon(
                         Icons.airline_stops_outlined,
                         color: controller.legatoMode
-                            ? Colors.blue
+                            ? Colors.red
                             : Colors.black,
                       ),
                       tooltip: controller.legatoMode
                           ? 'Legato Mode: On'
                           : 'Legato Mode: Off',
-                      onPressed:
-                      controller.toggleLegatoMode,
+                      onPressed: () {
+                        controller.toggleLegatoMode();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              controller.legatoMode
+                                  ? 'Legato mode is on. Tap notes '
+                                  'to mark them as played legato.'
+                                  : 'Legato mode is off.',
+                              style: const TextStyle(fontSize: 22),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+
+                    // HIGHLIGHT ACCIDENTAL NOTES — purely a
+                    // display toggle (see CompositionController.
+                    // highlightAccidentalNotes): while on, every
+                    // note with a non-null accidental is drawn
+                    // green in the grid instead of its usual
+                    // hand-based color; toggling off instantly
+                    // restores their normal color, since no note
+                    // data is actually changed. Icon itself turns
+                    // green (rather than the usual blue used by
+                    // other toggles) to preview what the toggle
+                    // does. Same icon NoteDialog uses for its own
+                    // Accidental field, for visual consistency.
+                    IconButton(
+                      icon: Icon(
+                        Icons.open_in_full_sharp,
+                        color: controller.highlightAccidentalNotes
+                            ? Colors.green
+                            : Colors.black,
+                      ),
+                      tooltip: controller.highlightAccidentalNotes
+                          ? 'Highlight Accidental Notes: On'
+                          : 'Highlight Accidental Notes: Off',
+                      onPressed: () {
+                        controller.toggleHighlightAccidentalNotes();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              controller.highlightAccidentalNotes
+                                  ? 'Notes which do not belong to '
+                                  'the scale are highlighted in '
+                                  'green.'
+                                  : 'Highlight mode is off.',
+                              style: const TextStyle(fontSize: 22),
+                            ),
+                          ),
+                        );
+                      },
                     ),
 
 
@@ -601,8 +681,21 @@ class _CompositionScreenState extends State<CompositionScreen>
                       tooltip: controller.inputLocked
                           ? 'Scroll Lock: On'
                           : 'Scroll Lock: Off',
-                      onPressed:
-                      controller.toggleInputLocked,
+                      onPressed: () {
+                        controller.toggleInputLocked();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              controller.inputLocked
+                                  ? 'Lock mode is on, no input is '
+                                  'possible. To be able to edit, '
+                                  'the button must be toggled.'
+                                  : 'Lock mode is off.',
+                              style: const TextStyle(fontSize: 22),
+                            ),
+                          ),
+                        );
+                      },
                     ),
 
 
@@ -623,8 +716,22 @@ class _CompositionScreenState extends State<CompositionScreen>
                       tooltip: controller.showCompensatedNotation
                           ? 'Compensated Notation: On'
                           : 'Compensated Notation: Off',
-                      onPressed:
-                      controller.toggleCompensatedNotation,
+                      onPressed: () {
+                        controller.toggleCompensatedNotation();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              controller.showCompensatedNotation
+                                  ? 'Easy Read mode is on and no '
+                                  'edit is possible. To return to '
+                                  'normal, the button must be '
+                                  'toggled.'
+                                  : 'Easy Read mode is off.',
+                              style: const TextStyle(fontSize: 22),
+                            ),
+                          ),
+                        );
+                      },
                     ),
 
                     // ROTATE PITCH TEXT — purely cosmetic; rotates
@@ -639,8 +746,52 @@ class _CompositionScreenState extends State<CompositionScreen>
                       tooltip: controller.rotatePitchText
                           ? 'Rotate Pitch Text: On'
                           : 'Rotate Pitch Text: Off',
-                      onPressed:
-                      controller.toggleRotatePitchText,
+                      onPressed: () {
+                        controller.toggleRotatePitchText();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              controller.rotatePitchText
+                                  ? 'The grid is rotated for '
+                                  'piano reading.'
+                                  : 'The grid is rotated for '
+                                  'notation reading.',
+                              style: const TextStyle(fontSize: 22),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+
+                    // HIDE FINGER NUMBERS — purely a display
+                    // toggle (see CompositionController.
+                    // hideFingerNumbers): while on, every note's
+                    // finger number is hidden in the grid;
+                    // toggling off instantly restores them, since
+                    // no note data is actually changed.
+                    IconButton(
+                      icon: Icon(
+                        Icons.touch_app,
+                        color: controller.hideFingerNumbers
+                            ? Colors.red
+                            : Colors.black,
+                      ),
+                      tooltip: controller.hideFingerNumbers
+                          ? 'Hide Finger Numbers: On'
+                          : 'Hide Finger Numbers: Off',
+                      onPressed: () {
+                        controller.toggleHideFingerNumbers();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              controller.hideFingerNumbers
+                                  ? 'Fingers are hidden.'
+                                  : 'Fingers are visible.',
+                              style: const TextStyle(fontSize: 22),
+                            ),
+                          ),
+                        );
+                      },
                     ),
 
                     // PLAY / PAUSE — auto-scrolls the grid left to
@@ -664,7 +815,19 @@ class _CompositionScreenState extends State<CompositionScreen>
                         color: Colors.black,
                       ),
                       tooltip: 'Scroll to Start',
-                      onPressed: hasMeasures ? _scrollToStart : null,
+                      onPressed: hasMeasures
+                          ? () {
+                        _scrollToStart();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Scrolled to the beginning.',
+                              style: TextStyle(fontSize: 22),
+                            ),
+                          ),
+                        );
+                      }
+                          : null,
                     ),
 
                     // SOUND ON/OFF — notes play a synthesized tone
@@ -681,7 +844,19 @@ class _CompositionScreenState extends State<CompositionScreen>
                       tooltip: controller.soundEnabled
                           ? 'Sound On'
                           : 'Sound Off',
-                      onPressed: controller.toggleSound,
+                      onPressed: () {
+                        controller.toggleSound();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              controller.soundEnabled
+                                  ? 'The sound is on.'
+                                  : 'The sound is off.',
+                              style: const TextStyle(fontSize: 22),
+                            ),
+                          ),
+                        );
+                      },
                     ),
 
 
@@ -699,8 +874,17 @@ class _CompositionScreenState extends State<CompositionScreen>
                         color: Colors.black,
                       ),
                       tooltip: 'Raise scales',
-                      onPressed:
-                      controller.raiseAllScales,
+                      onPressed: () {
+                        controller.raiseAllScales();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'The composition is raised a semitone.',
+                              style: TextStyle(fontSize: 22),
+                            ),
+                          ),
+                        );
+                      },
                     ),
 
 
@@ -710,8 +894,17 @@ class _CompositionScreenState extends State<CompositionScreen>
                         color: Colors.black,
                       ),
                       tooltip: 'Reset scales',
-                      onPressed:
-                      controller.resetAllScales,
+                      onPressed: () {
+                        controller.resetAllScales();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'The initial scale is set.',
+                              style: TextStyle(fontSize: 22),
+                            ),
+                          ),
+                        );
+                      },
                     ),
 
 
@@ -721,8 +914,17 @@ class _CompositionScreenState extends State<CompositionScreen>
                         color: Colors.black,
                       ),
                       tooltip: 'Lower scales',
-                      onPressed:
-                      controller.lowerAllScales,
+                      onPressed: () {
+                        controller.lowerAllScales();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'The composition is lowered a semitone.',
+                              style: TextStyle(fontSize: 22),
+                            ),
+                          ),
+                        );
+                      },
                     ),
 
 

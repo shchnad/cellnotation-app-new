@@ -1333,6 +1333,22 @@ class CompositionController extends ChangeNotifier {
   }
 
 
+  /// When on, every note with a non-null [Note.accidental] is drawn
+  /// green (in NoteBlockWidget) instead of its usual hand-based color
+  /// — purely a display toggle, the same way
+  /// [showCompensatedNotation] is: no note data changes, so switching
+  /// this back off instantly restores every note's normal color with
+  /// no risk of data loss. Ghost notes (an ornament's expanded
+  /// sequence — see displayNotes) are included too, since they carry
+  /// the same underlying note's accidental.
+  bool highlightAccidentalNotes = false;
+
+  void toggleHighlightAccidentalNotes() {
+    highlightAccidentalNotes = !highlightAccidentalNotes;
+    notifyListeners();
+  }
+
+
   // =====================================================
   // GLISSANDO
   // =====================================================
@@ -2123,6 +2139,19 @@ class CompositionController extends ChangeNotifier {
 
   void toggleRotatePitchText() {
     rotatePitchText = !rotatePitchText;
+    notifyListeners();
+  }
+
+  /// When on, the finger number strip normally drawn above a note
+  /// (see NoteBlockWidget) is hidden for every note, regardless of
+  /// its own Note.finger value — purely a display toggle, the same
+  /// way [showCompensatedNotation] is: no note data changes, so
+  /// switching this back off instantly restores every finger number
+  /// with no risk of data loss.
+  bool hideFingerNumbers = false;
+
+  void toggleHideFingerNumbers() {
+    hideFingerNumbers = !hideFingerNumbers;
     notifyListeners();
   }
 
