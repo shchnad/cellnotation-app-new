@@ -855,28 +855,39 @@ class CompositionController extends ChangeNotifier {
     }
   }
 
+  /// Sets [dChange] at [tick]. Only replaces an EXISTING event at that
+  /// tick if it's the SAME category (pedal vs crescendo/diminuendo) as
+  /// [dChange] itself — a pedal event and a hairpin event can
+  /// otherwise share the exact same tick without one silently
+  /// overwriting the other, since [Timeline.dynamicChangeEvents]
+  /// doesn't reserve a tick exclusively for one type or the other.
   void updateDynamicChangeEvent(
       int tick,
       DynamicChange dChange,
       ) {
-    final index = timeline.dynamicChangeEvents.indexWhere(
-          (e) => e.tick == tick,
+    // Timeline.addDynamicChangeEvent is itself category-aware now
+    // (only replaces an existing event of the SAME category — pedal
+    // vs crescendo/diminuendo — at this tick), so it's always safe to
+    // call directly here without checking for an existing event
+    // first.
+    timeline.addDynamicChangeEvent(
+      DynamicChangeEvent(
+        tick: tick,
+        dynamic_change: dChange,
+      ),
     );
-    if (index >= 0) {
-      timeline.dynamicChangeEvents[index].dynamic_change = dChange;
-    } else {
-      timeline.addDynamicChangeEvent(
-        DynamicChangeEvent(
-          tick: tick,
-          dynamic_change: dChange,
-        ),
-      );
-    }
     notifyListeners();
   }
 
-  void deleteDynamicChangeEvent(int tick) {
-    timeline.removeDynamicChangeEvent(tick);
+  /// Removes whichever event is at [tick] — [isPedal] selects which
+  /// CATEGORY to remove (a pedal event or a crescendo/diminuendo
+  /// event), since both can coexist at the same tick (see
+  /// [updateDynamicChangeEvent]'s doc) and deleting one must never
+  /// remove the other. Called with isPedal: false from
+  /// dynamicChangeDialog's Delete button, and isPedal: true from
+  /// pedalDialog's.
+  void deleteDynamicChangeEvent(int tick, {required bool isPedal}) {
+    timeline.removeDynamicChangeEvent(tick, isPedal: isPedal);
     notifyListeners();
   }
 
@@ -888,14 +899,13 @@ class CompositionController extends ChangeNotifier {
   // DynamicChangeEvent/timeline.dynamicChangeEvents storage as
   // crescendo/diminuendo above — same shape (a tick + a DynamicChange
   // value), same persistence semantics (a state holds from its event
-  // forward until the next one). They're kept independent everywhere
-  // they're READ or DRAWN, though: GridPainter draws them as their
-  // own thin red connecting line rather than the green crescendo/
+  // forward until the next one). GridPainter draws them as their own
+  // thin red connecting line rather than the green crescendo/
   // diminuendo line, and dynamicChangeDialog's picker excludes them
-  // entirely — pedal is only ever set via the single toggle button in
-  // editMeasureBeatDialog (see [togglePedalAtTick]), never via that
-  // dialog, so there's exactly one way to set it and no risk of the
-  // two getting out of sync with each other.
+  // entirely — pedal is only ever set via pedalDialog. Both types can
+  // coexist at the exact same tick without one overwriting or deleting
+  // the other — see updateDynamicChangeEvent / deleteDynamicChangeEvent's
+  // own docs for how that's kept safe.
 
   /// Whether the sustain pedal is currently held down AT [tick] — the
   /// latest pedal event (pedalDown or pedalUp) at or before [tick] is
@@ -2152,6 +2162,21 @@ class CompositionController extends ChangeNotifier {
 
   void toggleHideFingerNumbers() {
     hideFingerNumbers = !hideFingerNumbers;
+    notifyListeners();
+  }
+
+  /// Shared font size for every grid annotation label — finger
+  /// number, time signature, pedal sign, dynamic, tempo, scale name,
+  /// and measure number (see GridWidget/NoteBlockWidget, which all
+  /// read this instead of a hardcoded const style now). Starts at
+  /// [DefaultValues.gridFontSize] and toggles up to
+  /// [DefaultValues.gridFontSizeLarge] and back.
+  double gridFontSize = DefaultValues.gridFontSize;
+
+  void toggleGridFontSize() {
+    gridFontSize = gridFontSize == DefaultValues.gridFontSize
+        ? DefaultValues.gridFontSizeLarge
+        : DefaultValues.gridFontSize;
     notifyListeners();
   }
 

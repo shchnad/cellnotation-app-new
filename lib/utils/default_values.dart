@@ -25,6 +25,14 @@ class DefaultValues {
   static const double dialogPaddingRightLeft = 25.0;
   static const double dialogPaddingBottomTop = 8.0;
 
+  // Shared font size for every grid annotation label — finger number,
+  // time signature, pedal sign, dynamic, tempo, scale name, and
+  // measure number. Toggleable at runtime between this default and
+  // 22 (see CompositionController.gridFontSize /
+  // toggleGridFontSize).
+  static const double gridFontSize = 16.0;
+  static const double gridFontSizeLarge = 22.0;
+
 
   // NOTE COPYING
   static const String titleOfMessageForCopying = 'Note copying';

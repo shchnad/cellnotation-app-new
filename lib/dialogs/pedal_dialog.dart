@@ -21,8 +21,15 @@ void pedalDialog(
     builder: (_) {
       DynamicChangeEvent? currentEvent;
 
+      // Only ever considers a pedal event at this tick — a
+      // crescendo/diminuendo event can independently exist at the
+      // exact same tick (see CompositionController.
+      // updateDynamicChangeEvent's doc) and must never be picked up
+      // here instead.
       for (final event in controller.timeline.dynamicChangeEvents) {
-        if (event.tick == tick) {
+        if (event.tick == tick &&
+            (event.dynamic_change == DynamicChange.pedalDown ||
+                event.dynamic_change == DynamicChange.pedalUp)) {
           currentEvent = event;
           break;
         }
@@ -107,6 +114,7 @@ void pedalDialog(
                     : () {
                   controller.deleteDynamicChangeEvent(
                     tick,
+                    isPedal: true,
                   );
                   Navigator.pop(context);
                 },

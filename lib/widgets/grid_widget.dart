@@ -13,43 +13,43 @@ import '../utils/scale_resolver.dart';
 import 'note_block_widget.dart';
 
 /// tempo
-const _tempoLabelStyle = TextStyle(
+TextStyle _tempoLabelStyle(double fontSize) => TextStyle(
   color: Colors.blue,
-  fontSize: 22,
+  fontSize: fontSize,
   fontWeight: FontWeight.bold,
 );
 
 /// dynamic
-const _dynamicLabelStyle = TextStyle(
+TextStyle _dynamicLabelStyle(double fontSize) => TextStyle(
   color: Colors.green,
-  fontSize: 22,
+  fontSize: fontSize,
   fontWeight: FontWeight.bold,
 );
 
 /// sustain pedal — "ped" sign plus the thin connecting line drawn
 /// from a pedalDown event to its matching pedalUp (see
 /// _drawPedalMarks), in red.
-const _pedalLabelStyle = TextStyle(
+TextStyle _pedalLabelStyle(double fontSize) => TextStyle(
   color: Colors.green,
-  fontSize: 22,
+  fontSize: fontSize,
   fontWeight: FontWeight.bold,
 );
 
 /// scale name — drawn at the TOP of the grid, below the measure
 /// number (see _measureNumberLabelStyle), same size/weight as the
 /// tempo label at the bottom, in blue.
-const _scaleLabelStyle = TextStyle(
+TextStyle _scaleLabelStyle(double fontSize) => TextStyle(
   color: Colors.blue,
-  fontSize: 22,
+  fontSize: fontSize,
   fontWeight: FontWeight.bold,
 );
 
 /// measure number — drawn at the very TOP of the grid, above the
 /// scale name, for EVERY measure (unlike the scale name, which only
 /// repeats where the scale actually changes).
-const _measureNumberLabelStyle = TextStyle(
+TextStyle _measureNumberLabelStyle(double fontSize) => TextStyle(
   color: Colors.blue,
-  fontSize: 22,
+  fontSize: fontSize,
   fontWeight: FontWeight.bold,
 );
 
@@ -58,9 +58,9 @@ const _measureNumberLabelStyle = TextStyle(
 /// the measure number too (e.g. "1: 4/4") — that moved to the TOP of
 /// the grid instead (see _measureNumberLabelStyle), so this is just
 /// the fraction now (e.g. "4/4").
-const _measureLabelStyle = TextStyle(
+TextStyle _measureLabelStyle(double fontSize) => TextStyle(
   color: Colors.blue,
-  fontSize: 22,
+  fontSize: fontSize,
   fontWeight: FontWeight.bold,
 );
 
@@ -102,61 +102,61 @@ class _DynamicChangeLineHit {
   _DynamicChangeLineHit(this.tick, this.rect);
 }
 
-TextPainter _tempoTextPainter(dynamic tempoEvent) {
+TextPainter _tempoTextPainter(dynamic tempoEvent, double fontSize) {
   return TextPainter(
     text: TextSpan(
       text: '${tempoEvent.tempo.label} = ${tempoEvent.tempo.value}',
-      style: _tempoLabelStyle,
+      style: _tempoLabelStyle(fontSize),
     ),
     textDirection: TextDirection.ltr,
   )..layout();
 }
 
-TextPainter _dynamicTextPainter(dynamic dynamicEvent) {
+TextPainter _dynamicTextPainter(dynamic dynamicEvent, double fontSize) {
   return TextPainter(
     text: TextSpan(
       text: dynamicEvent.musical_dynamic.abbreviation,
-      style: _dynamicLabelStyle,
+      style: _dynamicLabelStyle(fontSize),
     ),
     textDirection: TextDirection.ltr,
   )..layout();
 }
 
-TextPainter _pedalTextPainter() {
+TextPainter _pedalTextPainter(double fontSize) {
   return TextPainter(
-    text: const TextSpan(
+    text: TextSpan(
       text: 'ped',
-      style: _pedalLabelStyle,
+      style: _pedalLabelStyle(fontSize),
     ),
     textDirection: TextDirection.ltr,
   )..layout();
 }
 
-TextPainter _scaleTextPainter(String scaleName) {
+TextPainter _scaleTextPainter(String scaleName, double fontSize) {
   return TextPainter(
     text: TextSpan(
       text: ScaleResolver.normalizeScaleName(scaleName),
-      style: _scaleLabelStyle,
+      style: _scaleLabelStyle(fontSize),
     ),
     textDirection: TextDirection.ltr,
   )..layout();
 }
 
-TextPainter _measureNumberTextPainter(String text) {
+TextPainter _measureNumberTextPainter(String text, double fontSize) {
   return TextPainter(
     text: TextSpan(
       text: text,
-      style: _measureNumberLabelStyle,
+      style: _measureNumberLabelStyle(fontSize),
     ),
     textDirection: TextDirection.ltr,
   )..layout();
 }
 
-TextPainter _measureLabelTextPainter(String text) {
+TextPainter _measureLabelTextPainter(String text, double fontSize) {
   return TextPainter(
     text: TextSpan(
       text: text,
-      style: _measureLabelStyle,
+      style: _measureLabelStyle(fontSize),
     ),
     textDirection: TextDirection.ltr,
   )..layout();
@@ -189,16 +189,16 @@ String _measureLabelText(dynamic timeSignature) {
 /// independent for single-line text at a fixed style, so any sample
 /// string works as a consistent reference for stacking the scale name
 /// below it.
-double _measureNumberReferenceHeight() =>
-    _measureNumberTextPainter('0').height;
+double _measureNumberReferenceHeight(double fontSize) =>
+    _measureNumberTextPainter('0', fontSize).height;
 
 /// Line-height of the time-signature label at the bottom — content-
 /// independent for single-line text at a fixed style, so any sample
 /// string works as a consistent reference for stacking the tempo/
 /// dynamic labels above it (same idea as the existing
 /// referenceTempoHeight/referenceDynamicHeight pattern below).
-double _measureLabelReferenceHeight() =>
-    _measureLabelTextPainter('0/0').height;
+double _measureLabelReferenceHeight(double fontSize) =>
+    _measureLabelTextPainter('0/0', fontSize).height;
 
 /// Computes tap-target rects for both tempo and dynamic labels.
 /// Both stack above the measure/time-signature label at the very
@@ -210,11 +210,12 @@ List<_LabelHit> _computeLabelHits(
     double gridHeight,
     ) {
   final hits = <_LabelHit>[];
-  final measureLabelHeight = _measureLabelReferenceHeight();
+  final fontSize = controller.gridFontSize;
+  final measureLabelHeight = _measureLabelReferenceHeight(fontSize);
 
   for (final tempoEvent in controller.timeline.tempoEvents) {
     final x = tempoEvent.tick * pixelsPerTick;
-    final tp = _tempoTextPainter(tempoEvent);
+    final tp = _tempoTextPainter(tempoEvent, fontSize);
     final y = gridHeight - measureLabelHeight - _bottomMargin - _labelGap - tp.height;
     hits.add(
       _LabelHit(
@@ -227,7 +228,7 @@ List<_LabelHit> _computeLabelHits(
 
   for (final dynamicEvent in controller.timeline.dynamicEvents) {
     final x = dynamicEvent.tick * pixelsPerTick;
-    final dynamicTp = _dynamicTextPainter(dynamicEvent);
+    final dynamicTp = _dynamicTextPainter(dynamicEvent, fontSize);
 
     // Position above the tempo label's height at the bottom, regardless
     // of whether a tempo event exists at this exact tick, so dynamic
@@ -235,6 +236,7 @@ List<_LabelHit> _computeLabelHits(
     final tempoLineHeight = _tempoTextPainter(
       controller.getTempoAtTick(tempoEventFallbackTick(controller, dynamicEvent.tick)) ??
           controller.timeline.tempoEvents.first,
+      fontSize,
     ).height;
 
     final y = gridHeight -
@@ -268,7 +270,8 @@ List<_ScaleLabelHit> _computeScaleLabelHits(
     ) {
   final hits = <_ScaleLabelHit>[];
   final measures = controller.measures;
-  final measureNumberHeight = _measureNumberReferenceHeight();
+  final fontSize = controller.gridFontSize;
+  final measureNumberHeight = _measureNumberReferenceHeight(fontSize);
   final scaleY = _topMargin + measureNumberHeight + _topLabelGap;
 
   for (int i = 0; i < measures.length; i++) {
@@ -278,7 +281,7 @@ List<_ScaleLabelHit> _computeScaleLabelHits(
     if (i != 0 && !scaleChanged) continue;
 
     final x = measure.startTick * pixelsPerTick;
-    final tp = _scaleTextPainter(measure.scaleName);
+    final tp = _scaleTextPainter(measure.scaleName, fontSize);
     hits.add(
       _ScaleLabelHit(
         i,
@@ -764,13 +767,14 @@ class GridPainter extends CustomPainter {
   /// so the two never overlap) so both stay in sync from one source
   /// of truth.
   double _pedalRowY(Size size) {
+    final fontSize = controller.gridFontSize;
     final referenceTempoHeight = controller.timeline.tempoEvents.isNotEmpty
-        ? _tempoTextPainter(controller.timeline.tempoEvents.first).height
+        ? _tempoTextPainter(controller.timeline.tempoEvents.first, fontSize).height
         : 0.0;
     final referenceDynamicHeight = controller.timeline.dynamicEvents.isNotEmpty
-        ? _dynamicTextPainter(controller.timeline.dynamicEvents.first).height
+        ? _dynamicTextPainter(controller.timeline.dynamicEvents.first, fontSize).height
         : 0.0;
-    final measureLabelHeight = _measureLabelReferenceHeight();
+    final measureLabelHeight = _measureLabelReferenceHeight(fontSize);
 
     final dynamicLabelY = size.height
         - measureLabelHeight
@@ -782,7 +786,7 @@ class GridPainter extends CustomPainter {
 
     // Small gap above the dynamic label's own top edge.
     const pedalBuffer = 4.0;
-    final pedalTextHeight = _pedalTextPainter().height;
+    final pedalTextHeight = _pedalTextPainter(fontSize).height;
     // Pedal text is painted CENTERED on its own y (see
     // `pedalY - tp.height / 2` in _drawPedalMarks), so half its height
     // needs to be reserved above dynamicLabelY too.
@@ -807,7 +811,7 @@ class GridPainter extends CustomPainter {
     const hairpinBuffer = 2.0;
 
     final pedalY = _pedalRowY(size);
-    final pedalTextHeight = _pedalTextPainter().height;
+    final pedalTextHeight = _pedalTextPainter(controller.gridFontSize).height;
     // The hairpin's row now sits ABOVE the pedal row (reversed from
     // how these two used to stack — see _pedalRowY's doc) — its own
     // lower swing point (y + hairpinSwing) must clear the pedal
@@ -881,19 +885,26 @@ class GridPainter extends CustomPainter {
       ..strokeWidth = 1.5;
 
     final pedalY = _pedalRowY(size);
+    final fontSize = controller.gridFontSize;
 
     DynamicChangeEvent? pedalBegin;
 
     for (final event in controller.timeline.dynamicChangeEvents) {
       if (event.dynamic_change == DynamicChange.pedalDown) {
         pedalBegin = event;
-        final tp = _pedalTextPainter();
+        final tp = _pedalTextPainter(fontSize);
         final x = event.tick * pixelsPerTick;
-        tp.paint(canvas, Offset(x, pedalY - tp.height / 2));
+        // + _labelOffsetX to match every other label in this file
+        // (dynamic, tempo, scale, measure number) — without it the
+        // "ped" sign started exactly at the tick line instead of
+        // slightly to the right, so it didn't line up vertically with
+        // the dynamic label stacked directly below it.
+        tp.paint(canvas, Offset(x + _labelOffsetX, pedalY - tp.height / 2));
       } else if (event.dynamic_change == DynamicChange.pedalUp) {
         if (pedalBegin != null) {
-          final tp = _pedalTextPainter();
-          final startX = pedalBegin.tick * pixelsPerTick + tp.width + 4;
+          final tp = _pedalTextPainter(fontSize);
+          final startX =
+              pedalBegin.tick * pixelsPerTick + _labelOffsetX + tp.width + 4;
           final endX = event.tick * pixelsPerTick;
           if (endX > startX) {
             canvas.drawLine(
@@ -933,6 +944,8 @@ class GridPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final fontSize = controller.gridFontSize;
+
     final thinPaint = Paint()
       ..color = Colors.grey.withOpacity(0.25)
       ..strokeWidth = 1;
@@ -996,6 +1009,7 @@ class GridPainter extends CustomPainter {
       // where the scale actually changes).
       final measureNumberPainter = _measureNumberTextPainter(
         _measureNumberText(i + 1),
+        fontSize,
       );
       measureNumberPainter.paint(
         canvas,
@@ -1008,9 +1022,9 @@ class GridPainter extends CustomPainter {
       // (same condition as the double measure-line above) — not
       // repeated on every single measure.
       if (i == 0 || scaleChanged) {
-        final scaleTextPainter = _scaleTextPainter(measure.scaleName);
+        final scaleTextPainter = _scaleTextPainter(measure.scaleName, fontSize);
         final scaleY = _topMargin +
-            _measureNumberReferenceHeight() +
+            _measureNumberReferenceHeight(fontSize) +
             _topLabelGap;
         scaleTextPainter.paint(
           canvas,
@@ -1025,7 +1039,8 @@ class GridPainter extends CustomPainter {
       // signature can differ measure to measure. The measure number
       // itself is drawn at the TOP instead (see above).
       final measureLabelText = _measureLabelText(measure.timeSignature);
-      final measureLabelPainter = _measureLabelTextPainter(measureLabelText);
+      final measureLabelPainter =
+      _measureLabelTextPainter(measureLabelText, fontSize);
       final measureLabelY = size.height - measureLabelPainter.height - _bottomMargin;
       measureLabelPainter.paint(
         canvas,
@@ -1060,7 +1075,7 @@ class GridPainter extends CustomPainter {
       ..color = Colors.blue
       ..strokeWidth = 2;
 
-    final measureLabelHeightForTempo = _measureLabelReferenceHeight();
+    final measureLabelHeightForTempo = _measureLabelReferenceHeight(fontSize);
 
     for (final tempoEvent in controller.timeline.tempoEvents) {
       final x = tempoEvent.tick * pixelsPerTick;
@@ -1071,7 +1086,7 @@ class GridPainter extends CustomPainter {
         tempoLinePaint,
       );
 
-      final textPainter = _tempoTextPainter(tempoEvent);
+      final textPainter = _tempoTextPainter(tempoEvent, fontSize);
       final y = size.height -
           measureLabelHeightForTempo -
           _bottomMargin -
@@ -1083,12 +1098,12 @@ class GridPainter extends CustomPainter {
 // DYNAMIC EVENTS — labels stacked above tempo label
 
     final referenceTempoHeight = controller.timeline.tempoEvents.isNotEmpty
-        ? _tempoTextPainter(controller.timeline.tempoEvents.first).height
+        ? _tempoTextPainter(controller.timeline.tempoEvents.first, fontSize).height
         : 0.0;
 
     for (final dynamicEvent in controller.timeline.dynamicEvents) {
       final x = dynamicEvent.tick * pixelsPerTick;
-      final textPainter = _dynamicTextPainter(dynamicEvent);
+      final textPainter = _dynamicTextPainter(dynamicEvent, fontSize);
 
       final y = size.height -
           measureLabelHeightForTempo -

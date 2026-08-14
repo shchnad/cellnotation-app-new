@@ -1,3 +1,4 @@
+import '../enums/dynamic_change.dart';
 import '../enums/tempo.dart';
 import 'beat_event_model.dart';
 import 'dynamic_change_event.dart';
@@ -238,19 +239,38 @@ class Timeline {
   //==============================
   //     DYNAMIC CHANGE EVENT
   //==============================
+  //
+  // pedalDown/pedalUp share this same DynamicChangeEvent storage with
+  // crescendoStart/crescendoFinish/diminuendoStart/diminuendoFinish —
+  // but the two are otherwise unrelated markers that must be able to
+  // coexist at the exact same tick (e.g. a pedal press starting right
+  // where a crescendo also starts). Every method below that touches
+  // dynamicChangeEvents by tick is therefore CATEGORY-aware — it only
+  // ever removes/matches an existing event of the SAME category
+  // (pedal vs crescendo/diminuendo) as the one being added/removed —
+  // rather than just matching by tick alone, which would silently let
+  // one category overwrite the other whenever they share a tick.
+
+  bool _isPedalChange(DynamicChange dc) =>
+      dc == DynamicChange.pedalDown || dc == DynamicChange.pedalUp;
 
   void addDynamicChangeEvent(DynamicChangeEvent event) {
+    final isPedal = _isPedalChange(event.dynamic_change);
     dynamicChangeEvents.removeWhere(
-          (e) => e.tick == event.tick,
+          (e) => e.tick == event.tick && _isPedalChange(e.dynamic_change) == isPedal,
     );
     dynamicChangeEvents.add(event);
     _sortDynamicChangeEvents();
   }
 
 
-  void removeDynamicChangeEvent(int tick) {
+  /// Removes whichever event is at [tick] — [isPedal] selects which
+  /// CATEGORY to remove (a pedal event or a crescendo/diminuendo
+  /// event), so deleting one never removes the other if both happen
+  /// to share the same tick.
+  void removeDynamicChangeEvent(int tick, {required bool isPedal}) {
     dynamicChangeEvents.removeWhere(
-          (e) => e.tick == tick,
+          (e) => e.tick == tick && _isPedalChange(e.dynamic_change) == isPedal,
     );
   }
 

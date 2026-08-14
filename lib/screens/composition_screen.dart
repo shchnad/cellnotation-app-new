@@ -392,7 +392,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Colors.black,
-                          fontSize: 22,
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -628,6 +628,76 @@ class _CompositionScreenState extends State<CompositionScreen>
                     ),
 
 
+                    // HIDE FINGER NUMBERS — purely a display
+                    // toggle (see CompositionController.
+                    // hideFingerNumbers): while on, every note's
+                    // finger number is hidden in the grid;
+                    // toggling off instantly restores them, since
+                    // no note data is actually changed.
+                    IconButton(
+                      icon: Icon(
+                        Icons.touch_app,
+                        color: controller.hideFingerNumbers
+                            ? Colors.red
+                            : Colors.black,
+                      ),
+                      tooltip: controller.hideFingerNumbers
+                          ? 'Hide Finger Numbers: On'
+                          : 'Hide Finger Numbers: Off',
+                      onPressed: () {
+                        controller.toggleHideFingerNumbers();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              controller.hideFingerNumbers
+                                  ? 'Fingers are hidden.'
+                                  : 'Fingers are visible.',
+                              style: const TextStyle(fontSize: 22),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+
+
+                    // GRID FONT SIZE — toggles the shared font
+                    // size used by every grid annotation label
+                    // (finger number, playing technique, time
+                    // signature, pedal, dynamic, tempo, scale
+                    // name, measure number — see
+                    // CompositionController.gridFontSize /
+                    // DefaultValues.gridFontSize /
+                    // gridFontSizeLarge) between 16 and 22.
+                    IconButton(
+                      icon: Icon(
+                        Icons.format_size,
+                        color: controller.gridFontSize ==
+                            DefaultValues.gridFontSizeLarge
+                            ? Colors.blue
+                            : Colors.black,
+                      ),
+                      tooltip: controller.gridFontSize ==
+                          DefaultValues.gridFontSizeLarge
+                          ? 'Grid Font Size: Large'
+                          : 'Grid Font Size: Normal',
+                      onPressed: () {
+                        controller.toggleGridFontSize();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              controller.gridFontSize ==
+                                  DefaultValues.gridFontSizeLarge
+                                  ? 'Grid labels are now larger.'
+                                  : 'Grid labels are back to '
+                                  'normal size.',
+                              style: const TextStyle(fontSize: 22),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+
+
                     // PASTE
                     if (controller.canPaste)
                       IconButton(
@@ -763,36 +833,6 @@ class _CompositionScreenState extends State<CompositionScreen>
                       },
                     ),
 
-                    // HIDE FINGER NUMBERS — purely a display
-                    // toggle (see CompositionController.
-                    // hideFingerNumbers): while on, every note's
-                    // finger number is hidden in the grid;
-                    // toggling off instantly restores them, since
-                    // no note data is actually changed.
-                    IconButton(
-                      icon: Icon(
-                        Icons.touch_app,
-                        color: controller.hideFingerNumbers
-                            ? Colors.red
-                            : Colors.black,
-                      ),
-                      tooltip: controller.hideFingerNumbers
-                          ? 'Hide Finger Numbers: On'
-                          : 'Hide Finger Numbers: Off',
-                      onPressed: () {
-                        controller.toggleHideFingerNumbers();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              controller.hideFingerNumbers
-                                  ? 'Fingers are hidden.'
-                                  : 'Fingers are visible.',
-                              style: const TextStyle(fontSize: 22),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
 
                     // PLAY / PAUSE — auto-scrolls the grid left to
                     // right at a speed derived from tempo and beat
@@ -899,7 +939,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                              'The initial scale is set.',
+                              'The initial scale is set back.',
                               style: TextStyle(fontSize: 22),
                             ),
                           ),

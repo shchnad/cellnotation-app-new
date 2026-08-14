@@ -18,9 +18,12 @@ const double _articulationMarkHeight = 12.0;
 // technique abbreviation.
 const double _techniqueHeight = 26.0;
 
-const _techniqueTextStyle = TextStyle(
+// CompositionController.gridFontSize — shared, toggleable font size
+// for every grid annotation label (see the same pattern used for
+// _fingerTextStyle below, and every label style in grid_widget.dart).
+TextStyle _techniqueTextStyle(double fontSize) => TextStyle(
   color: Colors.red,
-  fontSize: 22,
+  fontSize: fontSize,
   fontWeight: FontWeight.bold,
   // fontStyle: FontStyle.italic,
 );
@@ -28,9 +31,13 @@ const _techniqueTextStyle = TextStyle(
 // Height of the strip reserved above each note for the finger number.
 const double _fingerHeight = 26.0;
 
-const _fingerTextStyle = TextStyle(
+// CompositionController.gridFontSize — shared, toggleable font size
+// for every grid annotation label (finger number, time signature,
+// pedal, dynamic, tempo, scale name, measure number). See
+// grid_widget.dart for the others.
+TextStyle _fingerTextStyle(double fontSize) => TextStyle(
   color: Colors.red,
-  fontSize: 22,
+  fontSize: fontSize,
   fontWeight: FontWeight.bold,
 );
 
@@ -419,7 +426,7 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
               child: Center(
                 child: Text(
                   note.finger!.value.toString(),
-                  style: _fingerTextStyle,
+                  style: _fingerTextStyle(controller.gridFontSize),
                 ),
               ),
             ),
@@ -548,7 +555,7 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
               child: Center(
                 child: Text(
                   note.playingTechnique!.abbreviation,
-                  style: _techniqueTextStyle,
+                  style: _techniqueTextStyle(controller.gridFontSize),
                 ),
               ),
             ),
