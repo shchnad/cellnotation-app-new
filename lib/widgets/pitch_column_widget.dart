@@ -37,8 +37,12 @@ class PitchColumnWidget extends StatelessWidget {
 
         return Container(
           width: widthOfPitchColumn,
-          // color: Colors.grey.shade200,
-          // color: Colors.white,
+          // Deliberately fixed, matching the toolbar's own fixed
+          // Colors.grey.shade300 exactly — the toolbar itself never
+          // changes with CompositionController.isDarkMode (dark mode
+          // is scoped to just the grid/notes, per request), so this
+          // column — which sits right against the toolbar — stays
+          // fixed too, regardless of the grid's own theme.
           color: Colors.grey.shade300,
           child: SingleChildScrollView(
             controller: scrollController,

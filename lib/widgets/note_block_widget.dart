@@ -9,6 +9,7 @@ import '../enums/accidental.dart';
 import '../enums/articulation.dart';
 import '../enums/hand.dart';
 import '../models/note.dart';
+import '../utils/app_colors.dart';
 
 // Height of the strip reserved above each note for drawing staccato /
 // tenuto / marcato / accent marks.
@@ -386,7 +387,7 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
                 Text(
                   pitch,
                   style: TextStyle(
-                    color: Colors.white,
+                    color: AppColors.noteText(controller.isDarkMode),
                     fontSize: widget.cellHeight * .80,
                     fontWeight: FontWeight.bold,
                   ),
@@ -395,7 +396,7 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
                   Text(
                     accidental, // ACCIDENTAL
                     style: TextStyle(
-                      color: Colors.white,
+                      color: AppColors.noteText(controller.isDarkMode),
                       fontSize: widget.cellHeight * .80,
                       fontWeight: FontWeight.bold,
                     ),
@@ -565,7 +566,10 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
   }
 
   Color _handColor(Hand hand) {
-    return hand == Hand.right ? Colors.black : Colors.blue;
+    final isDarkMode = widget.controller.isDarkMode;
+    return hand == Hand.right
+        ? AppColors.noteHandRight(isDarkMode)
+        : AppColors.noteHandLeft(isDarkMode);
   }
 }
 

@@ -469,12 +469,6 @@ class _CompositionScreenState extends State<CompositionScreen>
                       },
                     ),
 
-                    const SizedBox(
-                      width: 50,
-                      child: Divider(
-                        color: Colors.white24,
-                      ),
-                    ),
 
                     // HAND
                     IconButton(
@@ -698,6 +692,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                     ),
 
 
+
                     // PASTE
                     if (controller.canPaste)
                       IconButton(
@@ -728,12 +723,6 @@ class _CompositionScreenState extends State<CompositionScreen>
                         },
                       ),
 
-                    const SizedBox(
-                      width: 50,
-                      child: Divider(
-                        color: Colors.white24,
-                      ),
-                    ),
 
                     // SCROLL LOCK — blocks tapping the grid from
                     // creating/editing notes, so the composition can
@@ -804,9 +793,13 @@ class _CompositionScreenState extends State<CompositionScreen>
                       },
                     ),
 
-                    // ROTATE PITCH TEXT — purely cosmetic; rotates
-                    // the pitch label drawn inside each note cell,
-                    // handy when cells are narrow.
+                    // ROTATE PITCH TEXT — rotates the pitch
+                    // label drawn inside each note cell, handy
+                    // when cells are narrow. Also drives Easy
+                    // Read mode (Compensated Notation) and
+                    // Scroll Lock to match its own new state —
+                    // see CompositionController.
+                    // toggleRotatePitchText.
                     IconButton(
                       icon: Icon(Icons.rotate_left,
                         color: controller.rotatePitchText
@@ -823,9 +816,13 @@ class _CompositionScreenState extends State<CompositionScreen>
                             content: Text(
                               controller.rotatePitchText
                                   ? 'The grid is rotated for '
-                                  'piano reading.'
+                                  'piano reading. Easy Read '
+                                  'mode and Scroll Lock are '
+                                  'now on too.'
                                   : 'The grid is rotated for '
-                                  'notation reading.',
+                                  'notation reading. Easy Read '
+                                  'mode and Scroll Lock are '
+                                  'now off too.',
                               style: const TextStyle(fontSize: 22),
                             ),
                           ),
@@ -900,12 +897,6 @@ class _CompositionScreenState extends State<CompositionScreen>
                     ),
 
 
-                    const SizedBox(
-                      width: 50,
-                      child: Divider(
-                        color: Colors.white24,
-                      ),
-                    ),
 
 
                     // RAISE SCALE
@@ -968,12 +959,6 @@ class _CompositionScreenState extends State<CompositionScreen>
                     ),
 
 
-                    const SizedBox(
-                      width: 50,
-                      child: Divider(
-                        color: Colors.white24,
-                      ),
-                    ),
 
                     // GRID SIZE
                     IconButton(
@@ -1031,6 +1016,44 @@ class _CompositionScreenState extends State<CompositionScreen>
                       controller.resetZoom,
                     ),
 
+
+                    // GRID DARK MODE — inverts ONLY the grid
+                    // itself (background/lines — see
+                    // GridPainter.paint), the pitch column next
+                    // to it, and every note's fill/text color
+                    // (see NoteBlockWidget/AppColors). The rest
+                    // of the app (this toolbar, every dialog)
+                    // stays as-is — scoped to just the grid on
+                    // request, not a full app-wide theme.
+                    // Placed at the very bottom of the toolbar
+                    // per request.
+                    IconButton(
+                      icon: Icon(
+                        controller.isDarkMode
+                            ? Icons.dark_mode
+                            : Icons.light_mode,
+                        color: controller.isDarkMode
+                            ? Colors.blue
+                            : Colors.black,
+                      ),
+                      tooltip: controller.isDarkMode
+                          ? 'Grid Dark Mode: On'
+                          : 'Grid Dark Mode: Off',
+                      onPressed: () {
+                        controller.toggleDarkMode();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              controller.isDarkMode
+                                  ? 'Grid dark mode is on.'
+                                  : 'Grid dark mode is off.',
+                              style: const TextStyle(fontSize: 22),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+
                   ];
 
                   return Theme(
@@ -1058,11 +1081,32 @@ class _CompositionScreenState extends State<CompositionScreen>
                     // one button can be.
                     child: Container(
                       width: 40,
+                      height: double.infinity,
                       color: Colors.grey.shade300,
-                      child: SingleChildScrollView(
-                        child: Column(
-                          children: buttons,
-                        ),
+                      // LayoutBuilder + ConstrainedBox(minHeight: full
+                      // available height) + Center: if the buttons
+                      // fit within the toolbar's full height, they're
+                      // centered vertically rather than starting from
+                      // the top; if they don't fit, the
+                      // SingleChildScrollView still scrolls normally
+                      // (ConstrainedBox's minHeight doesn't force the
+                      // Column smaller than it naturally needs).
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          return SingleChildScrollView(
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                minHeight: constraints.maxHeight,
+                              ),
+                              child: Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: buttons,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   );

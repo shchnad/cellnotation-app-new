@@ -2166,10 +2166,19 @@ class CompositionController extends ChangeNotifier {
   /// 90° — purely cosmetic, useful when cells are narrow (zoomed in
   /// tightly) and a vertical label reads more comfortably than a
   /// horizontal one squeezed into a thin box.
+  ///
+  /// Toggling this ALSO drives [showCompensatedNotation] (Easy Read
+  /// mode) and [inputLocked] (Scroll Lock) to the same new state —
+  /// turning rotation on turns both of those on too, and turning
+  /// rotation off turns both back off, per request. There's no
+  /// independent way to have rotation on with either of the other two
+  /// off — all three move together, driven by this single toggle.
   bool rotatePitchText = false;
 
   void toggleRotatePitchText() {
     rotatePitchText = !rotatePitchText;
+    showCompensatedNotation = rotatePitchText;
+    inputLocked = rotatePitchText;
     notifyListeners();
   }
 
@@ -2198,6 +2207,17 @@ class CompositionController extends ChangeNotifier {
     gridFontSize = gridFontSize == DefaultValues.gridFontSize
         ? DefaultValues.gridFontSizeLarge
         : DefaultValues.gridFontSize;
+    notifyListeners();
+  }
+
+  /// Whether the app is currently in dark mode — every screen/dialog
+  /// that reads AppColors (see app_colors.dart) instead of a
+  /// hardcoded white/black now flips consistently in response to
+  /// this, rather than each file managing its own light/dark state.
+  bool isDarkMode = false;
+
+  void toggleDarkMode() {
+    isDarkMode = !isDarkMode;
     notifyListeners();
   }
 

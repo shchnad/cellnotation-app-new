@@ -9,6 +9,7 @@ import '../dialogs/dynamic_change_dialog.dart';
 import '../enums/dynamic_change.dart';
 import '../enums/note_duration.dart';
 import '../models/dynamic_change_event.dart';
+import '../utils/app_colors.dart';
 import '../utils/scale_resolver.dart';
 import 'note_block_widget.dart';
 
@@ -945,25 +946,34 @@ class GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final fontSize = controller.gridFontSize;
+    final isDarkMode = controller.isDarkMode;
+
+    // BACKGROUND — the grid previously had no explicit fill of its
+    // own, relying on the white Scaffold sitting behind it; drawn
+    // explicitly now so it can be black in dark mode instead.
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      Paint()..color = AppColors.gridBackground(isDarkMode),
+    );
 
     final thinPaint = Paint()
-      ..color = Colors.grey.withOpacity(0.25)
+      ..color = AppColors.gridLineThin(isDarkMode)
       ..strokeWidth = 1;
 
     final beatPaint = Paint()
-      ..color = Colors.grey.withOpacity(0.55)
+      ..color = AppColors.gridLineMedium(isDarkMode)
       ..strokeWidth = 1.5;
 
     final octavePaint = Paint()
-      ..color = Colors.grey.withOpacity(0.55)
+      ..color = AppColors.gridLineMedium(isDarkMode)
       ..strokeWidth = 1.5;
 
     final measurePaint = Paint()
-      ..color = Colors.black.withOpacity(0.75)
+      ..color = AppColors.gridLineStrong(isDarkMode)
       ..strokeWidth = 2;
 
     final middleOctavePaint = Paint()
-      ..color = Colors.black.withOpacity(0.75)
+      ..color = AppColors.gridLineStrong(isDarkMode)
       ..strokeWidth = 2;
 
     // HORIZONTAL LINES
