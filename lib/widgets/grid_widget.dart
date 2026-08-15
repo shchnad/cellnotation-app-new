@@ -13,9 +13,10 @@ import '../utils/app_colors.dart';
 import '../utils/scale_resolver.dart';
 import 'note_block_widget.dart';
 
-/// tempo
-TextStyle _tempoLabelStyle(double fontSize) => TextStyle(
-  color: Colors.blue,
+/// tempo — blue in light mode, white in dark mode (see
+/// AppColors.gridLabelText) for legibility against the black grid.
+TextStyle _tempoLabelStyle(double fontSize, bool isDarkMode) => TextStyle(
+  color: AppColors.gridLabelText(isDarkMode),
   fontSize: fontSize,
   fontWeight: FontWeight.bold,
 );
@@ -38,29 +39,31 @@ TextStyle _pedalLabelStyle(double fontSize) => TextStyle(
 
 /// scale name — drawn at the TOP of the grid, below the measure
 /// number (see _measureNumberLabelStyle), same size/weight as the
-/// tempo label at the bottom, in blue.
-TextStyle _scaleLabelStyle(double fontSize) => TextStyle(
-  color: Colors.blue,
+/// tempo label at the bottom. Blue in light mode, white in dark mode.
+TextStyle _scaleLabelStyle(double fontSize, bool isDarkMode) => TextStyle(
+  color: AppColors.gridLabelText(isDarkMode),
   fontSize: fontSize,
   fontWeight: FontWeight.bold,
 );
 
 /// measure number — drawn at the very TOP of the grid, above the
 /// scale name, for EVERY measure (unlike the scale name, which only
-/// repeats where the scale actually changes).
-TextStyle _measureNumberLabelStyle(double fontSize) => TextStyle(
-  color: Colors.blue,
-  fontSize: fontSize,
-  fontWeight: FontWeight.bold,
-);
+/// repeats where the scale actually changes). Blue in light mode,
+/// white in dark mode.
+TextStyle _measureNumberLabelStyle(double fontSize, bool isDarkMode) =>
+    TextStyle(
+      color: AppColors.gridLabelText(isDarkMode),
+      fontSize: fontSize,
+      fontWeight: FontWeight.bold,
+    );
 
 /// time signature — drawn at the very BOTTOM of the grid (below
-/// tempo/dynamic, which stack above it), in blue. Used to also show
-/// the measure number too (e.g. "1: 4/4") — that moved to the TOP of
-/// the grid instead (see _measureNumberLabelStyle), so this is just
-/// the fraction now (e.g. "4/4").
-TextStyle _measureLabelStyle(double fontSize) => TextStyle(
-  color: Colors.blue,
+/// tempo/dynamic, which stack above it). Used to also show the
+/// measure number too (e.g. "1: 4/4") — that moved to the TOP of the
+/// grid instead (see _measureNumberLabelStyle), so this is just the
+/// fraction now (e.g. "4/4"). Blue in light mode, white in dark mode.
+TextStyle _measureLabelStyle(double fontSize, bool isDarkMode) => TextStyle(
+  color: AppColors.gridLabelText(isDarkMode),
   fontSize: fontSize,
   fontWeight: FontWeight.bold,
 );
@@ -103,11 +106,11 @@ class _DynamicChangeLineHit {
   _DynamicChangeLineHit(this.tick, this.rect);
 }
 
-TextPainter _tempoTextPainter(dynamic tempoEvent, double fontSize) {
+TextPainter _tempoTextPainter(dynamic tempoEvent, double fontSize, bool isDarkMode) {
   return TextPainter(
     text: TextSpan(
       text: '${tempoEvent.tempo.label} = ${tempoEvent.tempo.value}',
-      style: _tempoLabelStyle(fontSize),
+      style: _tempoLabelStyle(fontSize, isDarkMode),
     ),
     textDirection: TextDirection.ltr,
   )..layout();
@@ -133,31 +136,31 @@ TextPainter _pedalTextPainter(double fontSize) {
   )..layout();
 }
 
-TextPainter _scaleTextPainter(String scaleName, double fontSize) {
+TextPainter _scaleTextPainter(String scaleName, double fontSize, bool isDarkMode) {
   return TextPainter(
     text: TextSpan(
       text: ScaleResolver.normalizeScaleName(scaleName),
-      style: _scaleLabelStyle(fontSize),
+      style: _scaleLabelStyle(fontSize, isDarkMode),
     ),
     textDirection: TextDirection.ltr,
   )..layout();
 }
 
-TextPainter _measureNumberTextPainter(String text, double fontSize) {
+TextPainter _measureNumberTextPainter(String text, double fontSize, bool isDarkMode) {
   return TextPainter(
     text: TextSpan(
       text: text,
-      style: _measureNumberLabelStyle(fontSize),
+      style: _measureNumberLabelStyle(fontSize, isDarkMode),
     ),
     textDirection: TextDirection.ltr,
   )..layout();
 }
 
-TextPainter _measureLabelTextPainter(String text, double fontSize) {
+TextPainter _measureLabelTextPainter(String text, double fontSize, bool isDarkMode) {
   return TextPainter(
     text: TextSpan(
       text: text,
-      style: _measureLabelStyle(fontSize),
+      style: _measureLabelStyle(fontSize, isDarkMode),
     ),
     textDirection: TextDirection.ltr,
   )..layout();
@@ -191,7 +194,7 @@ String _measureLabelText(dynamic timeSignature) {
 /// string works as a consistent reference for stacking the scale name
 /// below it.
 double _measureNumberReferenceHeight(double fontSize) =>
-    _measureNumberTextPainter('0', fontSize).height;
+    _measureNumberTextPainter('0', fontSize, false).height;
 
 /// Line-height of the time-signature label at the bottom — content-
 /// independent for single-line text at a fixed style, so any sample
@@ -199,7 +202,7 @@ double _measureNumberReferenceHeight(double fontSize) =>
 /// dynamic labels above it (same idea as the existing
 /// referenceTempoHeight/referenceDynamicHeight pattern below).
 double _measureLabelReferenceHeight(double fontSize) =>
-    _measureLabelTextPainter('0/0', fontSize).height;
+    _measureLabelTextPainter('0/0', fontSize, false).height;
 
 /// Computes tap-target rects for both tempo and dynamic labels.
 /// Both stack above the measure/time-signature label at the very
@@ -216,7 +219,7 @@ List<_LabelHit> _computeLabelHits(
 
   for (final tempoEvent in controller.timeline.tempoEvents) {
     final x = tempoEvent.tick * pixelsPerTick;
-    final tp = _tempoTextPainter(tempoEvent, fontSize);
+    final tp = _tempoTextPainter(tempoEvent, fontSize, false);
     final y = gridHeight - measureLabelHeight - _bottomMargin - _labelGap - tp.height;
     hits.add(
       _LabelHit(
@@ -238,6 +241,7 @@ List<_LabelHit> _computeLabelHits(
       controller.getTempoAtTick(tempoEventFallbackTick(controller, dynamicEvent.tick)) ??
           controller.timeline.tempoEvents.first,
       fontSize,
+      false,
     ).height;
 
     final y = gridHeight -
@@ -282,7 +286,7 @@ List<_ScaleLabelHit> _computeScaleLabelHits(
     if (i != 0 && !scaleChanged) continue;
 
     final x = measure.startTick * pixelsPerTick;
-    final tp = _scaleTextPainter(measure.scaleName, fontSize);
+    final tp = _scaleTextPainter(measure.scaleName, fontSize, false);
     hits.add(
       _ScaleLabelHit(
         i,
@@ -770,7 +774,7 @@ class GridPainter extends CustomPainter {
   double _pedalRowY(Size size) {
     final fontSize = controller.gridFontSize;
     final referenceTempoHeight = controller.timeline.tempoEvents.isNotEmpty
-        ? _tempoTextPainter(controller.timeline.tempoEvents.first, fontSize).height
+        ? _tempoTextPainter(controller.timeline.tempoEvents.first, fontSize, false).height
         : 0.0;
     final referenceDynamicHeight = controller.timeline.dynamicEvents.isNotEmpty
         ? _dynamicTextPainter(controller.timeline.dynamicEvents.first, fontSize).height
@@ -988,6 +992,14 @@ class GridPainter extends CustomPainter {
       if (row == 28) {
         linePaint = middleOctavePaint;
       }
+      // The very top and bottom boundary lines of the whole grid —
+      // made as visible as the strongest line style available
+      // (matching measure boundaries), overriding whatever they'd
+      // otherwise get, so the grid's own edges always read clearly
+      // rather than blending into the regular row lines.
+      if (row == 0 || row == controller.totalRows) {
+        linePaint = measurePaint;
+      }
 
       canvas.drawLine(Offset(0, y), Offset(size.width, y), linePaint);
     }
@@ -1020,6 +1032,7 @@ class GridPainter extends CustomPainter {
       final measureNumberPainter = _measureNumberTextPainter(
         _measureNumberText(i + 1),
         fontSize,
+        isDarkMode,
       );
       measureNumberPainter.paint(
         canvas,
@@ -1032,7 +1045,8 @@ class GridPainter extends CustomPainter {
       // (same condition as the double measure-line above) — not
       // repeated on every single measure.
       if (i == 0 || scaleChanged) {
-        final scaleTextPainter = _scaleTextPainter(measure.scaleName, fontSize);
+        final scaleTextPainter =
+        _scaleTextPainter(measure.scaleName, fontSize, isDarkMode);
         final scaleY = _topMargin +
             _measureNumberReferenceHeight(fontSize) +
             _topLabelGap;
@@ -1050,7 +1064,7 @@ class GridPainter extends CustomPainter {
       // itself is drawn at the TOP instead (see above).
       final measureLabelText = _measureLabelText(measure.timeSignature);
       final measureLabelPainter =
-      _measureLabelTextPainter(measureLabelText, fontSize);
+      _measureLabelTextPainter(measureLabelText, fontSize, isDarkMode);
       final measureLabelY = size.height - measureLabelPainter.height - _bottomMargin;
       measureLabelPainter.paint(
         canvas,
@@ -1096,7 +1110,7 @@ class GridPainter extends CustomPainter {
         tempoLinePaint,
       );
 
-      final textPainter = _tempoTextPainter(tempoEvent, fontSize);
+      final textPainter = _tempoTextPainter(tempoEvent, fontSize, isDarkMode);
       final y = size.height -
           measureLabelHeightForTempo -
           _bottomMargin -
@@ -1108,7 +1122,7 @@ class GridPainter extends CustomPainter {
 // DYNAMIC EVENTS — labels stacked above tempo label
 
     final referenceTempoHeight = controller.timeline.tempoEvents.isNotEmpty
-        ? _tempoTextPainter(controller.timeline.tempoEvents.first, fontSize).height
+        ? _tempoTextPainter(controller.timeline.tempoEvents.first, fontSize, false).height
         : 0.0;
 
     for (final dynamicEvent in controller.timeline.dynamicEvents) {

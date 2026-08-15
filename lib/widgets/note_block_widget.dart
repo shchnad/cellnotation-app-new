@@ -22,8 +22,9 @@ const double _techniqueHeight = 26.0;
 // CompositionController.gridFontSize — shared, toggleable font size
 // for every grid annotation label (see the same pattern used for
 // _fingerTextStyle below, and every label style in grid_widget.dart).
-TextStyle _techniqueTextStyle(double fontSize) => TextStyle(
-  color: Colors.red,
+// Color flips red -> yellow in dark mode via AppColors.redMark.
+TextStyle _techniqueTextStyle(double fontSize, bool isDarkMode) => TextStyle(
+  color: AppColors.redMark(isDarkMode),
   fontSize: fontSize,
   fontWeight: FontWeight.bold,
   // fontStyle: FontStyle.italic,
@@ -35,9 +36,11 @@ const double _fingerHeight = 26.0;
 // CompositionController.gridFontSize — shared, toggleable font size
 // for every grid annotation label (finger number, time signature,
 // pedal, dynamic, tempo, scale name, measure number). See
-// grid_widget.dart for the others.
-TextStyle _fingerTextStyle(double fontSize) => TextStyle(
-  color: Colors.red,
+// grid_widget.dart for the others. Color flips red -> yellow in dark
+// mode via AppColors.redMark, same as the articulation mark/playing
+// technique.
+TextStyle _fingerTextStyle(double fontSize, bool isDarkMode) => TextStyle(
+  color: AppColors.redMark(isDarkMode),
   fontSize: fontSize,
   fontWeight: FontWeight.bold,
 );
@@ -427,7 +430,10 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
               child: Center(
                 child: Text(
                   note.finger!.value.toString(),
-                  style: _fingerTextStyle(controller.gridFontSize),
+                  style: _fingerTextStyle(
+                    controller.gridFontSize,
+                    controller.isDarkMode,
+                  ),
                 ),
               ),
             ),
@@ -439,7 +445,10 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
               width: noteWidth,
               height: _articulationMarkHeight,
               child: CustomPaint(
-                painter: _ArticulationMarkPainter(note.articulation!),
+                painter: _ArticulationMarkPainter(
+                  note.articulation!,
+                  controller.isDarkMode,
+                ),
               ),
             ),
 
@@ -578,7 +587,10 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
               child: Center(
                 child: Text(
                   note.playingTechnique!.abbreviation,
-                  style: _techniqueTextStyle(controller.gridFontSize),
+                  style: _techniqueTextStyle(
+                    controller.gridFontSize,
+                    controller.isDarkMode,
+                  ),
                 ),
               ),
             ),
@@ -600,13 +612,14 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
 /// line, marcato = an upward wedge/accent mark, accent = a ">" sign.
 class _ArticulationMarkPainter extends CustomPainter {
   final Articulation articulation;
+  final bool isDarkMode;
 
-  const _ArticulationMarkPainter(this.articulation);
+  const _ArticulationMarkPainter(this.articulation, this.isDarkMode);
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.red
+      ..color = AppColors.redMark(isDarkMode)
       ..strokeWidth = 3 // width of articulation signs
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
@@ -657,6 +670,7 @@ class _ArticulationMarkPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ArticulationMarkPainter oldDelegate) {
-    return oldDelegate.articulation != articulation;
+    return oldDelegate.articulation != articulation ||
+        oldDelegate.isDarkMode != isDarkMode;
   }
 }

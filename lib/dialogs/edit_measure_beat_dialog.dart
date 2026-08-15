@@ -228,12 +228,12 @@ void editMeasureBeatDialog({
 
                         ListTile(
                           leading: const Icon(Icons.lock_clock),
-                          iconColor: Colors.blue,
+                          iconColor: Colors.black,
                           title: const Text(
                             "Set Tempo",
                             style: TextStyle(
                               fontSize: 22,
-                              color: Colors.blue,
+                              color: Colors.black,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -252,12 +252,12 @@ void editMeasureBeatDialog({
 
                         ListTile(
                           leading: const Icon(Icons.music_note),
-                          iconColor: Colors.blue,
+                          iconColor: Colors.black,
                           title: const Text(
                             "Set Scale",
                             style: TextStyle(
                               fontSize: 22,
-                              color: Colors.blue,
+                              color: Colors.black,
                               fontWeight: FontWeight.bold,
                             ),
                           ),

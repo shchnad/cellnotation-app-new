@@ -43,7 +43,8 @@ class PitchColumnWidget extends StatelessWidget {
           // is scoped to just the grid/notes, per request), so this
           // column — which sits right against the toolbar — stays
           // fixed too, regardless of the grid's own theme.
-          color: Colors.grey.shade300,
+          // color: Colors.grey.shade300,
+          color: Colors.white,
           child: SingleChildScrollView(
             controller: scrollController,
             physics: const NeverScrollableScrollPhysics(),

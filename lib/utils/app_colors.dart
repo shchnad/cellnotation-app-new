@@ -82,6 +82,15 @@ class AppColors {
       ? Colors.white.withOpacity(0.75)
       : Colors.black.withOpacity(0.75);
 
+  /// Text color for the grid's own annotation labels — time
+  /// signature, tempo, scale name, measure number (see
+  /// grid_widget.dart's _tempoLabelStyle/_scaleLabelStyle/
+  /// _measureNumberLabelStyle/_measureLabelStyle). These were always
+  /// plain Colors.blue; kept in light mode, but flipped to white in
+  /// dark mode for legibility against the black grid background.
+  static Color gridLabelText(bool isDarkMode) =>
+      isDarkMode ? Colors.white : Colors.black;
+
   /// A right-hand note's fill color (was plain Colors.black).
   static Color noteHandRight(bool isDarkMode) =>
       isDarkMode ? Colors.white : Colors.black;
@@ -91,7 +100,7 @@ class AppColors {
   /// the earlier design), so its own inner text needs to flip to
   /// black there too — see [noteText].
   static Color noteHandLeft(bool isDarkMode) =>
-      isDarkMode ? Colors.blue.shade200 : Colors.blue;
+      isDarkMode ? Colors.orangeAccent.shade100 : Colors.blue;
 
   /// Text drawn INSIDE a note block (pitch/accidental) — was always
   /// plain Colors.white, since both fills (black right-hand, blue
@@ -102,4 +111,13 @@ class AppColors {
   /// means a light fill and light mode always means a dark one.
   static Color noteText(bool isDarkMode) =>
       isDarkMode ? Colors.black : Colors.white;
+
+  /// The articulation mark drawn above a note (staccato/tenuto/
+  /// marcato/accent — see NoteBlockWidget's _ArticulationMarkPainter)
+  /// and the playing technique abbreviation drawn below one (see
+  /// _techniqueTextStyle) — both were plain Colors.red; switched to
+  /// yellow in dark mode, since red reads poorly against a black
+  /// background.
+  static Color redMark(bool isDarkMode) =>
+      isDarkMode ? Colors.yellow : Colors.red;
 }
