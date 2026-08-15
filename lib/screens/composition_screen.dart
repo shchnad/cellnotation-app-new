@@ -343,14 +343,16 @@ class _CompositionScreenState extends State<CompositionScreen>
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Composition saved', style: TextStyle(fontSize: 22)),
+          content: Text('Composition saved',
+              style: TextStyle(fontSize: 22)),
         ),
       );
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Save failed: $e', style: const TextStyle(fontSize: 22)),
+          content: Text('Save failed: $e',
+              style: const TextStyle(fontSize: 22)),
         ),
       );
     }
@@ -708,7 +710,8 @@ class _CompositionScreenState extends State<CompositionScreen>
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                    DefaultValues.snackBarMessageForCopying.toString()
+                                    DefaultValues.snackBarMessageForCopying.toString(),
+                                  style: TextStyle(fontSize: 22),
                                 ),
                               ),
                             );

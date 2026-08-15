@@ -47,6 +47,6 @@ class DefaultValues {
 
 // SIMPLIFY MODE
   static const String messageForSimplifyMode =
-      'Turn off the simplify mode first!';
+      'Turn off the Read Easy mode first!';
 
 }
