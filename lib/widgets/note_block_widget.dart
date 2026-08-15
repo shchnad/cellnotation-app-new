@@ -461,6 +461,24 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
 
               onPanStart: (details) {
                 if (_blockedFromEditing(context)) return;
+                // A note carrying an ornament/glissando/grace notes,
+                // or one that IS a glissando run note/grace note
+                // itself, can't be dragged — see
+                // CompositionController.moveBlockedReason. Warned
+                // once here, the same way editingBlocked is.
+                final blockedReason =
+                controller.moveBlockedReason(interactionNote);
+                if (blockedReason != null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        blockedReason,
+                        style: const TextStyle(fontSize: 22),
+                      ),
+                    ),
+                  );
+                  return;
+                }
                 dragStartTick = interactionNote.startTick;
                 dragStartRow = interactionNote.row;
                 dragStartPosition = details.globalPosition;
@@ -470,6 +488,10 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
                 // No message here — onPanStart already warned once for
                 // this gesture; repeating it every frame would spam.
                 if (widget.controller.editingBlocked) return;
+                if (widget.controller.moveBlockedReason(interactionNote) !=
+                    null) {
+                  return;
+                }
                 final dx = details.globalPosition.dx - dragStartPosition.dx;
                 final dy = details.globalPosition.dy - dragStartPosition.dy;
                 final tickChange = (dx / widget.pixelsPerTick).round();

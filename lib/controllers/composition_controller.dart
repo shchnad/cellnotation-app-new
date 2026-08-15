@@ -1058,6 +1058,15 @@ class CompositionController extends ChangeNotifier {
     composition.notes.removeWhere(
           (n)=>n.id == note.id,
     );
+    // If the removed note itself HAD a glissando (see Note.glissando,
+    // the anchor-only marker), its generated run notes no longer have
+    // a main note to run from — remove them too rather than leaving
+    // them orphaned.
+    if (note.glissando != null) {
+      composition.notes.removeWhere(
+            (n) => n.glissandoSourceId == note.id,
+      );
+    }
     // If the removed note itself HAD grace notes (was an anchor —
     // see Note.graceOriginalDurationTicks, the anchor-only marker),
     // they no longer have a main note to precede — a grace note
@@ -1076,6 +1085,42 @@ class CompositionController extends ChangeNotifier {
       _redistributeGraceNotes(note.graceOfNoteId!);
     }
     notifyListeners();
+  }
+
+  /// Returns a short message explaining why [note] can't be dragged
+  /// to a new position on the grid right now, or null if it's fine to
+  /// move. Checked from NoteBlockWidget's drag handling before
+  /// calling [updateNote].
+  ///
+  /// A note carrying an ornament, a glissando, or grace notes can't
+  /// be moved directly — an ornament's ghost sequence, a glissando's
+  /// generated run, and a note's grace notes are all positioned
+  /// relative to THIS note's own current tick/row, so moving it out
+  /// from under them would leave them stale (ornament ghosts) or
+  /// break the invariants their own generation logic depends on
+  /// (glissando run, grace notes) rather than moving along with it.
+  /// Likewise, a note that IS itself a glissando run note or a grace
+  /// note can't be moved independently — its own position is entirely
+  /// managed by the anchor note it belongs to, and would just get
+  /// silently overwritten back to where the anchor puts it the next
+  /// time anything about that anchor changes.
+  String? moveBlockedReason(Note note) {
+    if (note.ornament != null) {
+      return 'This note has an ornament. Delete it first to move this note.';
+    }
+    if (note.glissando != null) {
+      return 'This note has a glissando. Delete it first to move this note.';
+    }
+    if (note.graceOriginalDurationTicks != null) {
+      return 'This note has grace notes. Delete them first to move this note.';
+    }
+    if (note.glissandoSourceId != null) {
+      return 'This note belongs to a glissando and moves with its main note.';
+    }
+    if (note.graceOfNoteId != null) {
+      return 'This is a grace note and moves with its main note.';
+    }
+    return null;
   }
 
   int getDegree(Note note) {
@@ -1240,13 +1285,25 @@ class CompositionController extends ChangeNotifier {
   }
 
 
+  /// Sets [note]'s hand — and, if [note] is an anchor with its own
+  /// glissando run and/or grace notes (see [Note.glissandoSourceId] /
+  /// [Note.graceOfNoteId]), updates THEIR hand to match too, since a
+  /// glissando/grace note is meant to always play with the same hand
+  /// as the main note it belongs to, not an independently-set one.
   void setNoteHand(
       Note note,
       Hand hand,
       ) {
-    _replaceNote(
-      note.copyWith(hand: hand),
-    );
+    final index = notes.indexWhere((n) => n.id == note.id);
+    if (index == -1) return;
+    notes[index] = notes[index].copyWith(hand: hand);
+    for (int i = 0; i < notes.length; i++) {
+      if (notes[i].glissandoSourceId == note.id ||
+          notes[i].graceOfNoteId == note.id) {
+        notes[i] = notes[i].copyWith(hand: hand);
+      }
+    }
+    notifyListeners();
   }
 
   void setNoteFinger(

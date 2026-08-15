@@ -1,11 +1,5 @@
 enum Ornament {
 
-  tremolo('tremolo','|||',
-      [
-        {'coeff':1/8, 'shift':0}, {'coeff':1/8, 'shift':0},{'coeff':1/8, 'shift':0}, {'coeff':1/8, 'shift':0},
-        {'coeff':1/8, 'shift':0}, {'coeff':1/8, 'shift':0},{'coeff':1/8, 'shift':0}, {'coeff':1/8, 'shift':0},
-      ]),
-
   trillDiatonic('diatonic trill','tr',
       [
         {'coeff':1/8, 'shift':0},{'coeff':1/8, 'shift':2}, {'coeff':1/8, 'shift':0},{'coeff':1/8, 'shift':2},
@@ -141,15 +135,11 @@ enum Ornament {
   betweenLowerGruppettoSharpFlat('between lower gruppetto sharp flat','bLG +-',
       [{'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':-1}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':1}]),
 
-  // apoggiaturaDiatonic('diatonic appoggiatura','Apg',
-  //     [{'coeff': 1/2, 'shift': 2}, {'coeff': 1/2, 'shift': 0}]),
-  // apoggiaturaChromatic('chromatic appoggiatura','Apg-',
-  //     [{'coeff': 1/2, 'shift': 1}, {'coeff': 1/2, 'shift': 0}]),
-  //
-  // acciaccaturaDiatonic('diatonic acciaccatura','Acc',
-  //     [{'coeff': 1/8, 'shift': 2}, {'coeff': 7/8, 'shift': 0}]),
-  // acciaccaturaChromatic('chromatic acciaccatura','Acc-',
-  //     [{'coeff': 1/8, 'shift': 1}, {'coeff': 7/8, 'shift': 0}]),
+  tremolo('tremolo','|||',
+      [
+        {'coeff':1/8, 'shift':0}, {'coeff':1/8, 'shift':0},{'coeff':1/8, 'shift':0}, {'coeff':1/8, 'shift':0},
+        {'coeff':1/8, 'shift':0}, {'coeff':1/8, 'shift':0},{'coeff':1/8, 'shift':0}, {'coeff':1/8, 'shift':0},
+      ]),
 
 ;
 
