@@ -1304,6 +1304,27 @@ class CompositionController extends ChangeNotifier {
     );
   }
 
+  /// Sets [note]'s duration directly to [ticks], rather than to one
+  /// of the standard [NoteDuration] enum values — for a note whose
+  /// duration is really a COMBINATION of two or more standard
+  /// durations summed together (e.g. an eighth note tied across a
+  /// barline into a half note, written as two separate tied symbols
+  /// in standard notation but representing one continuous sustained
+  /// pitch). This app's grid is duration-based rather than glyph-
+  /// based, so a tie doesn't need two separate Note objects — one
+  /// Note with the combined duration is both simpler and more
+  /// accurate to what's actually being played. See
+  /// combined_duration_dialog.dart, which sums a person's picks and
+  /// calls this. [ticks] is clamped to at least 1 to avoid an invalid
+  /// zero/negative-duration note.
+  void setNoteDurationTicks(Note note, int ticks) {
+    _replaceNote(
+      note.copyWith(
+        durationTicks: ticks.clamp(1, 1 << 30),
+      ),
+    );
+  }
+
 
   void setNoteArticulation(
       Note note,

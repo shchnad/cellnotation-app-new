@@ -7,11 +7,11 @@ import '../enums/finger.dart';
 import '../enums/glissando_direction.dart';
 import '../enums/grace_note_type.dart';
 import '../enums/hand.dart';
-import '../enums/note_duration.dart';
 import '../enums/ornament.dart';
 import '../enums/playing_technique.dart';
 import '../models/note.dart';
 import '../utils/default_values.dart';
+import 'combined_duration_dialog.dart';
 import 'note_values_dialog.dart';
 
 class NoteDialog extends StatelessWidget {
@@ -80,6 +80,19 @@ class NoteDialog extends StatelessWidget {
             ? 'none'
             : '${activeTempo.tempo.label} = ${activeTempo.tempo.value}';
 
+        // Shows the note's duration as a readable combination (e.g.
+        // "Half + Eighth" for a tie across a barline set via
+        // combinedDurationDialog) rather than a single label — most
+        // ordinary notes decompose into just one entry, which reads
+        // identically to how a plain single duration always did.
+        // Falls back to durationLabel's own "closest match" behavior
+        // for the rare case decomposition finds nothing (shouldn't
+        // normally happen for an ordinary note).
+        final durationParts = decomposeDurationTicks(editedNote.durationTicks);
+        final durationDisplay = durationParts.isEmpty
+            ? controller.durationLabel(editedNote)
+            : durationParts.map((d) => d.label).join(' + ');
+
         // Every row's own text, measured to find the single widest
         // one — combined rows (Measure+Beat, Octave+Degree) sum both
         // halves plus the gap between them; ListTile field rows add
@@ -114,7 +127,7 @@ class NoteDialog extends StatelessWidget {
             (editedNote.graceOfNoteId != null ||
                 editedNote.graceOriginalDurationTicks != null)
                 ? 'Duration: ${editedNote.durationTicks} ticks (auto)'
-                : 'Duration: ${controller.durationLabel(editedNote)}',
+                : 'Duration: $durationDisplay',
           ) +
               _listTileChrome,
           _textWidth('Hand: ${editedNote.hand.name}') + _listTileChrome,
@@ -379,7 +392,7 @@ class NoteDialog extends StatelessWidget {
                             text: (editedNote.graceOfNoteId != null ||
                                 editedNote.graceOriginalDurationTicks != null)
                                 ? '${editedNote.durationTicks} ticks (auto)'
-                                : controller.durationLabel(editedNote),
+                                : durationDisplay,
                             style: const TextStyle(
                               fontSize: 22,
                               color: Colors.blue,
@@ -412,21 +425,24 @@ class NoteDialog extends StatelessWidget {
                         );
                         return;
                       }
-                      final duration = NoteDuration.values.firstWhere(
-                            (d) => d.ticks == editedNote.durationTicks,
-                        orElse: () => NoteDuration.quarter,
-                      );
-                      noteValuesDialog<NoteDuration>(
+                      // combinedDurationDialog IS the Duration
+                      // picker now — picking just one duration
+                      // and hitting Apply works exactly like
+                      // the old single-select dialog did, but
+                      // it also supports adding more than one
+                      // duration before applying (e.g. a tie
+                      // across a barline, written as an eighth
+                      // then a half — see that dialog's own
+                      // doc). Pre-seeded with the note's
+                      // current duration if it matches a
+                      // single standard NoteDuration exactly,
+                      // so reopening this shows what's already
+                      // set, same as every other field's
+                      // picker does via currentValue.
+                      combinedDurationDialog(
                         context: context,
-                        allowToCloseNextWindow: true,
-                        currentValue: duration,
-                        title: 'Duration',
-                        values: NoteDuration.values,
-                        numberOfColumns: 3,
-                        labelBuilder: (d) => d.label,
-                        onSelected: (d) {
-                          controller.setNoteDuration(editedNote, d);
-                        },
+                        controller: controller,
+                        note: editedNote,
                       );
                     },
                   ),
