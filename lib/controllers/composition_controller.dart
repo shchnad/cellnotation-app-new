@@ -1092,22 +1092,21 @@ class CompositionController extends ChangeNotifier {
   /// move. Checked from NoteBlockWidget's drag handling before
   /// calling [updateNote].
   ///
-  /// A note carrying an ornament, a glissando, or grace notes can't
-  /// be moved directly — an ornament's ghost sequence, a glissando's
-  /// generated run, and a note's grace notes are all positioned
-  /// relative to THIS note's own current tick/row, so moving it out
-  /// from under them would leave them stale (ornament ghosts) or
-  /// break the invariants their own generation logic depends on
-  /// (glissando run, grace notes) rather than moving along with it.
-  /// Likewise, a note that IS itself a glissando run note or a grace
-  /// note can't be moved independently — its own position is entirely
-  /// managed by the anchor note it belongs to, and would just get
-  /// silently overwritten back to where the anchor puts it the next
-  /// time anything about that anchor changes.
+  /// A note carrying a glissando or grace notes can't be moved
+  /// directly — a glissando's generated run and a note's grace notes
+  /// are positioned relative to THIS note's own current tick/row, so
+  /// moving it out from under them would break the invariants their
+  /// own generation logic depends on. Likewise, a note that IS itself
+  /// a glissando run note or a grace note can't be moved
+  /// independently — its own position is entirely managed by the
+  /// anchor note it belongs to, and would just get silently
+  /// overwritten back to where the anchor puts it the next time
+  /// anything about that anchor changes. An ornament, unlike those
+  /// two, is NOT similarly protected — its ghost sequence is
+  /// recomputed fresh from the note's own row every time it's
+  /// displayed (see displayNotes), so moving an ornamented note just
+  /// works correctly without any extra handling.
   String? moveBlockedReason(Note note) {
-    if (note.ornament != null) {
-      return 'This note has an ornament. Delete it first to move this note.';
-    }
     if (note.glissando != null) {
       return 'This note has a glissando. Delete it first to move this note.';
     }

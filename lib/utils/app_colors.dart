@@ -62,9 +62,13 @@ class AppColors {
   static Color gridBackground(bool isDarkMode) =>
       isDarkMode ? Colors.black : Colors.white;
 
-  /// Thin thin/beat grid lines (were Colors.grey at ~25% opacity).
+  /// Thin thin/beat grid lines — these are the plain row-separator
+  /// lines, so visibility matters a lot here in particular. Were
+  /// Colors.grey at ~25% opacity in light mode; bumped up to 35% white
+  /// in dark mode (rather than a fainter 15%, which read as barely
+  /// visible against a pure black background).
   static Color gridLineThin(bool isDarkMode) => isDarkMode
-      ? Colors.white.withOpacity(0.15)
+      ? Colors.white.withOpacity(0.35)
       : Colors.grey.withOpacity(0.25);
 
   /// Octave/beat-boundary lines (were Colors.grey at ~55% opacity).
