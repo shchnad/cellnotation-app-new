@@ -15,54 +15,59 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
 
   final AuthService _authService = AuthService();
-
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
-
   bool loading = false;
-
+  bool _obscurePassword = true;
 
   Future<void> register() async {
-
     setState(() {
       loading = true;
     });
-
-
     try {
-
       await _authService.register(
         emailController.text.trim(),
         passwordController.text.trim(),
       );
-
-
       if (mounted) {
-        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Verification email sent — check your inbox.',
+              style: TextStyle(fontSize: 22),
+            ),
+          ),
+        );
+        // popUntil, not a plain pop — RegisterScreen may have been
+        // reached via a pushed route on top of AuthGate. Registering
+        // signs the new user in right away, so AuthGate's own
+        // StreamBuilder is about to reactively show VerifyEmailScreen
+        // — but that happens UNDERNEATH whatever's currently pushed
+        // on top of it. A plain pop() would only remove one route
+        // (potentially landing back on a stale pushed LoginScreen,
+        // the same bug already fixed once in "Back to Login?");
+        // clearing back to the root guarantees AuthGate's reactive
+        // content is what actually becomes visible.
+        Navigator.of(context).popUntil((route) => route.isFirst);
       }
-
-
     } catch (e) {
-
       if (!mounted) return;
-
       ScaffoldMessenger.of(context)
           .showSnackBar(
         SnackBar(
-          content: Text(e.toString()),
+          content: Text(
+            e.toString(),
+            style: TextStyle(fontSize: 22),
+          ),
         ),
       );
-
     }
-
-
     if (mounted) {
       setState(() {
         loading = false;
       });
     }
-
   }
 
 
@@ -71,78 +76,205 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
 
     return Scaffold(
+      resizeToAvoidBottomInset : false,
+      // appBar: AppBar(
+      //   title: const Text('Register'),
+      // ),
+      body: Center(
+        child: SizedBox(
+          width: 500,
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
 
-      appBar: AppBar(
-        title: const Text('Register'),
-      ),
+                const SizedBox(height: 100),
+
+                Text('Cellnotation',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                SizedBox(
+                  height: 50,
+                  child: TextField(
+                    controller: emailController,
+                    obscureText: false,
+                    style: const TextStyle(
+                      color: Colors.blue,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'Email',
+                      labelStyle: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.clear),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () {
+                          setState(() {
+                            emailController.clear();
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                SizedBox(
+                  height: 50,
+                  child: TextField(
+                    controller: passwordController,
+                    obscureText: _obscurePassword,
+                    style: const TextStyle(
+                      color: Colors.blue,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'Password',
+                      labelStyle: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      border: const OutlineInputBorder(),
+                      suffixIcon: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () {
+                              setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              });
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(Icons.clear),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () {
+                              setState(() {
+                                passwordController.clear();
+                              });
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height:20),
+
+                SizedBox(
+                  // width: double.infinity,
+                  width: 500,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 50),
+                      elevation: 0,
+                      // Same note-block shape as the home screen's
+                      // buttons — matches NoteBlockWidget's own
+                      // BorderRadius.circular(4).
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    onPressed: loading ? null : register,
+                    child: loading
+                        ? const CircularProgressIndicator()
+                        : const Text(
+                      'Register',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
 
 
-      body: Padding(
+                const SizedBox(height: 20),
 
-        padding: const EdgeInsets.all(20),
+                SizedBox(
+                  // width: double.infinity,
+                  width: 500,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      // Navigator.pop, not push — RegisterScreen was
+                      // reached BY pushing from LoginScreen (via
+                      // "Create Account"), so "Back to Login?" should
+                      // return to that SAME instance. Pushing a new
+                      // LoginScreen here instead stacks a duplicate
+                      // route on top of AuthGate — if a successful
+                      // sign-in later happens on THAT pushed copy,
+                      // AuthGate's own StreamBuilder switches to
+                      // HomeScreen underneath it, but the pushed
+                      // LoginScreen stays visible on top, making a
+                      // successful login look like it silently failed.
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      // backgroundColor: Colors.grey.shade300,
+                      backgroundColor: Colors.blue,
+                      // foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 50),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    child: loading
+                        ? const CircularProgressIndicator(
+                      color: Colors.white,
+                    )
+                        : const Text(
+                      'Back to Login',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
 
-        child: Column(
-
-          mainAxisAlignment:
-          MainAxisAlignment.center,
-
-
-          children: [
-
-            TextField(
-              controller: emailController,
-
-              decoration:
-              const InputDecoration(
-                labelText: 'Email',
-                border:
-                OutlineInputBorder(),
-              ),
             ),
 
-
-            const SizedBox(height:15),
-
-
-            TextField(
-              controller: passwordController,
-
-              obscureText:true,
-
-              decoration:
-              const InputDecoration(
-                labelText:'Password',
-                border:
-                OutlineInputBorder(),
-              ),
-            ),
-
-
-            const SizedBox(height:20),
-
-
-            SizedBox(
-
-              width:double.infinity,
-
-              child: ElevatedButton(
-
-                onPressed:
-                loading ? null : register,
-
-
-                child: loading
-                    ? const CircularProgressIndicator()
-                    : const Text('Register'),
-
-              ),
-
-            ),
-
-          ],
-
+          ),
         ),
-
       ),
 
     );

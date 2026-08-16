@@ -34,6 +34,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _saveName() async {
+    // Dismiss the on-screen keyboard whenever a save is triggered —
+    // covers both the Save button (called directly below) and
+    // pressing Enter/Done on the keyboard (TextField's onSubmitted
+    // also calls this same method, see below).
+    //
+    // FocusManager.instance.primaryFocus?.unfocus() rather than
+    // FocusScope.of(context).unfocus() — the latter didn't reliably
+    // dismiss the keyboard when triggered from the Save button
+    // (unlike onSubmitted, which gets an automatic dismiss from the
+    // IME's own "done" action regardless of what this method does).
+    // Operating on the global primary focus directly sidesteps
+    // whatever FocusScope this widget's own context resolves to.
+    FocusManager.instance.primaryFocus?.unfocus();
+
     final newName = _nameController.text.trim();
     if (newName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -73,100 +87,172 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         // title: const Text(
         //     'Profile',
         //     style: TextStyle(fontSize: 22)
         // ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, size: 30,),
-            tooltip: 'Sign out',
-            onPressed: () async {
-              await _authService.signOut();
-              if (context.mounted) {
-                Navigator.popUntil(context, (route) => route.isFirst);
-              }
-            },
-          ),
-        ],
+        // actions: [
+        // IconButton(
+        //   icon: const Icon(Icons.logout, size: 30,),
+        //   tooltip: 'Sign out',
+        //   onPressed: () async {
+        //     await _authService.signOut();
+        //     if (context.mounted) {
+        //       Navigator.popUntil(context, (route) => route.isFirst);
+        //     }
+        //   },
+        // ),
+        // ],
       ),
       body: user == null
-          ? const Center(child: Text(
-          'Not signed in',
-          style: TextStyle(fontSize: 22)))
+          ? Column(
+        children: [
+          const Center(
+              child: Text(
+                  'Not signed in',
+                  style: TextStyle(fontSize: 22))),
+        ],
+      )
           : ListView(
         padding: const EdgeInsets.all(24),
         children: [
           Center(
-            child: CircleAvatar(
-              radius: 60,
-              backgroundColor: Colors.blue.shade100,
-              backgroundImage: user.photoURL != null
-                  ? NetworkImage(user.photoURL!)
-                  : null,
-              child: user.photoURL == null
-                  ? const Icon(Icons.person, size: 48, color: Colors.black)
-                  : null,
-            ),
-          ),
-          const SizedBox(height: 20),
-          Center(
-            child: Text(
-              user.email ?? '',
-              style: const TextStyle(
-                  fontSize: 22,
-                  color: Colors.black,
-              ),
-            ),
-          ),
-          const SizedBox(height: 30),
-          SizedBox(
-            child: const Text(
-              'Edit user name',
-              style: TextStyle(
-                  fontSize: 22,
-                  color: Colors.black,
-              ),
-            ),
-          ),
-          const SizedBox(
-            height: 10,
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _nameController,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    color: Colors.blue,
-                    fontWeight: FontWeight.bold,
+            child: SizedBox(
+              width: 500,
+              child: Column(
+                children: [
+                  CircleAvatar(
+                    radius: 60,
+                    backgroundColor: Colors.blue.shade100,
+                    backgroundImage: user.photoURL != null
+                        ? NetworkImage(user.photoURL!)
+                        : null,
+                    child: user.photoURL == null
+                        ? const Icon(Icons.person, size: 48, color: Colors.black)
+                        : null,
                   ),
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.badge),
+
+                  const SizedBox(height: 20),
+
+                  Text(
+                    user.email ?? '',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      color: Colors.black,
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              ElevatedButton(
-                onPressed: _saving
-                    ? null
-                    : _saveName,
-                child: _saving
-                    ? const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-                    : const Text('Save',
-                    style: TextStyle(
-                        fontSize: 22,
+
+                  const SizedBox(height: 30),
+
+                  TextField(
+                    controller: _nameController,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _saveName(),
+                    style: const TextStyle(
+                      fontSize: 22,
+                      color: Colors.blue,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'Edit user name',
+                      labelStyle: const TextStyle(
                         color: Colors.black,
-                    )),
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.clear),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () {
+                          setState(() {
+                            _nameController.clear();
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _saving
+                          ? null
+                          : _saveName,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        // foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 50),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      // Kept as a plain ElevatedButton (rather than
+                      // ElevatedButton.icon) since it also needs to
+                      // swap to a loading spinner while saving —
+                      // building the icon+label Row manually gives
+                      // the same visual result as .icon while still
+                      // allowing that conditional.
+                      child: _saving
+                          ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                          : const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.save, color: Colors.white, size: 22),
+                          SizedBox(width: 8),
+                          Text('Save',
+                              style: TextStyle(
+                                fontSize: 22,
+                                color: Colors.white,
+                              )),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // Explicit Home button, same size/shape as Save but
+                  // black — replaces the AppBar's automatic back
+                  // arrow (suppressed via automaticallyImplyLeading:
+                  // false above).
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        minimumSize: const Size(double.infinity, 50),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      icon: const Icon(
+                        Icons.exit_to_app,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                      label: const Text('Home',
+                          style: TextStyle(
+                            fontSize: 22,
+                            color: Colors.white,
+                          )),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
 
           const SizedBox(height: 60),

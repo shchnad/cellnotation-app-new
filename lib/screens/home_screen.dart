@@ -36,92 +36,88 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Every button on this page shares one style — a plain blue/white
+    // ElevatedButton.icon at fontSize 22 bold, matching what "Create
+    // Composition" always used — stacked in a single centered column
+    // rather than split between an AppBar row and the body, per
+    // request. Sign out (previously an AppBar action) is now just
+    // "Exit", the last button in that same column.
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          "Cellnotation",
-          style: TextStyle(fontSize: 22),
-        ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Sign out',
-            onPressed: () async {
-              await AuthService().signOut();
-            },
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(48),
-          child: Container(
-            height: 48,
-            alignment: Alignment.center,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _MenuItem(
-                  label: 'My Compositions',
-                  icon: Icons.library_music,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder:
-                          (_) => const CompositionsListScreen()),
-                    );
-                  },
-                ),
-                _MenuItem(
-                  label: 'Cloud Library',
-                  icon: Icons.cloud,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const CloudLibraryScreen()),
-                    );
-                  },
-                ),
-                _MenuItem(
-                  label: 'Profile',
-                  icon: Icons.person,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const ProfileScreen()),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.music_video_rounded,
-              size: 80,
-              color: Colors.blue.shade400,
-            ),
-            const SizedBox(height: 16),
             Builder(
               builder: (buttonContext) {
-                return ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(220, 50),
-                    elevation: 0,
-                  ),
+                return _HomeMenuButton(
+                  icon: Icons.library_add,
+                  label: 'Create Composition',
+                  color: Colors.blue,
+                  textColor: Colors.white,
                   onPressed: () => _handleCreateComposition(buttonContext),
-                  icon: const Icon(Icons.add_circle_outline),
-                  label: const Text(
-                    "New Composition",
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                );
+              },
+            ),
+            const SizedBox(height: 40),
+            _HomeMenuButton(
+              icon: Icons.music_video_rounded,
+              label: 'My Compositions',
+              color: Colors.blue,
+              textColor: Colors.white,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const CompositionsListScreen(),
                   ),
                 );
+              },
+            ),
+
+            const SizedBox(height: 40),
+
+            _HomeMenuButton(
+              icon: Icons.cloud,
+              label: 'Cloud Library',
+              color: Colors.black,
+              textColor: Colors.white,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const CloudLibraryScreen(),
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: 40),
+
+            _HomeMenuButton(
+              icon: Icons.person,
+              label: 'Profile',
+              color: Colors.black,
+              textColor: Colors.white,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ProfileScreen(),
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: 40),
+
+            _HomeMenuButton(
+              icon: Icons.logout,
+              label: 'Exit',
+              // color: Colors.grey.shade300,
+              color: Colors.white,
+              textColor: Colors.red,
+              onPressed: () async {
+                await AuthService().signOut();
               },
             ),
           ],
@@ -131,35 +127,59 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-
-class _MenuItem extends StatelessWidget {
-  final String label;
+/// One button in the home page's centered column — same fixed width
+/// and text style (fontSize 22 bold) for every entry, so "Create
+/// Composition" and the four actions below it all read as one
+/// consistent set of choices. [color] varies per button (blue for
+/// the two composition-related actions, black for the two profile/
+/// library navigation actions, red for the destructive Exit) while
+/// everything else about the button stays identical.
+class _HomeMenuButton extends StatelessWidget {
   final IconData icon;
-  final VoidCallback onTap;
+  final String label;
+  final Color color;
+  final Color textColor;
+  final VoidCallback onPressed;
 
-  const _MenuItem({
-    required this.label,
+  const _HomeMenuButton({
     required this.icon,
-    required this.onTap,
+    required this.label,
+    required this.color,
+    required this.textColor,
+    required this.onPressed,
   });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 22, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w500),
-            ),
-          ],
+    // A fixed-width SizedBox, rather than relying on minimumSize
+    // alone — minimumSize only sets a FLOOR, so a longer label (e.g.
+    // "My Compositions") would still make its own button wider than
+    // a shorter one (e.g. "Profile") unless every button is
+    // explicitly constrained to the SAME width like this.
+    return SizedBox(
+      width: 500,
+      child: ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: textColor,
+          minimumSize: const Size(double.infinity, 50),
+          elevation: 0,
+          // Rectangular with just a touch of rounding — matches
+          // NoteBlockWidget's own note container exactly
+          // (BorderRadius.circular(4)), so this button reads as a
+          // "note" rather than Material's default pill-shaped button.
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        onPressed: onPressed,
+        icon: Icon(icon),
+        label: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
     );
