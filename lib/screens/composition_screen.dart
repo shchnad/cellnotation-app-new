@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import 'package:music_composer/dialogs/save_exit_dialog.dart';
 import 'package:music_composer/utils/default_values.dart';
 
 import '../controllers/composition_controller.dart';
 
+import '../models/import_batches.dart';
+import '../models/note_import.dart';
+
+import '../dialogs/measure_range_dialog.dart';
 import '../dialogs/cell_width_dialog.dart';
 import '../dialogs/new_composition_dialog.dart';
 import '../dialogs/global_duration_dialog.dart';
@@ -39,25 +44,16 @@ class _CompositionScreenState extends State<CompositionScreen>
 
   CompositionController get controller => widget.controller;
 
-  // Drives the grid's vertical scroll; the pitch column mirrors it so
-  // the pitch labels always line up with the rows currently on screen.
   final ScrollController _gridVerticalController = ScrollController();
   final ScrollController _pitchVerticalController = ScrollController();
 
-  // Drives the grid's horizontal scroll — used for both normal manual
-  // scrolling and, while playing, the auto-scroll below.
   final ScrollController _gridHorizontalController = ScrollController();
-
-  // =====================================================
-  // PLAYBACK (auto-scroll timed to tempo)
-  // =====================================================
 
   Ticker? _playbackTicker;
   Duration _lastTickerElapsed = Duration.zero;
-  double _playbackTick = 0; // fractional current tick position
+  double _playbackTick = 0;
   bool _isPlaying = false;
-  bool _pauseScheduled = false; // prevents scheduling the deferred
-  // pause below more than once per gesture
+  bool _pauseScheduled = false;
 
   void _togglePlayback() {
     if (_isPlaying) {
@@ -72,25 +68,16 @@ class _CompositionScreenState extends State<CompositionScreen>
       return;
     }
 
-    // Defensive: tear down any ticker that's still alive before making
-    // a new one. SingleTickerProviderStateMixin throws if createTicker
-    // is called while a previous ticker from it hasn't been disposed —
-    // which could otherwise happen if Play is pressed again in the
-    // brief window before a deferred pause (see the drag-detection
-    // listener below) has actually run.
     _playbackTicker?.stop();
     _playbackTicker?.dispose();
     _playbackTicker = null;
 
-    // Resume from wherever the grid is currently scrolled to, so a
-    // paused playback picks up right where it left off, and a person
-    // can also manually position the view and then hit play.
     _playbackTick = _gridHorizontalController.hasClients
         ? _gridHorizontalController.offset / controller.pixelsPerTick
         : 0;
 
     if (_playbackTick >= controller.maxTicks) {
-      _playbackTick = 0; // was already at the end — start over
+      _playbackTick = 0;
     }
 
     _lastTickerElapsed = Duration.zero;
@@ -98,9 +85,6 @@ class _CompositionScreenState extends State<CompositionScreen>
     _playbackTicker = createTicker(_onPlaybackTick)..start();
   }
 
-  /// Halts the ticker without resetting [_playbackTick] — this is a
-  /// pause, not a stop: the grid stays scrolled exactly where playback
-  /// left off, so hitting Play again resumes from that same spot.
   void _pausePlayback() {
     _playbackTicker?.stop();
     _playbackTicker?.dispose();
@@ -115,10 +99,6 @@ class _CompositionScreenState extends State<CompositionScreen>
         (elapsed - _lastTickerElapsed).inMicroseconds / 1000000.0;
     _lastTickerElapsed = elapsed;
 
-    // Speed = (ticks per beat, from whichever measure we're currently
-    // in) × (BPM, from whichever tempo event is currently active) / 60
-    // — re-evaluated every frame so it correctly follows tempo changes
-    // and measures with a different beat unit as playback crosses them.
     final currentTickInt =
     _playbackTick.floor().clamp(0, controller.maxTicks - 1);
     final measure = controller.getMeasureAtTick(currentTickInt);
@@ -132,25 +112,6 @@ class _CompositionScreenState extends State<CompositionScreen>
 
     _playbackTick += ticksPerSecond * dtSeconds;
 
-    // Play every note whose start tick falls in the range playback
-    // just crossed this frame (half-open, so each note triggers
-    // exactly once as the cursor passes it — never re-triggered on
-    // later frames, never skipped on fast frames covering many ticks).
-    //
-    // Uses controller.displayNotes rather than controller.notes: a
-    // plain note comes through unchanged (isGhost: false) and plays
-    // exactly as before, but a note carrying an ornament is expanded
-    // into its short "ghost" sequence of sub-notes (see
-    // CompositionController.displayNotes / Ornament.shiftMap) — so
-    // instead of the ornamented note sounding as one long tone at its
-    // base pitch, each ghost in the sequence triggers its own tone,
-    // at its own onset tick, at its own EXACT pitch (the real note's
-    // own actual pitch — accidental included — shifted by its raw
-    // semitone shift; see CompositionController.getOrnamentFrequencyHz),
-    // actually playing the ornament's pattern regardless of how it's
-    // currently drawn. entry.interactionNote is always the real
-    // underlying note for a ghost (not just when clickable), which is
-    // what supplies that actual pitch.
     if (controller.soundEnabled) {
       final newTickInt = _playbackTick.floor();
       if (newTickInt > previousTickInt) {
@@ -174,9 +135,6 @@ class _CompositionScreenState extends State<CompositionScreen>
     if (_playbackTick >= controller.maxTicks) {
       _playbackTick = controller.maxTicks.toDouble();
       _scrollTo(_playbackTick);
-      // Reached the end on its own — pause here too (rather than a
-      // silent auto-rewind), since _startPlayback already resets to 0
-      // when play is pressed again from an at-the-end position.
       _pausePlayback();
       return;
     }
@@ -200,6 +158,31 @@ class _CompositionScreenState extends State<CompositionScreen>
     );
   }
 
+  /// Locks the device's own physical screen orientation to whichever
+  /// one it's CURRENTLY in (portrait or landscape) when [locked] is
+  /// true, or releases the lock (allowing all orientations again)
+  /// when false. Called from the Rotate Pitch Text button — rotating
+  /// the physical device WHILE the pitch digits are also rotated
+  /// would be confusing (two independent rotations stacking), so the
+  /// device orientation is pinned to whatever it already was at the
+  /// moment that mode was turned on.
+  void _setOrientationLocked(BuildContext context, bool locked) {
+    if (!locked) {
+      SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+      return;
+    }
+    final isPortrait =
+        MediaQuery.of(context).orientation == Orientation.portrait;
+    SystemChrome.setPreferredOrientations(
+      isPortrait
+          ? [DeviceOrientation.portraitUp, DeviceOrientation.portraitDown]
+          : [
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ],
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -219,6 +202,10 @@ class _CompositionScreenState extends State<CompositionScreen>
     _pitchVerticalController.dispose();
     _gridHorizontalController.dispose();
     _playbackTicker?.dispose();
+    // Safety net: release any orientation lock left on by Rotate
+    // Pitch Text (see _setOrientationLocked) — leaving this screen
+    // shouldn't leave the rest of the app stuck unable to rotate.
+    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     super.dispose();
   }
 
@@ -285,10 +272,6 @@ class _CompositionScreenState extends State<CompositionScreen>
 
 
 
-  /// Checks for any measure whose scale has drifted from its original
-  /// (via raise/lower) and, if so, asks the user whether to keep or
-  /// revert before actually saving. Proceeds straight to saving if
-  /// there's no drift, or if the user cancels the whole save.
   Future<bool> _saveComposition(BuildContext context) async {
     final driftIndices = controller.measuresWithScaleDrift();
 
@@ -300,8 +283,6 @@ class _CompositionScreenState extends State<CompositionScreen>
       );
 
       if (keepChanges == null) {
-        // User cancelled the whole save — signal callers (e.g. the
-        // save-and-exit flow) not to navigate away either.
         return false;
       }
 
@@ -321,7 +302,6 @@ class _CompositionScreenState extends State<CompositionScreen>
   Future<void> _performSave(BuildContext context) async {
     final service = CompositionService();
 
-    // Show a small non-blocking indicator while saving
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Saving...', style: TextStyle(fontSize: 22)),
@@ -332,8 +312,6 @@ class _CompositionScreenState extends State<CompositionScreen>
     try {
       final newId = await service.saveComposition(controller.composition);
 
-      // If this was a brand-new composition, attach the returned id
-      // so future saves update it instead of creating duplicates.
       if (controller.composition.id == null) {
         controller.updateComposition(
           controller.composition.copyWith(id: newId),
@@ -343,16 +321,14 @@ class _CompositionScreenState extends State<CompositionScreen>
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Composition saved',
-              style: TextStyle(fontSize: 22)),
+          content: Text('Composition saved', style: TextStyle(fontSize: 22)),
         ),
       );
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Save failed: $e',
-              style: const TextStyle(fontSize: 22)),
+          content: Text('Save failed: $e', style: const TextStyle(fontSize: 22)),
         ),
       );
     }
@@ -374,69 +350,191 @@ class _CompositionScreenState extends State<CompositionScreen>
           return Row(
             children: [
 
-              // =====================================================
-              // TITLE COLUMN — tap to edit title/composer/style/
-              // instrument (see _showEditDialog); this replaces the
-              // toolbar's old separate "Edit Info" button.
-              // =====================================================
+              Container(
+                width: 45,
+                color: Colors.grey.shade300,
+                child: Column(
+                  children: [
 
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => _showEditDialog(context),
-                child: Container(
-                  width: 45,
-                  color: Colors.grey.shade300,
-                  child: Center(
-                    child: RotatedBox(
-                      quarterTurns: 3,
-                      child: Text(
-                        '${controller.composition.composer} - ${controller.composition.title}',
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                    Theme(
+                      data: Theme.of(context).copyWith(
+                        iconButtonTheme: IconButtonThemeData(
+                          style: IconButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: const Size(36, 36),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+
+                          SizedBox(
+                            height: 30,
+                          ),
+
+                          // HOME
+                          IconButton(
+                            icon: const Icon(
+                              Icons.arrow_back,
+                              color: Colors.black,
+                            ),
+                            tooltip: 'Home',
+                            onPressed: () {
+                              saveExitDialog(
+                                context,
+                                onSave: () => _saveComposition(context),
+                              );
+                            },
+                          ),
+
+                          // GRID DARK MODE
+                          IconButton(
+                            icon: Icon(
+                              controller.isDarkMode
+                                  ? Icons.dark_mode
+                                  : Icons.light_mode,
+                              color: controller.isDarkMode
+                                  ? Colors.blue
+                                  : Colors.black,
+                            ),
+                            tooltip: controller.isDarkMode
+                                ? 'Grid Dark Mode: On'
+                                : 'Grid Dark Mode: Off',
+                            onPressed: () {
+                              controller.toggleDarkMode();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    controller.isDarkMode
+                                        ? 'Grid dark mode is on.'
+                                        : 'Grid dark mode is off.',
+                                    style: const TextStyle(fontSize: 22),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+
+                          // GRID FONT SIZE
+                          IconButton(
+                            icon: Icon(
+                              Icons.format_size,
+                              color: controller.gridFontSize ==
+                                  DefaultValues.gridFontSizeLarge
+                                  ? Colors.blue
+                                  : Colors.black,
+                            ),
+                            tooltip: controller.gridFontSize ==
+                                DefaultValues.gridFontSizeLarge
+                                ? 'Grid Font Size: Large'
+                                : 'Grid Font Size: Normal',
+                            onPressed: () {
+                              controller.toggleGridFontSize();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    controller.gridFontSize ==
+                                        DefaultValues.gridFontSizeLarge
+                                        ? 'Grid labels are now larger.'
+                                        : 'Grid labels are back to '
+                                        'normal size.',
+                                    style: const TextStyle(fontSize: 22),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+
+                        ],
+                      ),
+                    ),
+
+                    Expanded(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => _showEditDialog(context),
+                        child: Center(
+                          child: RotatedBox(
+                            quarterTurns: 3,
+                            child: Text(
+                              '${controller.composition.composer} - ${controller.composition.title}',
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
+
+
+                    // GRID SIZE
+                    IconButton(
+                      icon: const Icon(Icons.grid_on,
+                        color: Colors.black,
+                      ),
+                      tooltip: 'Cell Width',
+                      onPressed: () {
+                        cellWidthDialog(
+                          context,
+                          controller,
+                        );
+                      },
+                    ),
+
+                    // ZOOM IN
+                    IconButton(
+                      icon: const Icon(
+                        Icons.zoom_in,
+                        color: Colors.black,
+                      ),
+                      tooltip: 'Zoom In',
+                      onPressed: () {
+                        controller.setZoom(
+                          controller.zoomX + 1,
+                          controller.zoomY + 0.1,
+                        );
+                      },
+                    ),
+
+                    // ZOOM OUT
+                    IconButton(
+                      icon: const Icon(
+                        Icons.zoom_out,
+                        color: Colors.black,
+                      ),
+                      tooltip: 'Zoom Out',
+                      onPressed: () {
+                        controller.setZoom(
+                          controller.zoomX - 1,
+                          controller.zoomY - 0.1,
+                        );
+                      },
+                    ),
+
+                    // RESET
+                    IconButton(
+                      icon: const Icon(
+                        Icons.center_focus_strong,
+                        color: Colors.black,
+                      ),
+                      tooltip: 'Reset Zoom',
+                      onPressed:
+                      controller.resetZoom,
+                    ),
+                  ],
                 ),
               ),
 
 
 
-              // =====================================================
-              // LEFT TOOLBAR — compact IconButtons via a local Theme
-              // override, laid out as a single vertical Column at a
-              // small FIXED width (see below) and scrolling if there
-              // isn't room for every button. Earlier attempts tried a
-              // multi-column Wrap sized either via IntrinsicWidth or
-              // an estimated column count — both approaches guessed
-              // at each button's true rendered size and consistently
-              // got it wrong (too wide, or overflowing) in one
-              // direction or the other. A single fixed-width column
-              // has no guessing involved at all.
-              // =====================================================
-
               Builder(
                 builder: (context) {
                   final buttons = <Widget>[
-                    const SizedBox(height: 10),
-
-                    // HOME
-                    IconButton(
-                      icon: const Icon(
-                        Icons.arrow_back,
-                        color: Colors.black,
-                      ),
-                      tooltip: 'Home',
-                      onPressed: () {
-                        saveExitDialog(
-                          context,
-                          onSave: () => _saveComposition(context),
-                        );
-                      },
-                    ),
 
                     // SAVE
                     IconButton(
@@ -471,6 +569,9 @@ class _CompositionScreenState extends State<CompositionScreen>
                       },
                     ),
 
+                    SizedBox(
+                      height: 20,
+                    ),
 
                     // HAND
                     IconButton(
@@ -510,17 +611,6 @@ class _CompositionScreenState extends State<CompositionScreen>
                       },
                     ),
 
-                    // ADD GRACE NOTE MODE — only ever turned ON
-                    // from a note's own dialog (choosing a grace
-                    // note type there needs a specific note to
-                    // attach to — see
-                    // CompositionController.startAddingGraceNotes),
-                    // but can always be turned OFF from here.
-                    // While on, every grid tap adds another
-                    // grace note to whichever note started it
-                    // (see CompositionController.
-                    // addGraceNoteAtRow), up to
-                    // maxGraceNotesPerNote.
                     IconButton(
                       icon: Icon(
                         Icons.grain,
@@ -532,11 +622,6 @@ class _CompositionScreenState extends State<CompositionScreen>
                           ? 'Add Grace Note Mode: On'
                           : 'Add Grace Note Mode: Off',
                       onPressed: () {
-                        // This button can only ever turn the mode
-                        // OFF (see the comment above) — if it was
-                        // already off, there's nothing to toggle,
-                        // so the message instead explains the
-                        // only way to actually turn it ON.
                         final wasOn = controller.isAddingGraceNotes;
                         controller.stopAddingGraceNotes();
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -553,11 +638,6 @@ class _CompositionScreenState extends State<CompositionScreen>
                       },
                     ),
 
-                    // LEGATO MODE — while on, tapping a note toggles
-                    // its own legato flag instead of opening the
-                    // note-edit dialog. Independent of Articulation
-                    // (a note can be legato and, say, sforzando at
-                    // the same time).
                     IconButton(
                       icon: Icon(
                         Icons.airline_stops_outlined,
@@ -584,18 +664,6 @@ class _CompositionScreenState extends State<CompositionScreen>
                       },
                     ),
 
-                    // HIGHLIGHT ACCIDENTAL NOTES — purely a
-                    // display toggle (see CompositionController.
-                    // highlightAccidentalNotes): while on, every
-                    // note with a non-null accidental is drawn
-                    // green in the grid instead of its usual
-                    // hand-based color; toggling off instantly
-                    // restores their normal color, since no note
-                    // data is actually changed. Icon itself turns
-                    // green (rather than the usual blue used by
-                    // other toggles) to preview what the toggle
-                    // does. Same icon NoteDialog uses for its own
-                    // Accidental field, for visual consistency.
                     IconButton(
                       icon: Icon(
                         Icons.open_in_full_sharp,
@@ -624,12 +692,6 @@ class _CompositionScreenState extends State<CompositionScreen>
                     ),
 
 
-                    // HIDE FINGER NUMBERS — purely a display
-                    // toggle (see CompositionController.
-                    // hideFingerNumbers): while on, every note's
-                    // finger number is hidden in the grid;
-                    // toggling off instantly restores them, since
-                    // no note data is actually changed.
                     IconButton(
                       icon: Icon(
                         Icons.touch_app,
@@ -656,45 +718,6 @@ class _CompositionScreenState extends State<CompositionScreen>
                     ),
 
 
-                    // GRID FONT SIZE — toggles the shared font
-                    // size used by every grid annotation label
-                    // (finger number, playing technique, time
-                    // signature, pedal, dynamic, tempo, scale
-                    // name, measure number — see
-                    // CompositionController.gridFontSize /
-                    // DefaultValues.gridFontSize /
-                    // gridFontSizeLarge) between 16 and 22.
-                    IconButton(
-                      icon: Icon(
-                        Icons.format_size,
-                        color: controller.gridFontSize ==
-                            DefaultValues.gridFontSizeLarge
-                            ? Colors.blue
-                            : Colors.black,
-                      ),
-                      tooltip: controller.gridFontSize ==
-                          DefaultValues.gridFontSizeLarge
-                          ? 'Grid Font Size: Large'
-                          : 'Grid Font Size: Normal',
-                      onPressed: () {
-                        controller.toggleGridFontSize();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              controller.gridFontSize ==
-                                  DefaultValues.gridFontSizeLarge
-                                  ? 'Grid labels are now larger.'
-                                  : 'Grid labels are back to '
-                                  'normal size.',
-                              style: const TextStyle(fontSize: 22),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-
-
-
                     // PASTE
                     if (controller.canPaste)
                       IconButton(
@@ -710,8 +733,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                    DefaultValues.snackBarMessageForCopying.toString(),
-                                  style: TextStyle(fontSize: 22),
+                                    DefaultValues.snackBarMessageForCopying.toString()
                                 ),
                               ),
                             );
@@ -726,11 +748,10 @@ class _CompositionScreenState extends State<CompositionScreen>
                         },
                       ),
 
+                    SizedBox(
+                      height: 20,
+                    ),
 
-                    // SCROLL LOCK — blocks tapping the grid from
-                    // creating/editing notes, so the composition can
-                    // be scrolled around without accidentally adding
-                    // a note on every tap.
                     IconButton(
                       icon: Icon(
                         controller.inputLocked
@@ -761,14 +782,6 @@ class _CompositionScreenState extends State<CompositionScreen>
                     ),
 
 
-                    // COMPENSATED NOTATION TOGGLE — switches between
-                    // normal notation (scale sign + accidental shown
-                    // separately, e.g. "4+" plus a "-") and a
-                    // simplified view where opposing signs cancel to
-                    // a plain note and matching signs respell as the
-                    // next degree over. Purely a display switch —
-                    // note.row/note.accidental never change, so this
-                    // toggles back instantly with no data loss.
                     IconButton(
                       icon: Icon(Icons.auto_fix_high,
                         color: controller.showCompensatedNotation
@@ -796,13 +809,6 @@ class _CompositionScreenState extends State<CompositionScreen>
                       },
                     ),
 
-                    // ROTATE PITCH TEXT — rotates the pitch
-                    // label drawn inside each note cell, handy
-                    // when cells are narrow. Also drives Easy
-                    // Read mode (Compensated Notation) and
-                    // Scroll Lock to match its own new state —
-                    // see CompositionController.
-                    // toggleRotatePitchText.
                     IconButton(
                       icon: Icon(Icons.rotate_left,
                         color: controller.rotatePitchText
@@ -814,6 +820,10 @@ class _CompositionScreenState extends State<CompositionScreen>
                           : 'Rotate Pitch Text: Off',
                       onPressed: () {
                         controller.toggleRotatePitchText();
+                        _setOrientationLocked(
+                          context,
+                          controller.rotatePitchText,
+                        );
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
@@ -834,10 +844,6 @@ class _CompositionScreenState extends State<CompositionScreen>
                     ),
 
 
-                    // PLAY / PAUSE — auto-scrolls the grid left to
-                    // right at a speed derived from tempo and beat
-                    // duration. Pausing keeps the current position,
-                    // so Play resumes right where it left off.
                     IconButton(
                       icon: Icon(
                         _isPlaying ? Icons.pause : Icons.play_arrow,
@@ -847,8 +853,6 @@ class _CompositionScreenState extends State<CompositionScreen>
                       onPressed: hasMeasures ? _togglePlayback : null,
                     ),
 
-                    // SCROLL TO START — jumps the horizontal view
-                    // back to the very beginning of the composition.
                     IconButton(
                       icon: const Icon(
                         Icons.first_page,
@@ -870,10 +874,6 @@ class _CompositionScreenState extends State<CompositionScreen>
                           : null,
                     ),
 
-                    // SOUND ON/OFF — notes play a synthesized tone
-                    // when created (by tapping the grid) and while
-                    // scroll playback passes them; this toggles that
-                    // off without affecting anything else.
                     IconButton(
                       icon: Icon(
                         controller.soundEnabled
@@ -899,8 +899,9 @@ class _CompositionScreenState extends State<CompositionScreen>
                       },
                     ),
 
-
-
+                    SizedBox(
+                      height: 20,
+                    ),
 
                     // RAISE SCALE
                     IconButton(
@@ -962,100 +963,257 @@ class _CompositionScreenState extends State<CompositionScreen>
                     ),
 
 
-
-                    // GRID SIZE
-                    IconButton(
-                      icon: const Icon(Icons.grid_on,
-                        color: Colors.black,
-                      ),
-                      tooltip: 'Cell Width',
-                      onPressed: () {
-                        cellWidthDialog(
-                          context,
-                          controller,
-                        );
-                      },
+                    SizedBox(
+                      height: 20,
                     ),
 
-                    // ZOOM IN
                     IconButton(
                       icon: const Icon(
-                        Icons.zoom_in,
+                        Icons.file_upload,
                         color: Colors.black,
                       ),
-                      tooltip: 'Zoom In',
+                      tooltip: 'Export Measures as Text',
                       onPressed: () {
-                        controller.setZoom(
-                          controller.zoomX + 1,
-                          controller.zoomY + 0.1,
+                        measureRangeDialog(
+                          context: context,
+                          controller: controller,
+                          title: 'Export Measures',
+                          actionLabel: 'Export',
+                          actionColor: Colors.black,
+                          onConfirm: (from, to) {
+                            final exported =
+                            controller.exportMeasureRange(from, to);
+                            final dynamicsText = controller
+                                .exportDynamicsAndHairpinsText(from, to);
+                            final text =
+                                formatImportMeasuresAsText(exported) +
+                                    '\nDynamics / Dynamic Changes\n' +
+                                    dynamicsText;
+                            Future.delayed(Duration.zero, () {
+                              showDialog(
+                                context: context,
+                                builder: (resultContext) => AlertDialog(
+                                  backgroundColor: Colors.white,
+                                  surfaceTintColor: Colors.white,
+                                  title: const Text(
+                                    'Exported Measures',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  content: SizedBox(
+                                    width: 400,
+                                    height: 400,
+                                    child: SingleChildScrollView(
+                                      child: SelectableText(
+                                        text,
+                                        style: const TextStyle(
+                                            fontSize: 18),
+                                      ),
+                                    ),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(resultContext),
+                                      child: const Text(
+                                        'Close',
+                                        style: TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            });
+                          },
                         );
                       },
                     ),
 
 
-                    // ZOOM OUT
                     IconButton(
                       icon: const Icon(
-                        Icons.zoom_out,
+                        Icons.file_download,
                         color: Colors.black,
                       ),
-                      tooltip: 'Zoom Out',
+                      tooltip: 'Import Transcription',
                       onPressed: () {
-                        controller.setZoom(
-                          controller.zoomX - 1,
-                          controller.zoomY - 0.1,
+                        showDialog(
+                          context: context,
+                          builder: (dialogContext) {
+                            return StatefulBuilder(
+                              builder: (dialogContext, setDialogState) {
+                                return AlertDialog(
+                                  backgroundColor: Colors.white,
+                                  surfaceTintColor: Colors.white,
+                                  title: const Text(
+                                    'Import Transcription',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  content: SizedBox(
+                                    width: 400,
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        for (final batch
+                                        in availableImportBatches)
+                                          Builder(
+                                            builder: (_) {
+                                              final done = controller
+                                                  .importedBatchLabels
+                                                  .contains(
+                                                  batch.label);
+                                              return ListTile(
+                                                title: Text(
+                                                  batch.label,
+                                                  style: TextStyle(
+                                                    fontSize: 22,
+                                                    fontWeight:
+                                                    FontWeight.bold,
+                                                    color: done
+                                                        ? Colors.grey
+                                                        : Colors.black,
+                                                  ),
+                                                ),
+                                                trailing: Icon(
+                                                  done
+                                                      ? Icons
+                                                      .check_circle
+                                                      : Icons
+                                                      .file_download,
+                                                  color: done
+                                                      ? Colors.green
+                                                      : Colors.black,
+                                                ),
+                                                onLongPress: done
+                                                    ? () {
+                                                  controller
+                                                      .resetImportedBatch(
+                                                      batch.label);
+                                                  setDialogState(
+                                                          () {});
+                                                  ScaffoldMessenger.of(
+                                                      context)
+                                                      .showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                        '"${batch.label}" can be imported again.',
+                                                        style: const TextStyle(
+                                                            fontSize: 22),
+                                                      ),
+                                                    ),
+                                                  );
+                                                }
+                                                    : null,
+                                                onTap: done
+                                                    ? null
+                                                    : () {
+                                                  final warnings =
+                                                  controller
+                                                      .importBatch(
+                                                      batch);
+                                                  setDialogState(
+                                                          () {});
+                                                  showDialog(
+                                                    context:
+                                                    dialogContext,
+                                                    builder:
+                                                        (resultContext) =>
+                                                        AlertDialog(
+                                                          backgroundColor:
+                                                          Colors.white,
+                                                          surfaceTintColor:
+                                                          Colors.white,
+                                                          title: Text(
+                                                            warnings
+                                                                .isEmpty
+                                                                ? 'Import Complete'
+                                                                : 'Import Complete — '
+                                                                '${warnings.length} warning'
+                                                                '${warnings.length == 1 ? '' : 's'}',
+                                                            style: const TextStyle(
+                                                              fontSize: 22,
+                                                              fontWeight: FontWeight.bold,
+                                                            ),
+                                                          ),
+                                                          content: SizedBox(
+                                                            width: 400,
+                                                            child: warnings.isEmpty
+                                                                ? Text(
+                                                              'All notes from ${batch.label} were created successfully.',
+                                                              style: const TextStyle(fontSize: 22),
+                                                            )
+                                                                : SingleChildScrollView(
+                                                              child: Column(
+                                                                mainAxisSize: MainAxisSize.min,
+                                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                                children: [
+                                                                  for (final w in warnings)
+                                                                    Padding(
+                                                                      padding: const EdgeInsets.only(bottom: 8),
+                                                                      child: Text(
+                                                                        w.toString(),
+                                                                        style: const TextStyle(fontSize: 18, color: Colors.red),
+                                                                      ),
+                                                                    ),
+                                                                ],
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          actions: [
+                                                            TextButton(
+                                                              onPressed: () => Navigator.pop(resultContext),
+                                                              child: const Text(
+                                                                'Close',
+                                                                style: TextStyle(
+                                                                  fontSize: 22,
+                                                                  fontWeight: FontWeight.bold,
+                                                                  color: Colors.black,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                  );
+                                                },
+                                              );
+                                            },
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(dialogContext),
+                                      child: const Text(
+                                        'Close',
+                                        style: TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            );
+                          },
                         );
                       },
                     ),
 
-                    // RESET
-                    IconButton(
-                      icon: const Icon(
-                        Icons.center_focus_strong,
-                        color: Colors.black,
-                      ),
-                      tooltip: 'Reset Zoom',
-                      onPressed:
-                      controller.resetZoom,
-                    ),
 
 
-                    // GRID DARK MODE — inverts ONLY the grid
-                    // itself (background/lines — see
-                    // GridPainter.paint), the pitch column next
-                    // to it, and every note's fill/text color
-                    // (see NoteBlockWidget/AppColors). The rest
-                    // of the app (this toolbar, every dialog)
-                    // stays as-is — scoped to just the grid on
-                    // request, not a full app-wide theme.
-                    // Placed at the very bottom of the toolbar
-                    // per request.
-                    IconButton(
-                      icon: Icon(
-                        controller.isDarkMode
-                            ? Icons.dark_mode
-                            : Icons.light_mode,
-                        color: controller.isDarkMode
-                            ? Colors.blue
-                            : Colors.black,
-                      ),
-                      tooltip: controller.isDarkMode
-                          ? 'Grid Dark Mode: On'
-                          : 'Grid Dark Mode: Off',
-                      onPressed: () {
-                        controller.toggleDarkMode();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              controller.isDarkMode
-                                  ? 'Grid dark mode is on.'
-                                  : 'Grid dark mode is off.',
-                              style: const TextStyle(fontSize: 22),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
 
                   ];
 
@@ -1071,29 +1229,10 @@ class _CompositionScreenState extends State<CompositionScreen>
                         ),
                       ),
                     ),
-                    // Single column, small FIXED width (exactly one
-                    // button's worth + a couple pixels), scrolling
-                    // vertically if there isn't room for every button
-                    // on screen — deliberately NOT trying to estimate
-                    // how many columns/pixels are needed (that
-                    // required guessing each button's true rendered
-                    // height, which never quite matched reality and
-                    // kept making the toolbar either too wide or
-                    // overflowing). A fixed single-column width has no
-                    // guesswork at all: it's always exactly as thin as
-                    // one button can be.
                     child: Container(
                       width: 40,
                       height: double.infinity,
                       color: Colors.grey.shade300,
-                      // LayoutBuilder + ConstrainedBox(minHeight: full
-                      // available height) + Center: if the buttons
-                      // fit within the toolbar's full height, they're
-                      // centered vertically rather than starting from
-                      // the top; if they don't fit, the
-                      // SingleChildScrollView still scrolls normally
-                      // (ConstrainedBox's minHeight doesn't force the
-                      // Column smaller than it naturally needs).
                       child: LayoutBuilder(
                         builder: (context, constraints) {
                           return SingleChildScrollView(
@@ -1117,12 +1256,6 @@ class _CompositionScreenState extends State<CompositionScreen>
               ),
 
 
-              // =====================================================
-              // PITCH COLUMN — constantly present, shows the current
-              // scale's pitch for every one of the 56 rows. Scrolls
-              // vertically in sync with the grid.
-              // =====================================================
-
               SafeArea(
                 child: PitchColumnWidget(
                   controller: controller,
@@ -1131,10 +1264,6 @@ class _CompositionScreenState extends State<CompositionScreen>
                 ),
               ),
 
-
-              // =====================================================
-              // GRID AREA
-              // =====================================================
 
               Expanded(
                 child: !hasMeasures
@@ -1147,14 +1276,11 @@ class _CompositionScreenState extends State<CompositionScreen>
                     icon: const Icon(
                       Icons.copy,
                       size: 22,
-                      // color: Colors.black,
                     ),
                     label: const Text(
                       'Add Measures',
                       style: TextStyle(
                         fontSize: 22,
-                        // color: Colors.black,
-                        // fontWeight: FontWeight.bold,
                       ),
                     ),
                     onPressed: () {
@@ -1164,23 +1290,6 @@ class _CompositionScreenState extends State<CompositionScreen>
                 )
                     : SafeArea(
                   child: NotificationListener<ScrollNotification>(
-                    // If playback is running and the person starts an
-                    // actual finger drag (as opposed to the jumpTo()
-                    // calls the ticker itself makes every frame), pause
-                    // playback — otherwise the next frame's jumpTo()
-                    // would just override their gesture, and manual
-                    // scrolling (especially backward) would look like
-                    // it's not working at all.
-                    //
-                    // The ticker itself is torn down immediately (safe
-                    // — no setState involved), so there's no window
-                    // where Play could create a second ticker while
-                    // this one is still alive. Only the setState/icon
-                    // update is deferred to a post-frame callback,
-                    // since this notification fires WHILE the
-                    // descendant Scrollable's drag gesture is still
-                    // being dispatched, and calling setState() at that
-                    // exact moment can misbehave.
                     onNotification: (notification) {
                       if (_isPlaying &&
                           notification.metrics.axis == Axis.horizontal &&

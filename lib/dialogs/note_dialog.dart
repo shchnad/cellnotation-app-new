@@ -12,6 +12,7 @@ import '../enums/playing_technique.dart';
 import '../models/note.dart';
 import '../utils/default_values.dart';
 import 'combined_duration_dialog.dart';
+import '../models/note_import.dart';
 import 'note_values_dialog.dart';
 
 class NoteDialog extends StatelessWidget {
@@ -80,6 +81,19 @@ class NoteDialog extends StatelessWidget {
             ? 'none'
             : '${activeTempo.tempo.label} = ${activeTempo.tempo.value}';
 
+        // Shows the note's duration as a readable combination (e.g.
+        // "Half + Eighth" for a tie across a barline set via
+        // combinedDurationDialog) rather than a single label — most
+        // ordinary notes decompose into just one entry, which reads
+        // identically to how a plain single duration always did.
+        // Falls back to durationLabel's own "closest match" behavior
+        // for the rare case decomposition finds nothing (shouldn't
+        // normally happen for an ordinary note).
+        final durationParts = decomposeDurationTicks(editedNote.durationTicks);
+        final durationDisplay = durationParts.isEmpty
+            ? controller.durationLabel(editedNote)
+            : durationParts.map((d) => d.label).join(' + ');
+
         // Every row's own text, measured to find the single widest
         // one — combined rows (Measure+Beat, Octave+Degree) sum both
         // halves plus the gap between them; ListTile field rows add
@@ -114,7 +128,7 @@ class NoteDialog extends StatelessWidget {
             (editedNote.graceOfNoteId != null ||
                 editedNote.graceOriginalDurationTicks != null)
                 ? 'Duration: ${editedNote.durationTicks} ticks (auto)'
-                : 'Duration: ${controller.durationLabel(editedNote)}',
+                : 'Duration: $durationDisplay',
           ) +
               _listTileChrome,
           _textWidth('Hand: ${editedNote.hand.name}') + _listTileChrome,
@@ -379,7 +393,7 @@ class NoteDialog extends StatelessWidget {
                             text: (editedNote.graceOfNoteId != null ||
                                 editedNote.graceOriginalDurationTicks != null)
                                 ? '${editedNote.durationTicks} ticks (auto)'
-                                : controller.durationLabel(editedNote),
+                                : durationDisplay,
                             style: const TextStyle(
                               fontSize: 22,
                               color: Colors.blue,

@@ -9,6 +9,12 @@ import '../dialogs/note_values_dialog.dart';
 import '../dialogs/edit_composition_dialog.dart';
 import 'composition_screen.dart';
 
+/// Capitalizes just the first letter for display — the underlying
+/// data (comp.title/comp.composer) is left exactly as stored;
+/// this only affects how it's shown here.
+String _capitalizeFirst(String s) =>
+    s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+
 class CompositionsListScreen extends StatefulWidget {
   const CompositionsListScreen({super.key});
 
@@ -43,12 +49,16 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
         readOnly: true,
         controller: TextEditingController(text: valueText),
         style: const TextStyle(
-          fontSize: 18,
+          fontSize: 22,
           color: Colors.blue,
           fontWeight: FontWeight.bold,
         ),
         decoration: InputDecoration(
           labelText: label,
+          labelStyle: const TextStyle(
+            fontSize: 22,
+            color: Colors.black,
+          ),
           isDense: true,
           border: const OutlineInputBorder(),
           prefixIcon: Icon(icon, size: 20),
@@ -69,7 +79,11 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Compositions', style: TextStyle(fontSize: 22)),
+        title: const Text('My Compositions', style: TextStyle(
+          fontSize: 22,
+          color: Colors.blue,
+          fontWeight: FontWeight.bold,
+        )),
       ),
       body: Column(
         children: [
@@ -78,12 +92,21 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
             child: Row(
               children: [
                 Expanded(
-                  flex: 3,
+                  flex: 2,
                   child: TextField(
                     controller: _searchController,
-                    style: const TextStyle(fontSize: 18),
+                    style: const TextStyle(
+                      fontSize: 22,
+                      color: Colors.blue,
+                      fontWeight: FontWeight.bold,
+                    ),
                     decoration: InputDecoration(
-                      labelText: 'Search title or composer',
+                      labelText:
+                      'Search title or composer',
+                      labelStyle: TextStyle(
+                        fontSize: 22,
+                        color: Colors.black,
+                      ),
                       isDense: true,
                       border: const OutlineInputBorder(),
                       prefixIcon: const Icon(Icons.search, size: 20),
@@ -145,29 +168,29 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
           ),
           const Divider(height: 1),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: Colors.grey.shade200,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            color: Colors.grey.shade300,
             child: const Row(
               children: [
                 Expanded(
-                  flex: 3,
-                  child: Text('Title', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  flex: 5,
+                  child: Text('Title', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
                 ),
                 Expanded(
                   flex: 2,
-                  child: Text('Composer', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  child: Text('Composer', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
                 ),
                 Expanded(
                   flex: 2,
-                  child: Text('Style', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  child: Text('Style', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
                 ),
                 Expanded(
                   flex: 2,
-                  child: Text('Instrument', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  child: Text('Instrument', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
                 ),
                 Expanded(
                   flex: 2,
-                  child: Text('Edited', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  child: Text('Edited', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
                 ),
                 SizedBox(width: 44), // aligns with the edit icon column
               ],
@@ -248,12 +271,12 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
                         child: Row(
                           children: [
                             Expanded(
-                              flex: 3,
+                              flex: 5,
                               child: Text(
-                                comp.title,
+                                _capitalizeFirst(comp.title),
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                  fontSize: 18,
+                                  fontSize: 22,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -261,9 +284,9 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
                             Expanded(
                               flex: 2,
                               child: Text(
-                                comp.composer,
+                                _capitalizeFirst(comp.composer),
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 16),
+                                style: const TextStyle(fontSize: 22),
                               ),
                             ),
                             Expanded(
@@ -271,7 +294,7 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
                               child: Text(
                                 comp.style,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 16, color: Colors.grey),
+                                style: const TextStyle(fontSize: 22, color: Colors.black),
                               ),
                             ),
                             Expanded(
@@ -279,7 +302,7 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
                               child: Text(
                                 comp.instrument,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 16, color: Colors.grey),
+                                style: const TextStyle(fontSize: 22, color: Colors.black),
                               ),
                             ),
                             Expanded(
@@ -287,7 +310,7 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
                               child: Text(
                                 comp.editedAt.toLocal().toString().split(' ').first,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 14, color: Colors.grey),
+                                style: const TextStyle(fontSize: 22, color: Colors.black),
                               ),
                             ),
                             IconButton(

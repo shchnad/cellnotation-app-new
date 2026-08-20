@@ -15,6 +15,12 @@ void noteValuesDialog<T>({
   const spacing = 8.0;
   final screenWidth = MediaQuery.of(context).size.width;
   final screenHeight = MediaQuery.of(context).size.height;
+  // In landscape, the available height is naturally shorter — a
+  // fixed 55px button height meant a long list (like Instrument's)
+  // needed more rows than fit within the height cap below, forcing a
+  // scroll. Thinner buttons in landscape let more rows fit instead.
+  final isLandscape = screenWidth >= screenHeight;
+  final buttonHeight = isLandscape ? 40.0 : 55.0;
 
   double textWidth(String text) {
     final painter = TextPainter(
@@ -59,6 +65,7 @@ void noteValuesDialog<T>({
         labelBuilder(value),
         selected,
         buttonWidth,
+        buttonHeight,
             () {
           onSelected(value);
           Navigator.pop(context);
@@ -147,12 +154,13 @@ Widget _button(
     String text,
     bool selected,
     double width,
+    double height,
     VoidCallback onPressed,
     ) {
   return ElevatedButton(
     style: ElevatedButton.styleFrom(
       backgroundColor: Colors.grey.shade300,
-      minimumSize: Size(width, 55),
+      minimumSize: Size(width, height),
       // Buttons are laid out in a Wrap now (not a size-constrained
       // GridView cell), so this minimumSize is actually respected —
       // each button renders at exactly `width` (wide enough for its

@@ -9,6 +9,13 @@ import '../enums/instrument.dart';
 import '../dialogs/note_values_dialog.dart';
 import 'composition_screen.dart';
 
+/// Capitalizes just the first letter for display — the underlying
+/// data (comp.title/comp.composer) is left exactly as stored; this
+/// only affects how it's shown here. Matches
+/// CompositionsListScreen's own identical helper.
+String _capitalizeFirst(String s) =>
+    s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+
 class CloudLibraryScreen extends StatefulWidget {
   const CloudLibraryScreen({super.key});
 
@@ -33,6 +40,8 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
     super.dispose();
   }
 
+  // Matches CompositionsListScreen's own _buildFilterField exactly —
+  // fontSize 22 blue bold value, black 22px label.
   Widget _buildFilterField({
     required String label,
     required String valueText,
@@ -44,12 +53,16 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
         readOnly: true,
         controller: TextEditingController(text: valueText),
         style: const TextStyle(
-          fontSize: 18,
+          fontSize: 22,
           color: Colors.blue,
           fontWeight: FontWeight.bold,
         ),
         decoration: InputDecoration(
           labelText: label,
+          labelStyle: const TextStyle(
+            fontSize: 22,
+            color: Colors.black,
+          ),
           isDense: true,
           border: const OutlineInputBorder(),
           prefixIcon: Icon(icon, size: 20),
@@ -84,7 +97,14 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Cloud Library', style: TextStyle(fontSize: 22)),
+        // Same size/weight as CompositionsListScreen's "My
+        // Compositions" title — only difference (per request) is the
+        // color: black here instead of blue.
+        title: const Text('Cloud Library', style: TextStyle(
+          fontSize: 22,
+          color: Colors.black,
+          fontWeight: FontWeight.bold,
+        )),
       ),
       body: Column(
         children: [
@@ -93,12 +113,20 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
             child: Row(
               children: [
                 Expanded(
-                  flex: 3,
+                  flex: 2,
                   child: TextField(
                     controller: _searchController,
-                    style: const TextStyle(fontSize: 18),
+                    style: const TextStyle(
+                      fontSize: 22,
+                      color: Colors.blue,
+                      fontWeight: FontWeight.bold,
+                    ),
                     decoration: InputDecoration(
                       labelText: 'Search title or composer',
+                      labelStyle: const TextStyle(
+                        fontSize: 22,
+                        color: Colors.black,
+                      ),
                       isDense: true,
                       border: const OutlineInputBorder(),
                       prefixIcon: const Icon(Icons.search, size: 20),
@@ -170,34 +198,40 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
             ),
           ),
           const Divider(height: 1),
+          // Header — same grey.shade300 background + black bold
+          // fontSize 22 text as CompositionsListScreen's header, and
+          // Title given the same proportionally larger flex (5)
+          // widening it the same way. "Shared by" and "Likes" are
+          // extra columns CompositionsListScreen doesn't have, kept
+          // here since this screen genuinely needs them.
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: Colors.grey.shade200,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            color: Colors.grey.shade300,
             child: const Row(
               children: [
                 Expanded(
-                  flex: 3,
-                  child: Text('Title', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  flex: 5,
+                  child: Text('Title', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
                 ),
                 Expanded(
                   flex: 2,
-                  child: Text('Composer', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  child: Text('Composer', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
                 ),
                 Expanded(
                   flex: 2,
-                  child: Text('Shared by', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  child: Text('Shared by', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
                 ),
                 Expanded(
                   flex: 2,
-                  child: Text('Style', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  child: Text('Style', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
                 ),
                 Expanded(
                   flex: 2,
-                  child: Text('Instrument', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  child: Text('Instrument', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
                 ),
                 SizedBox(
                   width: 110,
-                  child: Text('Likes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  child: Text('Likes', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
                 ),
                 SizedBox(width: 40),
               ],
@@ -282,20 +316,26 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
                         ),
                         child: Row(
                           children: [
+                            // Title/composer/style/instrument styled
+                            // exactly like CompositionsListScreen's
+                            // own data row (fontSize 22 bold title,
+                            // fontSize 22 composer, fontSize 16 black
+                            // for style/instrument — replacing the
+                            // earlier blueGrey/grey coloring).
                             Expanded(
-                              flex: 3,
+                              flex: 5,
                               child: Text(
-                                comp.title,
+                                _capitalizeFirst(comp.title),
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                               ),
                             ),
                             Expanded(
                               flex: 2,
                               child: Text(
-                                comp.composer,
+                                _capitalizeFirst(comp.composer),
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 16),
+                                style: const TextStyle(fontSize: 22),
                               ),
                             ),
                             Expanded(
@@ -303,7 +343,7 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
                               child: Text(
                                 comp.userName,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 16, color: Colors.blueGrey),
+                                style: const TextStyle(fontSize: 16, color: Colors.black),
                               ),
                             ),
                             Expanded(
@@ -311,7 +351,7 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
                               child: Text(
                                 comp.style,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 16, color: Colors.grey),
+                                style: const TextStyle(fontSize: 22, color: Colors.black),
                               ),
                             ),
                             Expanded(
@@ -319,7 +359,7 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
                               child: Text(
                                 comp.instrument,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 16, color: Colors.grey),
+                                style: const TextStyle(fontSize: 22, color: Colors.black),
                               ),
                             ),
                             if (isMine)
@@ -350,7 +390,7 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
                               width: 24,
                               child: Text(
                                 '${comp.likeCount}',
-                                style: const TextStyle(fontSize: 14, color: Colors.grey),
+                                style: const TextStyle(fontSize: 16, color: Colors.black),
                               ),
                             ),
                             IconButton(

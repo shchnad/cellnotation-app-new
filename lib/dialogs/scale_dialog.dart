@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../controllers/composition_controller.dart';
+import 'scale_help_dialog.dart';
 
 Future<void> scaleDialog({
   required BuildContext context,
@@ -125,6 +126,32 @@ Future<void> scaleDialog({
             ),
           ),
         ),
+
+        // HELP — opens scale_help_dialog.dart, a combined
+        // major+minor reference list showing each scale's actual
+        // degree spelling and key signature. Choosing a scale there
+        // applies it (via the SAME onSelected callback) and closes
+        // both dialogs.
+        actions: [
+          TextButton(
+            onPressed: () {
+              scaleHelpDialog(
+                context: context,
+                controller: controller,
+                currentScale: currentScale,
+                onSelected: onSelected,
+              );
+            },
+            child: const Text(
+              'Help',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+          ),
+        ],
       );
     },
   );

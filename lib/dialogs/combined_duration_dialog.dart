@@ -3,32 +3,7 @@ import 'package:flutter/material.dart';
 import '../controllers/composition_controller.dart';
 import '../enums/note_duration.dart';
 import '../models/note.dart';
-
-/// Greedily decomposes [ticks] into a list of NoteDuration values
-/// (largest first) summing to it — e.g. an eighth+half combination's
-/// ticks decomposes back into [half, eighth]. Used both to display a
-/// note's duration as a readable combination (see note_dialog.dart)
-/// and to pre-seed this dialog's own combination when reopening it.
-/// Returns an empty list if [ticks] <= 0. Any note whose duration was
-/// set either via a single NoteDuration or via this dialog decomposes
-/// exactly; a genuinely non-standard tick count (which shouldn't
-/// normally reach here — grace notes use a separate display path)
-/// just stops once no remaining standard duration fits the leftover
-/// amount, silently dropping that remainder rather than showing an
-/// inexact label.
-List<NoteDuration> decomposeDurationTicks(int ticks) {
-  final result = <NoteDuration>[];
-  var remaining = ticks;
-  final sortedDesc = NoteDuration.values.toList()
-    ..sort((a, b) => b.ticks.compareTo(a.ticks));
-  for (final d in sortedDesc) {
-    while (d.ticks > 0 && remaining >= d.ticks) {
-      result.add(d);
-      remaining -= d.ticks;
-    }
-  }
-  return result;
-}
+import '../models/note_import.dart';
 
 /// Lets the person build up [note]'s duration as the SUM of two or
 /// more standard NoteDuration values — for a note that's really a tie

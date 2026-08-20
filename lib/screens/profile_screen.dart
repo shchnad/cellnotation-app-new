@@ -85,197 +85,187 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final user = _user;
 
+    // No AppBar — HomeScreen (whose Exit text this Home text is meant
+    // to line up with) has none either, and an AppBar here — even
+    // with nothing visible in it (title/actions commented out below)
+    // — still reserves its own height, which was pushing the body
+    // (and the Home text inside it) down from that same position.
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        // title: const Text(
-        //     'Profile',
-        //     style: TextStyle(fontSize: 22)
-        // ),
-        // actions: [
-        // IconButton(
-        //   icon: const Icon(Icons.logout, size: 30,),
-        //   tooltip: 'Sign out',
-        //   onPressed: () async {
-        //     await _authService.signOut();
-        //     if (context.mounted) {
-        //       Navigator.popUntil(context, (route) => route.isFirst);
-        //     }
-        //   },
-        // ),
-        // ],
-      ),
-      body: user == null
-          ? Column(
+      body: Stack(
         children: [
-          const Center(
-              child: Text(
-                  'Not signed in',
-                  style: TextStyle(fontSize: 22))),
-        ],
-      )
-          : ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          Center(
-            child: SizedBox(
-              width: 500,
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 60,
-                    backgroundColor: Colors.blue.shade100,
-                    backgroundImage: user.photoURL != null
-                        ? NetworkImage(user.photoURL!)
-                        : null,
-                    child: user.photoURL == null
-                        ? const Icon(Icons.person, size: 48, color: Colors.black)
-                        : null,
+          user == null
+              ? Column(
+            children: [
+              const Center(
+                  child: Text(
+                      'Not signed in',
+                      style: TextStyle(fontSize: 22))),
+            ],
+          )
+              : ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              Center(
+                child: SizedBox(
+                  width: 500,
+                  child: Column(
+                    children: [
+                      CircleAvatar(
+                        radius: 60,
+                        backgroundColor: Colors.blue.shade100,
+                        backgroundImage: user.photoURL != null
+                            ? NetworkImage(user.photoURL!)
+                            : null,
+                        child: user.photoURL == null
+                            ? const Icon(Icons.person, size: 48, color: Colors.black)
+                            : null,
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      Text(
+                        user.email ?? '',
+                        style: const TextStyle(
+                          fontSize: 22,
+                          color: Colors.black,
+                        ),
+                      ),
+
+                      const SizedBox(height: 30),
+
+                      TextField(
+                        controller: _nameController,
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) => _saveName(),
+                        style: const TextStyle(
+                          fontSize: 22,
+                          color: Colors.blue,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'Edit user name',
+                          labelStyle: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.clear),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () {
+                              setState(() {
+                                _nameController.clear();
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _saving
+                              ? null
+                              : _saveName,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            // foregroundColor: Colors.white,
+                            minimumSize: const Size(double.infinity, 50),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                          // Kept as a plain ElevatedButton (rather than
+                          // ElevatedButton.icon) since it also needs to
+                          // swap to a loading spinner while saving —
+                          // building the icon+label Row manually gives
+                          // the same visual result as .icon while still
+                          // allowing that conditional.
+                          child: _saving
+                              ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                              : const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.save, color: Colors.white, size: 22),
+                              SizedBox(width: 8),
+                              Text('Save',
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    color: Colors.white,
+                                  )),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                    ],
                   ),
+                ),
+              ),
 
-                  const SizedBox(height: 20),
+              const SizedBox(height: 60),
 
-                  Text(
-                    user.email ?? '',
-                    style: const TextStyle(
-                      fontSize: 22,
-                      color: Colors.black,
-                    ),
-                  ),
+              StreamBuilder<List<Composition>>(
+                stream: _compositionService.getUserCompositions(),
+                builder: (context, snapshot) {
+                  final compositions = snapshot.data ?? [];
+                  final publicCount = compositions.where((c) => c.isPublic).length;
+                  final totalLikes = compositions.fold<int>(
+                    0,
+                        (sum, c) => sum + c.likeCount,
+                  );
 
-                  const SizedBox(height: 30),
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _StatTile(label: 'Compositions', value: '${compositions.length}'),
+                      _StatTile(label: 'Public', value: '$publicCount'),
+                      _StatTile(label: 'Likes received', value: '$totalLikes'),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
 
-                  TextField(
-                    controller: _nameController,
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => _saveName(),
-                    style: const TextStyle(
-                      fontSize: 22,
-                      color: Colors.blue,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    decoration: InputDecoration(
-                      labelText: 'Edit user name',
-                      labelStyle: const TextStyle(
-                        color: Colors.black,
+          // HOME — top-left corner, clickable text + icon (not a
+          // full note-block button), matching HomeScreen's own Exit
+          // treatment — arrow icon kept, per request, rather than
+          // the exit-door icon the old button used.
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: InkWell(
+                onTap: () => Navigator.pop(context),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.arrow_back, color: Colors.red),
+                    SizedBox(width: 6),
+                    Text(
+                      'Home',
+                      style: TextStyle(
+                        color: Colors.red,
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                       ),
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.clear),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        visualDensity: VisualDensity.compact,
-                        onPressed: () {
-                          setState(() {
-                            _nameController.clear();
-                          });
-                        },
-                      ),
                     ),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _saving
-                          ? null
-                          : _saveName,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        // foregroundColor: Colors.white,
-                        minimumSize: const Size(double.infinity, 50),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                      // Kept as a plain ElevatedButton (rather than
-                      // ElevatedButton.icon) since it also needs to
-                      // swap to a loading spinner while saving —
-                      // building the icon+label Row manually gives
-                      // the same visual result as .icon while still
-                      // allowing that conditional.
-                      child: _saving
-                          ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                          : const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.save, color: Colors.white, size: 22),
-                          SizedBox(width: 8),
-                          Text('Save',
-                              style: TextStyle(
-                                fontSize: 22,
-                                color: Colors.white,
-                              )),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  // Explicit Home button, same size/shape as Save but
-                  // black — replaces the AppBar's automatic back
-                  // arrow (suppressed via automaticallyImplyLeading:
-                  // false above).
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () => Navigator.pop(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black,
-                        minimumSize: const Size(double.infinity, 50),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                      icon: const Icon(
-                        Icons.exit_to_app,
-                        color: Colors.white,
-                        size: 22,
-                      ),
-                      label: const Text('Home',
-                          style: TextStyle(
-                            fontSize: 22,
-                            color: Colors.white,
-                          )),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-
-          const SizedBox(height: 60),
-
-          StreamBuilder<List<Composition>>(
-            stream: _compositionService.getUserCompositions(),
-            builder: (context, snapshot) {
-              final compositions = snapshot.data ?? [];
-              final publicCount = compositions.where((c) => c.isPublic).length;
-              final totalLikes = compositions.fold<int>(
-                0,
-                    (sum, c) => sum + c.likeCount,
-              );
-
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _StatTile(label: 'Compositions', value: '${compositions.length}'),
-                  _StatTile(label: 'Public', value: '$publicCount'),
-                  _StatTile(label: 'Likes received', value: '$totalLikes'),
-                ],
-              );
-            },
           ),
         ],
       ),

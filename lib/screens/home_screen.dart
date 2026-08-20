@@ -43,85 +43,101 @@ class HomeScreen extends StatelessWidget {
     // request. Sign out (previously an AppBar action) is now just
     // "Exit", the last button in that same column.
     return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Builder(
-              builder: (buttonContext) {
-                return _HomeMenuButton(
-                  icon: Icons.library_add,
-                  label: 'Create Composition',
+      body: Stack(
+        children: [
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Builder(
+                  builder: (buttonContext) {
+                    return _HomeMenuButton(
+                      icon: Icons.library_add,
+                      label: 'Create Composition',
+                      color: Colors.blue,
+                      textColor: Colors.white,
+                      onPressed: () => _handleCreateComposition(buttonContext),
+                    );
+                  },
+                ),
+                const SizedBox(height: 40),
+                _HomeMenuButton(
+                  icon: Icons.music_video_rounded,
+                  label: 'My Compositions',
                   color: Colors.blue,
                   textColor: Colors.white,
-                  onPressed: () => _handleCreateComposition(buttonContext),
-                );
-              },
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const CompositionsListScreen(),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 40),
+                _HomeMenuButton(
+                  icon: Icons.cloud,
+                  label: 'Cloud Library',
+                  color: Colors.black,
+                  textColor: Colors.white,
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const CloudLibraryScreen(),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 40),
+                _HomeMenuButton(
+                  icon: Icons.person,
+                  label: 'Profile',
+                  color: Colors.black,
+                  textColor: Colors.white,
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ProfileScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
-            const SizedBox(height: 40),
-            _HomeMenuButton(
-              icon: Icons.music_video_rounded,
-              label: 'My Compositions',
-              color: Colors.blue,
-              textColor: Colors.white,
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const CompositionsListScreen(),
-                  ),
-                );
-              },
+          ),
+
+          // EXIT — top-left corner, clickable text + icon (not a
+          // full note-block button like the rest of this page), both
+          // red. SafeArea keeps it clear of any notch/status bar.
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: InkWell(
+                onTap: () async {
+                  await AuthService().signOut();
+                },
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.logout, color: Colors.red),
+                    SizedBox(width: 6),
+                    Text(
+                      'Exit',
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-
-            const SizedBox(height: 40),
-
-            _HomeMenuButton(
-              icon: Icons.cloud,
-              label: 'Cloud Library',
-              color: Colors.black,
-              textColor: Colors.white,
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const CloudLibraryScreen(),
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 40),
-
-            _HomeMenuButton(
-              icon: Icons.person,
-              label: 'Profile',
-              color: Colors.black,
-              textColor: Colors.white,
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const ProfileScreen(),
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 40),
-
-            _HomeMenuButton(
-              icon: Icons.logout,
-              label: 'Exit',
-              // color: Colors.grey.shade300,
-              color: Colors.white,
-              textColor: Colors.red,
-              onPressed: () async {
-                await AuthService().signOut();
-              },
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

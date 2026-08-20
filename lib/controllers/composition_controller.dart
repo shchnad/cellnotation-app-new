@@ -20,6 +20,7 @@ import '../models/composition.dart';
 import '../models/dynamic_event.dart';
 import '../models/note.dart';
 import '../models/measure.dart';
+import '../models/note_import.dart';
 import '../models/tempo_event.dart';
 import '../models/time_signature.dart';
 import '../models/timeline.dart';
@@ -1051,6 +1052,335 @@ class CompositionController extends ChangeNotifier {
     }
     playNoteSound(note);
     notifyListeners();
+  }
+
+
+  /// Imports a measure-by-measure transcription (see ImportMeasure /
+  /// ImportEvent / ImportNoteSpec in note_import.dart) into real Note
+  /// objects — the code counterpart to the manual, verified
+  /// transcription process: each event's beat position is converted
+  /// to a tick (whole-beat part via getBeatTick, any half-beat
+  /// fraction added on top), each event's durationParts are summed
+  /// the same way CombinedDurationDialog does, and each pitch's
+  /// degree+octave is converted to a row the same way the rest of
+  /// the app does (ImportNoteSpec.row). A rest (empty pitches) is
+  /// simply skipped — no Note object needed for silence. A chord
+  /// (pitches.length > 1) creates one Note per pitch, all sharing the
+  /// same startTick/durationTicks.
+  ///
+  /// Unlike addNoteAtGridPosition, this does NOT read
+  /// currentDuration/currentHand — every note's duration, hand,
+  /// accidental, articulation, and legato come explicitly from its
+  /// own ImportNoteSpec/ImportEvent, since a transcription generally
+  /// mixes many different values across a single import rather than
+  /// sharing the controller's current single "next note" settings.
+  ///
+  /// An overlapping note (same row, overlapping tick range as an
+  /// existing note) is skipped rather than aborting the whole import
+  /// — every skip is collected into the returned warning list instead,
+  /// so the caller can report exactly what didn't make it in and why.
+
+  /// Labels of every ImportBatch (see import_batches.dart) already
+  /// imported into THIS composition — checked by [importBatch] to
+  /// avoid silently re-importing the same batch twice (which would
+  /// otherwise just produce a wall of "overlaps an existing note"
+  /// warnings from importTranscribedMeasures instead of a clean "already
+  /// done"). Not persisted with the composition itself — this only
+  /// tracks what's happened in the current session.
+  final Set<String> importedBatchLabels = {};
+
+  /// Imports [batch] via [importTranscribedMeasures], but only if its
+  /// label hasn't already been imported into this composition — see
+  /// [importedBatchLabels]. Returns a single batch-level ImportWarning
+  /// (measureIndex/beat both null) instead of importing again if it
+  /// has.
+  List<ImportWarning> importBatch(ImportBatch batch) {
+    if (importedBatchLabels.contains(batch.label)) {
+      return [
+        ImportWarning(
+          message: '"${batch.label}" was already imported into this '
+              'composition — skipped to avoid duplicating notes.',
+        ),
+      ];
+    }
+    final warnings = importTranscribedMeasures(batch.measures);
+    // Only mark as done if it actually fully succeeded — a batch
+    // that hit warnings (e.g. because the composition didn't have
+    // enough measures yet) is NOT locked out from being retried once
+    // the underlying problem is fixed (e.g. after adding the missing
+    // measures). Without this check, a batch that failed almost
+    // entirely on its first attempt would get marked "done" anyway
+    // and become permanently unimportable through the UI.
+    if (warnings.isEmpty) {
+      importedBatchLabels.add(batch.label);
+    }
+    return warnings;
+  }
+
+  /// Manually clears [label] from [importedBatchLabels], letting a
+  /// batch be re-imported even if it previously succeeded — an
+  /// explicit escape hatch for cases importBatch's own automatic
+  /// "only mark done on full success" logic doesn't cover (e.g.
+  /// deliberately wanting to try again after undoing/deleting some of
+  /// what a successful import created). Does NOT undo or remove any
+  /// notes that import already created — only resets the tracking
+  /// flag itself.
+  void resetImportedBatch(String label) {
+    importedBatchLabels.remove(label);
+    notifyListeners();
+  }
+
+  /// The inverse of [importTranscribedMeasures] — reads the ACTUAL
+  /// notes currently in the composition, within
+  /// [fromMeasureIndex]..[toMeasureIndex] inclusive (both 0-based),
+  /// and converts them back into the same ImportMeasure/ImportEvent/
+  /// ImportNoteSpec structure a transcription is built from. Meant
+  /// for round-tripping: after correcting an import's mistakes
+  /// directly on the grid, export the corrected range back out to
+  /// compare against the original transcription and see exactly
+  /// where it went wrong.
+  ///
+  /// Notes sharing the exact same startTick are grouped into ONE
+  /// ImportEvent with multiple pitches (a chord) — matching how a
+  /// chord is represented on the way in. [beat] and [durationParts]
+  /// are derived directly from each note's own startTick/
+  /// durationTicks (via decomposeDurationTicks for the latter), so a
+  /// note whose duration doesn't decompose exactly into standard
+  /// values will just show whatever decomposeDurationTicks finds
+  /// (same caveat as that function's own doc).
+  List<ImportMeasure> exportMeasureRange(
+      int fromMeasureIndex,
+      int toMeasureIndex,
+      ) {
+    final result = <ImportMeasure>[];
+
+    for (int m = fromMeasureIndex; m <= toMeasureIndex; m++) {
+      if (m < 0 || m >= measures.length) continue;
+      final measure = measures[m];
+
+      // Every note starting within this measure's tick range,
+      // grouped by (startTick, hand) — notes sharing BOTH are
+      // treated as one chord event. Hand is part of the key, not
+      // just tick: a right-hand and left-hand note commonly share
+      // the exact same startTick without being a chord together at
+      // all (e.g. Measure 4/5/7/8 of the reference score, where RH
+      // and LH both start on beat 1) — grouping by tick alone would
+      // silently merge them into a single mislabeled event.
+      final notesInMeasure = notes.where(
+            (n) => n.startTick >= measure.startTick &&
+            n.startTick < measure.endTick,
+      ).toList()
+        ..sort((a, b) => a.startTick.compareTo(b.startTick));
+
+      final byStartTickAndHand = <String, List<Note>>{};
+      for (final n in notesInMeasure) {
+        final key = '${n.startTick}_${n.hand}';
+        byStartTickAndHand.putIfAbsent(key, () => []).add(n);
+      }
+
+      final events = <ImportEvent>[];
+      final sortedGroups = byStartTickAndHand.values.toList()
+        ..sort((a, b) => a.first.startTick.compareTo(b.first.startTick));
+      for (final chordNotes in sortedGroups) {
+        final tick = chordNotes.first.startTick;
+        final beat = 1 +
+            (tick - measure.startTick) / measure.timeSignature.ticksPerBeat;
+        // A chord's notes could in principle have different
+        // durations; the first note's duration is used for the
+        // whole event, matching how a chord is always specified on
+        // the way in (one shared durationParts list per event).
+        final durationParts = decomposeDurationTicks(
+          chordNotes.first.durationTicks,
+        );
+        events.add(
+          ImportEvent(
+            beat: beat,
+            durationParts: durationParts,
+            pitches: [
+              for (final n in chordNotes)
+                ImportNoteSpec(
+                  degree: getDegree(n),
+                  octave: n.row ~/ 7,
+                  accidental: n.accidental,
+                  hand: n.hand,
+                  articulation: n.articulation,
+                  legato: n.legato,
+                ),
+            ],
+          ),
+        );
+      }
+
+      result.add(
+        ImportMeasure(measureIndex: m, events: events),
+      );
+    }
+
+    return result;
+  }
+
+  /// Exports dynamic (p/f/mf/etc) and dynamic-change (crescendo/
+  /// diminuendo hairpin) markers within [fromMeasureIndex]..
+  /// [toMeasureIndex] inclusive, as readable text — the counterpart
+  /// to [exportMeasureRange], which only covers Note objects.
+  /// Dynamics and hairpins are stored entirely separately from Note
+  /// (as DynamicEvent/DynamicChangeEvent on the timeline — see
+  /// grid_widget.dart's GridPainter, which draws them independently
+  /// of any note), so they need their own export path rather than
+  /// showing up as part of a Note's own data. Pedal markers (which
+  /// share DynamicChangeEvent's storage — see the doc on
+  /// updateDynamicChangeEvent) are deliberately excluded here,
+  /// matching how they're excluded from dynamicChangeDialog's own
+  /// picker.
+  String exportDynamicsAndHairpinsText(
+      int fromMeasureIndex,
+      int toMeasureIndex,
+      ) {
+    if (fromMeasureIndex < 0 ||
+        toMeasureIndex < fromMeasureIndex ||
+        toMeasureIndex >= measures.length) {
+      return '';
+    }
+
+    final startTick = measures[fromMeasureIndex].startTick;
+    final endTick = measures[toMeasureIndex].endTick;
+
+    String describeTick(int tick) {
+      final measure = getMeasureAtTick(tick);
+      final measureIndex = measures.indexOf(measure);
+      final beat = 1 +
+          (tick - measure.startTick) / measure.timeSignature.ticksPerBeat;
+      return 'Measure ${measureIndex + 1}, beat $beat';
+    }
+
+    // (tick, text) pairs, sorted by tick before formatting — sorting
+    // the finished text lines directly would sort alphabetically
+    // ("Measure 10" before "Measure 2"), not chronologically.
+    final entries = <(int, String)>[];
+
+    for (final event in timeline.dynamicEvents) {
+      if (event.tick < startTick || event.tick >= endTick) continue;
+      entries.add((
+      event.tick,
+      '${describeTick(event.tick)}: Dynamic '
+          '${event.musical_dynamic.abbreviation}',
+      ));
+    }
+
+    for (final event in timeline.dynamicChangeEvents) {
+      if (event.tick < startTick || event.tick >= endTick) continue;
+      if (event.dynamic_change == DynamicChange.pedalDown ||
+          event.dynamic_change == DynamicChange.pedalUp) {
+        continue;
+      }
+      entries.add((
+      event.tick,
+      '${describeTick(event.tick)}: ${event.dynamic_change.name}',
+      ));
+    }
+
+    entries.sort((a, b) => a.$1.compareTo(b.$1));
+
+    return entries.isEmpty
+        ? 'No dynamics or dynamic changes in this range.'
+        : entries.map((e) => e.$2).join('\n');
+  }
+
+  List<ImportWarning> importTranscribedMeasures(
+      List<ImportMeasure> importMeasures,
+      ) {
+    final warnings = <ImportWarning>[];
+
+    for (final importMeasure in importMeasures) {
+      if (importMeasure.measureIndex < 0 ||
+          importMeasure.measureIndex >= measures.length) {
+        warnings.add(
+          ImportWarning(
+            measureIndex: importMeasure.measureIndex,
+            beat: 0,
+            message: 'Measure ${importMeasure.measureIndex + 1} '
+                "doesn't exist in this composition (only "
+                '${measures.length} measures).',
+          ),
+        );
+        continue;
+      }
+
+      final measure = measures[importMeasure.measureIndex];
+      final ticksPerBeat = measure.timeSignature.ticksPerBeat;
+
+      for (final event in importMeasure.events) {
+        if (event.pitches.isEmpty) continue; // rest — nothing to create
+
+        final wholeBeatIndex = (event.beat - 1).floor();
+        final fraction = (event.beat - 1) - wholeBeatIndex;
+        final tick = getBeatTick(importMeasure.measureIndex, wholeBeatIndex) +
+            (fraction * ticksPerBeat).round();
+        final durationTicks = event.durationTicks;
+
+        if (durationTicks <= 0) {
+          warnings.add(
+            ImportWarning(
+              measureIndex: importMeasure.measureIndex,
+              beat: event.beat,
+              message: 'No duration specified — skipped.',
+            ),
+          );
+          continue;
+        }
+
+        for (final pitch in event.pitches) {
+          final row = pitch.row;
+          if (row < 0 || row >= totalRows) {
+            warnings.add(
+              ImportWarning(
+                measureIndex: importMeasure.measureIndex,
+                beat: event.beat,
+                message: 'Degree ${pitch.degree}, octave ${pitch.octave} '
+                    'is off the grid — skipped.',
+              ),
+            );
+            continue;
+          }
+
+          final overlaps = notes.any((n) {
+            if (n.row != row) return false;
+            final existingStart = n.startTick;
+            final existingEnd = n.startTick + n.durationTicks;
+            final newStart = tick;
+            final newEnd = tick + durationTicks;
+            return newStart < existingEnd && newEnd > existingStart;
+          });
+          if (overlaps) {
+            warnings.add(
+              ImportWarning(
+                measureIndex: importMeasure.measureIndex,
+                beat: event.beat,
+                message: 'Degree ${pitch.degree}, octave ${pitch.octave} '
+                    'overlaps an existing note — skipped.',
+              ),
+            );
+            continue;
+          }
+
+          composition.notes.add(
+            Note(
+              id: generateNoteId(),
+              startTick: tick,
+              durationTicks: durationTicks,
+              row: row,
+              hand: pitch.hand,
+              accidental: pitch.accidental,
+              articulation: pitch.articulation,
+              legato: pitch.legato,
+            ),
+          );
+        }
+      }
+    }
+
+    notifyListeners();
+    return warnings;
   }
 
 
