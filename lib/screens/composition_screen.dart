@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -53,7 +55,32 @@ class _CompositionScreenState extends State<CompositionScreen>
   Duration _lastTickerElapsed = Duration.zero;
   double _playbackTick = 0;
   bool _isPlaying = false;
+
+  // Rows whose note is CURRENTLY sounding at the current playback
+  // tick (startTick <= tick < endTick) — used to highlight those
+  // rows green in the pitch column while a note is actively playing.
+  // A ValueNotifier rather than a setState()-driving field: this
+  // updates every single animation frame during playback, and a full
+  // setState() at that frequency would rebuild this whole screen 60
+  // times a second. PitchColumnWidget listens to this directly via
+  // ValueListenableBuilder instead, so only IT rebuilds each frame.
+  final ValueNotifier<Set<int>> _activeNoteRows = ValueNotifier<Set<int>>({});
   bool _pauseScheduled = false;
+
+  // How many silent "ghost beats" of lead-in scroll through before
+  // tick 0 (beat 1 of measure 1) actually reaches the pitch column,
+  // when starting fresh from the beginning — per request, using the
+  // SAME tempo/time-signature-paced scrolling as real playback (not
+  // a fixed pause), so it visibly moves at the actual first
+  // measure's speed rather than snapping or feeling arbitrary.
+  static const int _ghostLeadInBeats = 2;
+
+  // Blank scrollable space before tick 0, sized to EXACTLY match
+  // _ghostLeadInBeats worth of ticks in pixels (not a fixed screen
+  // fraction) — see GridWidget's own leadingPadding doc. Updated
+  // every build(), since it depends on pixelsPerTick (zoom-
+  // dependent) and the first measure's own ticksPerBeat.
+  double _leadingPadding = 0;
 
   void _togglePlayback() {
     if (_isPlaying) {
@@ -68,16 +95,49 @@ class _CompositionScreenState extends State<CompositionScreen>
       return;
     }
 
+    // Starting playback ("hitting the scroll icon") automatically
+    // turns on Scroll Lock and Easy Read (Compensated Notation) if
+    // they aren't already — per request. Scroll Lock being on is
+    // what makes grid taps control playback pause/resume instead of
+    // creating notes (see GridWidget's isPlaying parameter below);
+    // neither is turned back off automatically on pause — they stay
+    // on (and their icons stay red) until explicitly toggled off via
+    // their own buttons, which is what actually returns the grid to
+    // normal editing.
+    if (!controller.inputLocked) {
+      controller.toggleInputLocked();
+    }
+    if (!controller.showCompensatedNotation) {
+      controller.toggleCompensatedNotation();
+    }
+
     _playbackTicker?.stop();
     _playbackTicker?.dispose();
     _playbackTicker = null;
 
-    _playbackTick = _gridHorizontalController.hasClients
-        ? _gridHorizontalController.offset / controller.pixelsPerTick
-        : 0;
+    // Subtract leadingPadding before converting back to a tick — the
+    // scroll offset now includes that leading blank space (see
+    // _scrollTo), so the raw offset alone would overstate the tick.
+    final tickFromScroll = _gridHorizontalController.hasClients
+        ? (_gridHorizontalController.offset - _leadingPadding) /
+        controller.pixelsPerTick
+        : 0.0;
 
-    if (_playbackTick >= controller.maxTicks) {
-      _playbackTick = 0;
+    if (tickFromScroll <= 0 || tickFromScroll >= controller.maxTicks) {
+      // Starting fresh from the very beginning (or resuming from
+      // past the end, which _startPlayback already treated as "start
+      // over") — begin at a NEGATIVE tick representing
+      // _ghostLeadInBeats worth of silent lead-in, using measure 1's
+      // own ticksPerBeat. _onPlaybackTick's normal per-frame
+      // tempo-paced advancement (see below) carries this smoothly up
+      // to and through tick 0, so the whole lead-in scrolls at the
+      // ACTUAL first-measure speed — no separate pause/jump needed.
+      final firstMeasure = controller.measures.first;
+      _playbackTick =
+      -(_ghostLeadInBeats * firstMeasure.timeSignature.ticksPerBeat)
+          .toDouble();
+    } else {
+      _playbackTick = tickFromScroll;
     }
 
     _lastTickerElapsed = Duration.zero;
@@ -89,6 +149,7 @@ class _CompositionScreenState extends State<CompositionScreen>
     _playbackTicker?.stop();
     _playbackTicker?.dispose();
     _playbackTicker = null;
+    _activeNoteRows.value = {};
     if (mounted) {
       setState(() => _isPlaying = false);
     }
@@ -132,6 +193,22 @@ class _CompositionScreenState extends State<CompositionScreen>
       }
     }
 
+    // Which rows currently have a note actively sounding (startTick
+    // <= current tick < endTick) — highlighted green in the pitch
+    // column (see PitchColumnWidget). Computed every frame regardless
+    // of soundEnabled, since this is a visual indicator independent
+    // of whether sound itself is on.
+    final currentTickForHighlight = _playbackTick.floor();
+    final newActiveRows = <int>{};
+    for (final entry in controller.displayNotes) {
+      final n = entry.note;
+      if (n.startTick <= currentTickForHighlight &&
+          currentTickForHighlight < n.endTick) {
+        newActiveRows.add(n.row);
+      }
+    }
+    _activeNoteRows.value = newActiveRows;
+
     if (_playbackTick >= controller.maxTicks) {
       _playbackTick = controller.maxTicks.toDouble();
       _scrollTo(_playbackTick);
@@ -142,20 +219,40 @@ class _CompositionScreenState extends State<CompositionScreen>
     _scrollTo(_playbackTick);
   }
 
+  /// Whether the grid is CURRENTLY scrolled back to (or before) the
+  /// very beginning — beat 1 of measure 1 at the pitch column, or
+  /// still within the ghost lead-in padding before it. Used by the
+  /// Play/Pause icon's color (see build()): red only applies to an
+  /// actual mid-piece pause, not to sitting at the start.
+  bool get _isAtBeginning {
+    if (!_gridHorizontalController.hasClients) return true;
+    return _gridHorizontalController.offset <= _leadingPadding + 1;
+  }
+
   void _scrollTo(double tick) {
     if (!_gridHorizontalController.hasClients) return;
-    final offset = tick * controller.pixelsPerTick;
+    final offset = _leadingPadding + tick * controller.pixelsPerTick;
     final maxScroll = _gridHorizontalController.position.maxScrollExtent;
     _gridHorizontalController.jumpTo(offset.clamp(0.0, maxScroll));
   }
 
-  void _scrollToStart() {
+  Future<void> _scrollToStart() async {
     if (!_gridHorizontalController.hasClients) return;
-    _gridHorizontalController.animateTo(
-      0,
+    // Targets _leadingPadding (beat 1 at the pitch column), not 0
+    // (which would show the blank leading padding itself) — this
+    // button is for normal navigation/editing, not the pre-playback
+    // "runway" moment (see _startPlayback for that).
+    await _gridHorizontalController.animateTo(
+      _leadingPadding,
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOut,
     );
+    // Without this, the Play/Pause icon's color (which depends on
+    // _isAtBeginning, itself computed from the scroll controller's
+    // own offset) wouldn't actually refresh until some unrelated
+    // rebuild happened to occur — animateTo alone doesn't trigger a
+    // setState() in this widget.
+    if (mounted) setState(() {});
   }
 
   /// Locks the device's own physical screen orientation to whichever
@@ -202,6 +299,7 @@ class _CompositionScreenState extends State<CompositionScreen>
     _pitchVerticalController.dispose();
     _gridHorizontalController.dispose();
     _playbackTicker?.dispose();
+    _activeNoteRows.dispose();
     // Safety net: release any orientation lock left on by Rotate
     // Pitch Text (see _setOrientationLocked) — leaving this screen
     // shouldn't leave the rest of the app stuck unable to rotate.
@@ -347,11 +445,24 @@ class _CompositionScreenState extends State<CompositionScreen>
 
           final cellHeight = controller.getCellHeight(context);
 
+          // Sized to EXACTLY match _ghostLeadInBeats worth of ticks
+          // in pixels — not an arbitrary screen fraction — so the
+          // blank scrollable space here lines up precisely with
+          // where _startPlayback's negative-tick lead-in actually
+          // starts scrolling from. hasMeasures guards against
+          // controller.measures.first throwing on an empty
+          // composition.
+          _leadingPadding = hasMeasures
+              ? _ghostLeadInBeats *
+              controller.measures.first.timeSignature.ticksPerBeat *
+              controller.pixelsPerTick
+              : 0;
+
           return Row(
             children: [
 
               Container(
-                width: 45,
+                width: 46,
                 color: Colors.grey.shade300,
                 child: Column(
                   children: [
@@ -361,7 +472,8 @@ class _CompositionScreenState extends State<CompositionScreen>
                         iconButtonTheme: IconButtonThemeData(
                           style: IconButton.styleFrom(
                             padding: EdgeInsets.zero,
-                            minimumSize: const Size(36, 36),
+                            minimumSize: const Size(44, 44),
+                            iconSize: 28,
                             visualDensity: VisualDensity.compact,
                           ),
                         ),
@@ -375,9 +487,12 @@ class _CompositionScreenState extends State<CompositionScreen>
 
                           // HOME
                           IconButton(
-                            icon: const Icon(
-                              Icons.arrow_back,
-                              color: Colors.black,
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: const Icon(
+                                Icons.arrow_back,
+                                color: Colors.black,
+                              ),
                             ),
                             tooltip: 'Home',
                             onPressed: () {
@@ -390,13 +505,16 @@ class _CompositionScreenState extends State<CompositionScreen>
 
                           // GRID DARK MODE
                           IconButton(
-                            icon: Icon(
-                              controller.isDarkMode
-                                  ? Icons.dark_mode
-                                  : Icons.light_mode,
-                              color: controller.isDarkMode
-                                  ? Colors.blue
-                                  : Colors.black,
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: Icon(
+                                controller.isDarkMode
+                                    ? Icons.dark_mode
+                                    : Icons.light_mode,
+                                color: controller.isDarkMode
+                                    ? Colors.blue
+                                    : Colors.black,
+                              ),
                             ),
                             tooltip: controller.isDarkMode
                                 ? 'Grid Dark Mode: On'
@@ -406,9 +524,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
-                                    controller.isDarkMode
-                                        ? 'Grid dark mode is on.'
-                                        : 'Grid dark mode is off.',
+                                    controller.isDarkMode ? 'Dark mode on.' : 'Dark mode off.',
                                     style: const TextStyle(fontSize: 22),
                                   ),
                                 ),
@@ -418,12 +534,15 @@ class _CompositionScreenState extends State<CompositionScreen>
 
                           // GRID FONT SIZE
                           IconButton(
-                            icon: Icon(
-                              Icons.format_size,
-                              color: controller.gridFontSize ==
-                                  DefaultValues.gridFontSizeLarge
-                                  ? Colors.blue
-                                  : Colors.black,
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: Icon(
+                                Icons.format_size,
+                                color: controller.gridFontSize ==
+                                    DefaultValues.gridFontSizeLarge
+                                    ? Colors.blue
+                                    : Colors.black,
+                              ),
                             ),
                             tooltip: controller.gridFontSize ==
                                 DefaultValues.gridFontSizeLarge
@@ -436,9 +555,39 @@ class _CompositionScreenState extends State<CompositionScreen>
                                   content: Text(
                                     controller.gridFontSize ==
                                         DefaultValues.gridFontSizeLarge
-                                        ? 'Grid labels are now larger.'
-                                        : 'Grid labels are back to '
-                                        'normal size.',
+                                        ? 'Labels larger.'
+                                        : 'Labels normal.',
+                                    style: const TextStyle(fontSize: 22),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+
+                          // SCROLL LOCK — moved here from the main
+                          // toolbar, per request, right after Grid
+                          // Font Size.
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: Icon(
+                                controller.inputLocked
+                                    ? Icons.lock
+                                    : Icons.lock_open,
+                                color: controller.inputLocked
+                                    ? Colors.red
+                                    : Colors.black,
+                              ),
+                            ),
+                            tooltip: controller.inputLocked
+                                ? 'Scroll Lock: On'
+                                : 'Scroll Lock: Off',
+                            onPressed: () {
+                              controller.toggleInputLocked();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    controller.inputLocked ? 'Lock on.' : 'Lock off.',
                                     style: const TextStyle(fontSize: 22),
                                   ),
                                 ),
@@ -474,8 +623,11 @@ class _CompositionScreenState extends State<CompositionScreen>
 
                     // GRID SIZE
                     IconButton(
-                      icon: const Icon(Icons.grid_on,
-                        color: Colors.black,
+                      icon: Transform.rotate(
+                        angle: controller.rotatePitchText ? -pi / 2 : 0,
+                        child: const Icon(Icons.grid_on,
+                          color: Colors.black,
+                        ),
                       ),
                       tooltip: 'Cell Width',
                       onPressed: () {
@@ -488,9 +640,12 @@ class _CompositionScreenState extends State<CompositionScreen>
 
                     // ZOOM IN
                     IconButton(
-                      icon: const Icon(
-                        Icons.zoom_in,
-                        color: Colors.black,
+                      icon: Transform.rotate(
+                        angle: controller.rotatePitchText ? -pi / 2 : 0,
+                        child: const Icon(
+                          Icons.zoom_in,
+                          color: Colors.black,
+                        ),
                       ),
                       tooltip: 'Zoom In',
                       onPressed: () {
@@ -503,9 +658,12 @@ class _CompositionScreenState extends State<CompositionScreen>
 
                     // ZOOM OUT
                     IconButton(
-                      icon: const Icon(
-                        Icons.zoom_out,
-                        color: Colors.black,
+                      icon: Transform.rotate(
+                        angle: controller.rotatePitchText ? -pi / 2 : 0,
+                        child: const Icon(
+                          Icons.zoom_out,
+                          color: Colors.black,
+                        ),
                       ),
                       tooltip: 'Zoom Out',
                       onPressed: () {
@@ -518,9 +676,12 @@ class _CompositionScreenState extends State<CompositionScreen>
 
                     // RESET
                     IconButton(
-                      icon: const Icon(
-                        Icons.center_focus_strong,
-                        color: Colors.black,
+                      icon: Transform.rotate(
+                        angle: controller.rotatePitchText ? -pi / 2 : 0,
+                        child: const Icon(
+                          Icons.center_focus_strong,
+                          color: Colors.black,
+                        ),
                       ),
                       tooltip: 'Reset Zoom',
                       onPressed:
@@ -538,8 +699,11 @@ class _CompositionScreenState extends State<CompositionScreen>
 
                     // SAVE
                     IconButton(
-                      icon: const Icon(Icons.save,
-                        color: Colors.black,
+                      icon: Transform.rotate(
+                        angle: controller.rotatePitchText ? -pi / 2 : 0,
+                        child: const Icon(Icons.save,
+                          color: Colors.black,
+                        ),
                       ),
                       tooltip: 'Save Composition',
                       onPressed: () {
@@ -549,8 +713,11 @@ class _CompositionScreenState extends State<CompositionScreen>
 
                     // NEW COMPOSITION
                     IconButton(
-                      icon: const Icon(Icons.library_add,
-                        color: Colors.black,
+                      icon: Transform.rotate(
+                        angle: controller.rotatePitchText ? -pi / 2 : 0,
+                        child: const Icon(Icons.library_add,
+                          color: Colors.black,
+                        ),
                       ),
                       tooltip: 'New Composition',
                       onPressed: () {
@@ -560,8 +727,11 @@ class _CompositionScreenState extends State<CompositionScreen>
 
                     // ADD MEASURES
                     IconButton(
-                      icon: const Icon(Icons.copy,
-                        color: Colors.black,
+                      icon: Transform.rotate(
+                        angle: controller.rotatePitchText ? -pi / 2 : 0,
+                        child: const Icon(Icons.copy,
+                          color: Colors.black,
+                        ),
                       ),
                       tooltip: 'Add Measures',
                       onPressed: () {
@@ -569,16 +739,18 @@ class _CompositionScreenState extends State<CompositionScreen>
                       },
                     ),
 
-                    SizedBox(
-                      height: 20,
-                    ),
-
                     // HAND
                     IconButton(
-                      icon: Icon(Icons.pan_tool,
-                        color:  controller.currentHand == Hand.right
-                            ? Colors.black
-                            : Colors.blue,
+                      // Rotated the same way as every other toolbar
+                      // icon now, matching request — my earlier
+                      // exclusion of this one was wrong.
+                      icon: Transform.rotate(
+                        angle: controller.rotatePitchText ? -pi / 2 : 0,
+                        child: Icon(Icons.pan_tool,
+                          color:  controller.currentHand == Hand.right
+                              ? Colors.black
+                              : Colors.blue,
+                        ),
                       ),
                       tooltip: 'Hand',
                       onPressed: () {
@@ -586,9 +758,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              controller.currentHand == Hand.right
-                                  ? 'The right hand is set.'
-                                  : 'The left hand is set.',
+                              controller.currentHand == Hand.right ? 'Right hand.' : 'Left hand.',
                               style: const TextStyle(fontSize: 22),
                             ),
                           ),
@@ -599,8 +769,11 @@ class _CompositionScreenState extends State<CompositionScreen>
 
                     // DURATION
                     IconButton(
-                      icon: const Icon(Icons.av_timer,
-                        color: Colors.black,
+                      icon: Transform.rotate(
+                        angle: controller.rotatePitchText ? -pi / 2 : 0,
+                        child: const Icon(Icons.av_timer,
+                          color: Colors.black,
+                        ),
                       ),
                       tooltip: 'Note Duration',
                       onPressed: () {
@@ -612,11 +785,14 @@ class _CompositionScreenState extends State<CompositionScreen>
                     ),
 
                     IconButton(
-                      icon: Icon(
-                        Icons.grain,
-                        color: controller.isAddingGraceNotes
-                            ? Colors.blue
-                            : Colors.black,
+                      icon: Transform.rotate(
+                        angle: controller.rotatePitchText ? -pi / 2 : 0,
+                        child: Icon(
+                          Icons.grain,
+                          color: controller.isAddingGraceNotes
+                              ? Colors.blue
+                              : Colors.black,
+                        ),
                       ),
                       tooltip: controller.isAddingGraceNotes
                           ? 'Add Grace Note Mode: On'
@@ -627,10 +803,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              wasOn
-                                  ? 'Add Grace Note mode is off.'
-                                  : 'To add grace notes, tap the '
-                                  'note and choose Grace Notes.',
+                              wasOn ? 'Grace note off.' : 'Tap a note to add.',
                               style: const TextStyle(fontSize: 22),
                             ),
                           ),
@@ -639,11 +812,14 @@ class _CompositionScreenState extends State<CompositionScreen>
                     ),
 
                     IconButton(
-                      icon: Icon(
-                        Icons.airline_stops_outlined,
-                        color: controller.legatoMode
-                            ? Colors.red
-                            : Colors.black,
+                      icon: Transform.rotate(
+                        angle: controller.rotatePitchText ? -pi / 2 : 0,
+                        child: Icon(
+                          Icons.airline_stops_outlined,
+                          color: controller.legatoMode
+                              ? Colors.red
+                              : Colors.black,
+                        ),
                       ),
                       tooltip: controller.legatoMode
                           ? 'Legato Mode: On'
@@ -653,10 +829,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              controller.legatoMode
-                                  ? 'Legato mode is on. Tap notes '
-                                  'to mark them as played legato.'
-                                  : 'Legato mode is off.',
+                              controller.legatoMode ? 'Legato on.' : 'Legato off.',
                               style: const TextStyle(fontSize: 22),
                             ),
                           ),
@@ -665,11 +838,14 @@ class _CompositionScreenState extends State<CompositionScreen>
                     ),
 
                     IconButton(
-                      icon: Icon(
-                        Icons.open_in_full_sharp,
-                        color: controller.highlightAccidentalNotes
-                            ? Colors.green
-                            : Colors.black,
+                      icon: Transform.rotate(
+                        angle: controller.rotatePitchText ? -pi / 2 : 0,
+                        child: Icon(
+                          Icons.open_in_full_sharp,
+                          color: controller.highlightAccidentalNotes
+                              ? Colors.green
+                              : Colors.black,
+                        ),
                       ),
                       tooltip: controller.highlightAccidentalNotes
                           ? 'Highlight Accidental Notes: On'
@@ -679,11 +855,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              controller.highlightAccidentalNotes
-                                  ? 'Notes which do not belong to '
-                                  'the scale are highlighted in '
-                                  'green.'
-                                  : 'Highlight mode is off.',
+                              controller.highlightAccidentalNotes ? 'Highlight on.' : 'Highlight off.',
                               style: const TextStyle(fontSize: 22),
                             ),
                           ),
@@ -693,11 +865,14 @@ class _CompositionScreenState extends State<CompositionScreen>
 
 
                     IconButton(
-                      icon: Icon(
-                        Icons.touch_app,
-                        color: controller.hideFingerNumbers
-                            ? Colors.red
-                            : Colors.black,
+                      icon: Transform.rotate(
+                        angle: controller.rotatePitchText ? -pi / 2 : 0,
+                        child: Icon(
+                          Icons.touch_app,
+                          color: controller.hideFingerNumbers
+                              ? Colors.red
+                              : Colors.black,
+                        ),
                       ),
                       tooltip: controller.hideFingerNumbers
                           ? 'Hide Finger Numbers: On'
@@ -707,9 +882,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              controller.hideFingerNumbers
-                                  ? 'Fingers are hidden.'
-                                  : 'Fingers are visible.',
+                              controller.hideFingerNumbers ? 'Fingers hidden.' : 'Fingers visible.',
                               style: const TextStyle(fontSize: 22),
                             ),
                           ),
@@ -721,10 +894,13 @@ class _CompositionScreenState extends State<CompositionScreen>
                     // PASTE
                     if (controller.canPaste)
                       IconButton(
-                        icon: Icon(Icons.control_point_duplicate,
-                          color: controller.pasteMode
-                              ? Colors.blue
-                              : Colors.black,
+                        icon: Transform.rotate(
+                          angle: controller.rotatePitchText ? -pi / 2 : 0,
+                          child: Icon(Icons.control_point_duplicate,
+                            color: controller.pasteMode
+                                ? Colors.blue
+                                : Colors.black,
+                          ),
                         ),
                         tooltip: 'Paste',
                         onPressed: () {
@@ -748,72 +924,17 @@ class _CompositionScreenState extends State<CompositionScreen>
                         },
                       ),
 
-                    SizedBox(
-                      height: 20,
-                    ),
-
                     IconButton(
-                      icon: Icon(
-                        controller.inputLocked
-                            ? Icons.lock
-                            : Icons.lock_open,
-                        color: controller.inputLocked
-                            ? Colors.blue
-                            : Colors.black,
-                      ),
-                      tooltip: controller.inputLocked
-                          ? 'Scroll Lock: On'
-                          : 'Scroll Lock: Off',
-                      onPressed: () {
-                        controller.toggleInputLocked();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              controller.inputLocked
-                                  ? 'Lock mode is on, no input is '
-                                  'possible. To be able to edit, '
-                                  'the button must be toggled.'
-                                  : 'Lock mode is off.',
-                              style: const TextStyle(fontSize: 22),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-
-
-                    IconButton(
-                      icon: Icon(Icons.auto_fix_high,
-                        color: controller.showCompensatedNotation
-                            ? Colors.blue
-                            : Colors.black,
-                      ),
-                      tooltip: controller.showCompensatedNotation
-                          ? 'Compensated Notation: On'
-                          : 'Compensated Notation: Off',
-                      onPressed: () {
-                        controller.toggleCompensatedNotation();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              controller.showCompensatedNotation
-                                  ? 'Easy Read mode is on and no '
-                                  'edit is possible. To return to '
-                                  'normal, the button must be '
-                                  'toggled.'
-                                  : 'Easy Read mode is off.',
-                              style: const TextStyle(fontSize: 22),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-
-                    IconButton(
-                      icon: Icon(Icons.rotate_left,
-                        color: controller.rotatePitchText
-                            ? Colors.blue
-                            : Colors.black,
+                      // Icon itself rotated 180° while the mode is
+                      // on, per request, so the button visually
+                      // matches the rotated state it represents.
+                      icon: Transform.rotate(
+                        angle: controller.rotatePitchText ? -pi / 2 : 0,
+                        child: Icon(Icons.rotate_left,
+                          color: controller.rotatePitchText
+                              ? Colors.blue
+                              : Colors.black,
+                        ),
                       ),
                       tooltip: controller.rotatePitchText
                           ? 'Rotate Pitch Text: On'
@@ -824,18 +945,35 @@ class _CompositionScreenState extends State<CompositionScreen>
                           context,
                           controller.rotatePitchText,
                         );
+                      },
+                    ),
+
+                    IconButton(
+                      icon: Transform.rotate(
+                        angle: controller.rotatePitchText ? -pi / 2 : 0,
+                        child: Icon(Icons.auto_fix_high,
+                          color: controller.showCompensatedNotation
+                              ? Colors.red
+                              : Colors.black,
+                        ),
+                      ),
+                      tooltip: controller.showCompensatedNotation
+                          ? 'Compensated Notation: On'
+                          : 'Compensated Notation: Off',
+                      onPressed: () {
+                        controller.toggleCompensatedNotation();
+                        // Keep Scroll Lock in sync with Easy Read
+                        // Mode, per request — turning Easy Read on
+                        // turns Scroll Lock on too, and turning Easy
+                        // Read off turns Scroll Lock off too.
+                        if (controller.showCompensatedNotation !=
+                            controller.inputLocked) {
+                          controller.toggleInputLocked();
+                        }
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              controller.rotatePitchText
-                                  ? 'The grid is rotated for '
-                                  'piano reading. Easy Read '
-                                  'mode and Scroll Lock are '
-                                  'now on too.'
-                                  : 'The grid is rotated for '
-                                  'notation reading. Easy Read '
-                                  'mode and Scroll Lock are '
-                                  'now off too.',
+                              controller.showCompensatedNotation ? 'Easy Read on.' : 'Easy Read off.',
                               style: const TextStyle(fontSize: 22),
                             ),
                           ),
@@ -845,41 +983,51 @@ class _CompositionScreenState extends State<CompositionScreen>
 
 
                     IconButton(
-                      icon: Icon(
-                        _isPlaying ? Icons.pause : Icons.play_arrow,
-                        color: _isPlaying ? Colors.blue : Colors.black,
+                      icon: Transform.rotate(
+                        angle: controller.rotatePitchText ? -pi / 2 : 0,
+                        child: Icon(
+                          _isPlaying ? Icons.pause : Icons.play_arrow,
+                          // Pause icon (shown while scrolling) is
+                          // always red. Play icon (shown while paused)
+                          // is red only for an actual mid-piece pause
+                          // with Lock Mode on — black if back at the
+                          // beginning, or Lock Mode is off.
+                          color: _isPlaying
+                              ? Colors.red
+                              : ((!_isAtBeginning && controller.inputLocked)
+                              ? Colors.red
+                              : Colors.black),
+                        ),
                       ),
                       tooltip: _isPlaying ? 'Pause' : 'Play',
                       onPressed: hasMeasures ? _togglePlayback : null,
                     ),
 
                     IconButton(
-                      icon: const Icon(
-                        Icons.first_page,
-                        color: Colors.black,
+                      icon: Transform.rotate(
+                        angle: controller.rotatePitchText ? -pi / 2 : 0,
+                        child: const Icon(
+                          Icons.first_page,
+                          color: Colors.black,
+                        ),
                       ),
                       tooltip: 'Scroll to Start',
                       onPressed: hasMeasures
                           ? () {
                         _scrollToStart();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Scrolled to the beginning.',
-                              style: TextStyle(fontSize: 22),
-                            ),
-                          ),
-                        );
                       }
                           : null,
                     ),
 
                     IconButton(
-                      icon: Icon(
-                        controller.soundEnabled
-                            ? Icons.volume_up
-                            : Icons.volume_off,
-                        color: Colors.black,
+                      icon: Transform.rotate(
+                        angle: controller.rotatePitchText ? -pi / 2 : 0,
+                        child: Icon(
+                          controller.soundEnabled
+                              ? Icons.volume_up
+                              : Icons.volume_off,
+                          color: Colors.black,
+                        ),
                       ),
                       tooltip: controller.soundEnabled
                           ? 'Sound On'
@@ -889,9 +1037,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              controller.soundEnabled
-                                  ? 'The sound is on.'
-                                  : 'The sound is off.',
+                              controller.soundEnabled ? 'Sound on.' : 'Sound off.',
                               style: const TextStyle(fontSize: 22),
                             ),
                           ),
@@ -899,14 +1045,13 @@ class _CompositionScreenState extends State<CompositionScreen>
                       },
                     ),
 
-                    SizedBox(
-                      height: 20,
-                    ),
-
                     // RAISE SCALE
                     IconButton(
-                      icon: const Icon(Icons.arrow_upward,
-                        color: Colors.black,
+                      icon: Transform.rotate(
+                        angle: controller.rotatePitchText ? -pi / 2 : 0,
+                        child: const Icon(Icons.arrow_upward,
+                          color: Colors.black,
+                        ),
                       ),
                       tooltip: 'Raise scales',
                       onPressed: () {
@@ -914,7 +1059,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                              'The composition is raised a semitone.',
+                              'Raised a semitone.',
                               style: TextStyle(fontSize: 22),
                             ),
                           ),
@@ -925,8 +1070,11 @@ class _CompositionScreenState extends State<CompositionScreen>
 
                     // RESET SCALE
                     IconButton(
-                      icon: const Icon(Icons.adjust,
-                        color: Colors.black,
+                      icon: Transform.rotate(
+                        angle: controller.rotatePitchText ? -pi / 2 : 0,
+                        child: const Icon(Icons.adjust,
+                          color: Colors.black,
+                        ),
                       ),
                       tooltip: 'Reset scales',
                       onPressed: () {
@@ -934,7 +1082,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                              'The initial scale is set back.',
+                              'Scale reset.',
                               style: TextStyle(fontSize: 22),
                             ),
                           ),
@@ -945,8 +1093,11 @@ class _CompositionScreenState extends State<CompositionScreen>
 
                     // LOWER SCALE
                     IconButton(
-                      icon: const Icon(Icons.arrow_downward,
-                        color: Colors.black,
+                      icon: Transform.rotate(
+                        angle: controller.rotatePitchText ? -pi / 2 : 0,
+                        child: const Icon(Icons.arrow_downward,
+                          color: Colors.black,
+                        ),
                       ),
                       tooltip: 'Lower scales',
                       onPressed: () {
@@ -954,7 +1105,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                              'The composition is lowered a semitone.',
+                              'Lowered a semitone.',
                               style: TextStyle(fontSize: 22),
                             ),
                           ),
@@ -963,14 +1114,13 @@ class _CompositionScreenState extends State<CompositionScreen>
                     ),
 
 
-                    SizedBox(
-                      height: 20,
-                    ),
-
                     IconButton(
-                      icon: const Icon(
-                        Icons.file_upload,
-                        color: Colors.black,
+                      icon: Transform.rotate(
+                        angle: controller.rotatePitchText ? -pi / 2 : 0,
+                        child: const Icon(
+                          Icons.file_upload,
+                          color: Colors.black,
+                        ),
                       ),
                       tooltip: 'Export Measures as Text',
                       onPressed: () {
@@ -1037,9 +1187,12 @@ class _CompositionScreenState extends State<CompositionScreen>
 
 
                     IconButton(
-                      icon: const Icon(
-                        Icons.file_download,
-                        color: Colors.black,
+                      icon: Transform.rotate(
+                        angle: controller.rotatePitchText ? -pi / 2 : 0,
+                        child: const Icon(
+                          Icons.file_download,
+                          color: Colors.black,
+                        ),
                       ),
                       tooltip: 'Import Transcription',
                       onPressed: () {
@@ -1105,7 +1258,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                                                       .showSnackBar(
                                                     SnackBar(
                                                       content: Text(
-                                                        '"${batch.label}" can be imported again.',
+                                                        'Can re-import.',
                                                         style: const TextStyle(
                                                             fontSize: 22),
                                                       ),
@@ -1222,15 +1375,15 @@ class _CompositionScreenState extends State<CompositionScreen>
                       iconButtonTheme: IconButtonThemeData(
                         style: IconButton.styleFrom(
                           padding: const EdgeInsets.all(4),
-                          minimumSize: const Size(36, 36),
-                          iconSize: 22,
+                          minimumSize: const Size(44, 44),
+                          iconSize: 28,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           visualDensity: VisualDensity.compact,
                         ),
                       ),
                     ),
                     child: Container(
-                      width: 40,
+                      width: 46,
                       height: double.infinity,
                       color: Colors.grey.shade300,
                       child: LayoutBuilder(
@@ -1261,6 +1414,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                   controller: controller,
                   cellHeight: cellHeight,
                   scrollController: _pitchVerticalController,
+                  activeNoteRows: _activeNoteRows,
                 ),
               ),
 
@@ -1273,9 +1427,12 @@ class _CompositionScreenState extends State<CompositionScreen>
                       backgroundColor: Colors.grey.shade300,
                       foregroundColor: Colors.black,
                     ),
-                    icon: const Icon(
-                      Icons.copy,
-                      size: 22,
+                    icon: Transform.rotate(
+                      angle: controller.rotatePitchText ? -pi / 2 : 0,
+                      child: const Icon(
+                        Icons.copy,
+                        size: 22,
+                      ),
                     ),
                     label: const Text(
                       'Add Measures',
@@ -1316,6 +1473,17 @@ class _CompositionScreenState extends State<CompositionScreen>
                       cellHeight: cellHeight,
                       verticalScrollController: _gridVerticalController,
                       horizontalScrollController: _gridHorizontalController,
+                      leadingPadding: _leadingPadding,
+                      // Scroll Lock is what controls this now — on
+                      // means grid taps pause/resume playback
+                      // instead of creating/editing notes; off means
+                      // normal editing. Starting playback
+                      // automatically turns Scroll Lock on (see
+                      // _startPlayback); it stays on across a pause
+                      // (so a second tap resumes) until explicitly
+                      // turned off via its own button.
+                      isPlaying: controller.inputLocked,
+                      onTapWhilePlaying: _togglePlayback,
                     ),
                   ),
                 ),

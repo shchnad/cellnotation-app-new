@@ -343,11 +343,38 @@ int tempoEventFallbackTick(CompositionController controller, int tick) {
   return exists != null ? tick : controller.timeline.tempoEvents.first.tick;
 }
 
+/// Converts a tapped/dragged Y position's visual row index (0 = the
+/// very top row on screen) into the actual logical row number — row
+/// 0 (lowest pitch) is always at the BOTTOM, so this always flips.
+/// Does NOT change with Rotate Pitch Text (that toggle only rotates
+/// the pitch digit itself, not the grid's own row layout).
+int visualRowToLogicalRow(CompositionController controller, int visualRow) {
+  return controller.totalRows - 1 - visualRow;
+}
+
 class GridWidget extends StatelessWidget {
   final CompositionController controller;
   final double cellHeight;
   final ScrollController? verticalScrollController;
   final ScrollController? horizontalScrollController;
+  // Blank SCROLLABLE space added before tick 0's content — lets the
+  // grid rest with beat 1 of measure 1 sitting in the middle of the
+  // viewport (rather than jammed against the pitch column) before
+  // playback starts. This is purely a scroll-view-level padding
+  // concept — it does NOT change any tick-to-pixel math elsewhere in
+  // this file (GridPainter, note positioning), so nothing else needs
+  // to know about it. CompositionScreen's own _scrollTo (which
+  // drives playback's auto-scroll) adds this SAME amount to its
+  // offset formula, keeping the two in sync.
+  final double leadingPadding;
+  // Whether playback is currently active, and what to call if the
+  // grid is tapped while it is — per request, tapping anywhere on
+  // the grid during playback pauses it (tapping again resumes from
+  // that same spot via the normal Play button/_togglePlayback logic
+  // in CompositionScreen), INSTEAD of the tap's normal note-creation/
+  // editing behavior.
+  final bool isPlaying;
+  final VoidCallback? onTapWhilePlaying;
 
   const GridWidget({
     super.key,
@@ -355,6 +382,9 @@ class GridWidget extends StatelessWidget {
     required this.cellHeight,
     this.verticalScrollController,
     this.horizontalScrollController,
+    this.leadingPadding = 0,
+    this.isPlaying = false,
+    this.onTapWhilePlaying,
   });
 
 
@@ -373,6 +403,7 @@ class GridWidget extends StatelessWidget {
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             controller: horizontalScrollController,
+            padding: EdgeInsets.only(left: leadingPadding),
             child: SizedBox(
               width: gridWidth,
               height: gridHeight,
@@ -397,6 +428,17 @@ class GridWidget extends StatelessWidget {
                       // sits on top in the Stack and captures the touch
                       // before it ever reaches this background detector.
                       onTapUp: (details) {
+                        // While playback is active, ANY tap on the
+                        // grid pauses it instead of doing its normal
+                        // note-creation/editing thing — tapping again
+                        // later resumes from that same spot via the
+                        // ordinary Play button logic, since pausing
+                        // (unlike stopping) never resets the playback
+                        // position.
+                        if (isPlaying) {
+                          onTapWhilePlaying?.call();
+                          return;
+                        }
                         if (controller.editingBlocked) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -422,7 +464,7 @@ class GridWidget extends StatelessWidget {
                         if (controller.isPickingGlissandoEndRow) {
                           final visualRow =
                           (details.localPosition.dy / cellHeight).floor();
-                          final row = controller.totalRows - 1 - visualRow;
+                          final row = visualRowToLogicalRow(controller, visualRow);
                           final errorMessage =
                           controller.finishGlissandoPick(row);
                           if (errorMessage != null) {
@@ -456,7 +498,7 @@ class GridWidget extends StatelessWidget {
                         if (controller.isAddingGraceNotes) {
                           final visualRow =
                           (details.localPosition.dy / cellHeight).floor();
-                          final row = controller.totalRows - 1 - visualRow;
+                          final row = visualRowToLogicalRow(controller, visualRow);
                           final errorMessage =
                           controller.addGraceNoteAtRow(row);
                           if (errorMessage != null) {
@@ -556,7 +598,7 @@ class GridWidget extends StatelessWidget {
                         // number.
                         final visualRow =
                         (details.localPosition.dy / cellHeight).floor();
-                        final row = controller.totalRows - 1 - visualRow;
+                        final row = visualRowToLogicalRow(controller, visualRow);
 
                         final rawTick =
                         (details.localPosition.dx / pixelsPerTick).floor();
@@ -667,6 +709,8 @@ class GridWidget extends StatelessWidget {
                       isClickable: entry.isClickable,
                       interactionNote: entry.interactionNote,
                       ornamentShift: entry.shift,
+                      isPlaying: isPlaying,
+                      onTapWhilePlaying: onTapWhilePlaying,
                     ),
                   ),
                 ],

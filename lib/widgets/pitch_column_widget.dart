@@ -19,6 +19,16 @@ class PitchColumnWidget extends StatelessWidget {
   final double cellHeight;
   final ScrollController scrollController;
 
+  /// Rows whose note is currently sounding during playback — those
+  /// rows highlight green.shade300 while active, reverting the
+  /// instant the note's endTick is reached (see CompositionScreen's
+  /// _onPlaybackTick, which owns and updates this every frame). A
+  /// ValueNotifier rather than a plain Set so this column can rebuild
+  /// on its own via ValueListenableBuilder below WITHOUT the rest of
+  /// the screen needing a full setState() at animation-frame
+  /// frequency during playback.
+  final ValueNotifier<Set<int>> activeNoteRows;
+
   static const double widthOfPitchColumn = 25;
 
   const PitchColumnWidget({
@@ -26,6 +36,7 @@ class PitchColumnWidget extends StatelessWidget {
     required this.controller,
     required this.cellHeight,
     required this.scrollController,
+    required this.activeNoteRows,
   });
 
   @override
@@ -48,42 +59,57 @@ class PitchColumnWidget extends StatelessWidget {
           child: SingleChildScrollView(
             controller: scrollController,
             physics: const NeverScrollableScrollPhysics(),
-            child: Column(
-              children:
-              List.generate(totalRows, (index) {
-                final row = totalRows - 1 - index;
-                // No measure argument passed — defaults to
-                // controller.currentMeasure, i.e. the scale of
-                // whichever measure was most recently tapped/selected
-                // on the grid (see CompositionController.
-                // selectMeasureAtTick).
-                final pitch = controller.getPitchNameForRow(row);
-                return Container(
-                  height: cellHeight,
-                  // alignment: Alignment.centerLeft,
-                  decoration: BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(
-                        color: Colors.grey.shade400,
-                        width: 0.5,
+            child: ValueListenableBuilder<Set<int>>(
+              valueListenable: activeNoteRows,
+              builder: (context, activeRows, _) {
+                return Column(
+                  children:
+                  List.generate(totalRows, (index) {
+                    // Index 0 (top of the visible list) always shows
+                    // the HIGHEST row, matching the grid's own "row 0
+                    // = bottom" convention. Does NOT change with
+                    // Rotate Pitch Text (that toggle only rotates the
+                    // pitch digit itself — see the RotatedBox below —
+                    // not the column's own row layout).
+                    final row = totalRows - 1 - index;
+                    // No measure argument passed — defaults to
+                    // controller.currentMeasure, i.e. the scale of
+                    // whichever measure was most recently tapped/
+                    // selected on the grid (see CompositionController.
+                    // selectMeasureAtTick).
+                    final pitch = controller.getPitchNameForRow(row);
+                    final isActive = activeRows.contains(row);
+                    return Container(
+                      height: cellHeight,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: isActive ? Colors.red : null,
+                        border: Border(
+                          bottom: BorderSide(
+                            color: Colors.grey.shade400,
+                            width: 0.5,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  // Rotated the same way (and by the same toggle) as the
-                  // pitch text inside note cells, so both stay consistent.
-                  child: RotatedBox(
-                    quarterTurns: controller.rotatePitchText ? 3 : 0,
-                    child: Text(
-                      pitch,
-                      style: TextStyle(
-                        fontSize: cellHeight * 0.80,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
+                      // Rotated the same way (and by the same toggle)
+                      // as the pitch text inside note cells — flipped
+                      // back to quarterTurns: 3, matching that file's
+                      // own second attempt at this direction.
+                      child: RotatedBox(
+                        quarterTurns: controller.rotatePitchText ? 3 : 0,
+                        child: Text(
+                          pitch,
+                          style: TextStyle(
+                            fontSize: cellHeight * 0.80,
+                            fontWeight: FontWeight.bold,
+                            color: isActive ? Colors.white : Colors.black,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  }),
                 );
-              }),
+              },
             ),
           ),
         );

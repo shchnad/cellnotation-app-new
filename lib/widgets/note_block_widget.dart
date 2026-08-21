@@ -119,6 +119,14 @@ class NoteBlockWidget extends StatefulWidget {
   /// below shows as "2+" on the row below, not "3-" on the same row.
   final int ornamentShift;
 
+  // Whether playback is currently active, and what to call if this
+  // note is tapped while it is — same interception as the empty-grid
+  // background's own GestureDetector (see GridWidget), so tapping
+  // directly ON a note during playback also pauses it instead of
+  // opening the note's edit dialog.
+  final bool isPlaying;
+  final VoidCallback? onTapWhilePlaying;
+
   const NoteBlockWidget({
     super.key,
     required this.note,
@@ -129,6 +137,8 @@ class NoteBlockWidget extends StatefulWidget {
     this.isClickable = true,
     this.interactionNote,
     this.ornamentShift = 0,
+    this.isPlaying = false,
+    this.onTapWhilePlaying,
   });
 
   @override
@@ -325,6 +335,10 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
         : (controller.showCompensatedNotation
         ? controller.getCompensatedDisplay(note).row
         : note.row));
+    // Row 0 (lowest pitch) always sits at the BOTTOM, highest row at
+    // the TOP — this does NOT change with Rotate Pitch Text (that
+    // toggle only rotates the pitch digit itself, see below; it does
+    // not affect the grid's own row layout).
     final top = (controller.totalRows - 1 - displayRow) * widget.cellHeight;
 
     final drawMark = _hasDrawnMark(note.articulation);
@@ -372,14 +386,16 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
           ? Padding(
         padding: const EdgeInsets.only(left: 3, right: 2),
         child: RotatedBox(
+          // Flipped back to 3, per request — this is now my SECOND
+          // attempt at this direction (was 3, changed to 1, now back
+          // to 3), and I still have no way to visually verify it
+          // (no Flutter runtime available here). Please confirm this
+          // is actually correct before I flip it again.
           quarterTurns: controller.rotatePitchText ? 3 : 0,
           child: FittedBox(
-            // Alignment is applied BEFORE the RotatedBox above
-            // rotates everything — "right" becomes "top" after a
-            // 90° counter-clockwise turn, so this has to flip to
-            // centerRight while rotated to keep the digit pinned
-            // to the top of the cell (matching centerLeft's
-            // normal, unrotated placement at the left edge).
+            // Alignment applied BEFORE the RotatedBox rotates
+            // everything — back to topCenter, matching quarterTurns:
+            // 3 (see the note above).
             alignment: controller.rotatePitchText
                 ? Alignment.topCenter
                 : Alignment.centerLeft,
@@ -504,10 +520,11 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
                 final dx = details.globalPosition.dx - dragStartPosition.dx;
                 final dy = details.globalPosition.dy - dragStartPosition.dy;
                 final tickChange = (dx / widget.pixelsPerTick).round();
-                // Screen Y grows downward, but row now grows upward
-                // (row 0 = bottom, highest row = top) to match the
-                // flipped `top` above — so dragging the finger down
-                // (positive dy) must DECREASE the row, not increase it.
+                // Screen Y grows downward, but row grows upward (row
+                // 0 = bottom, highest row = top) — so dragging the
+                // finger down (positive dy) must DECREASE the row,
+                // not increase it. This does NOT change with Rotate
+                // Pitch Text (see the `top` computation above).
                 final rowChange = -(dy / widget.cellHeight).round();
                 final newTick =
                 controller.snapTick(dragStartTick + tickChange);
@@ -521,6 +538,10 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
               },
 
               onTap: () {
+                if (widget.isPlaying) {
+                  widget.onTapWhilePlaying?.call();
+                  return;
+                }
                 if (_blockedFromEditing(context)) return;
                 if (controller.pasteMode) {
                   return;
