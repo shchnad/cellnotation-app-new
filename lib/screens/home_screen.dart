@@ -54,7 +54,7 @@ class HomeScreen extends StatelessWidget {
                     return _HomeMenuButton(
                       icon: Icons.library_add,
                       label: 'Create Composition',
-                      color: Colors.blue,
+                      color: Colors.black,
                       textColor: Colors.white,
                       onPressed: () => _handleCreateComposition(buttonContext),
                     );
@@ -64,7 +64,7 @@ class HomeScreen extends StatelessWidget {
                 _HomeMenuButton(
                   icon: Icons.music_video_rounded,
                   label: 'My Compositions',
-                  color: Colors.blue,
+                  color: Colors.green,
                   textColor: Colors.white,
                   onPressed: () {
                     Navigator.push(
@@ -79,7 +79,7 @@ class HomeScreen extends StatelessWidget {
                 _HomeMenuButton(
                   icon: Icons.cloud,
                   label: 'Cloud Library',
-                  color: Colors.black,
+                  color: Colors.blue,
                   textColor: Colors.white,
                   onPressed: () {
                     Navigator.push(
@@ -94,8 +94,8 @@ class HomeScreen extends StatelessWidget {
                 _HomeMenuButton(
                   icon: Icons.person,
                   label: 'Profile',
-                  color: Colors.black,
-                  textColor: Colors.white,
+                  color: Colors.grey.shade300,
+                  textColor: Colors.black,
                   onPressed: () {
                     Navigator.push(
                       context,
@@ -173,7 +173,8 @@ class _HomeMenuButton extends StatelessWidget {
     // a shorter one (e.g. "Profile") unless every button is
     // explicitly constrained to the SAME width like this.
     return SizedBox(
-      width: 500,
+        width: 300,
+        height: 100,
       child: ElevatedButton.icon(
         style: ElevatedButton.styleFrom(
           backgroundColor: color,

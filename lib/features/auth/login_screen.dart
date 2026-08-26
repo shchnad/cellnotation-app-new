@@ -189,11 +189,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 SizedBox(
                   // width: double.infinity,
-                  width: 500,
+                  width: 250,
+                  height: 100,
                   child: ElevatedButton(
                     onPressed: loading ? null : login,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
+                      backgroundColor: Colors.black,
                       foregroundColor: Colors.white,
                       minimumSize: const Size(double.infinity, 50),
                       elevation: 0,
@@ -223,7 +224,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 SizedBox(
                   // width: double.infinity,
-                  width: 500,
+                  width: 250,
                   child: ElevatedButton(
                     onPressed: () async {
                       if (emailController.text.isEmpty) {
@@ -276,10 +277,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 60),
+                const SizedBox(height: 30),
 
                 SizedBox(
-                  width: 220,
+                  width: 250,
                   child: InkWell(
                     onTap: () async {
                       try {
@@ -332,7 +333,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 SizedBox(
                   // width: double.infinity,
-                  width: 500,
+                  width: 250,
+                  height: 100,
                   child: ElevatedButton(
                     onPressed: () {
                       Navigator.push(
@@ -343,7 +345,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       );
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
+                      backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
                       minimumSize: const Size(double.infinity, 50),
                       elevation: 0,

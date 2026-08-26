@@ -50,7 +50,7 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
         controller: TextEditingController(text: valueText),
         style: const TextStyle(
           fontSize: 22,
-          color: Colors.blue,
+          color: Colors.green,
           fontWeight: FontWeight.bold,
         ),
         decoration: InputDecoration(
@@ -79,9 +79,17 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        // Explicit leading icon (blue) — the default automatic back
+        // arrow AppBar provides otherwise uses the theme's own
+        // default color, not blue. Matches the same treatment
+        // applied to CloudLibraryScreen (green there instead).
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.green),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: const Text('My Compositions', style: TextStyle(
           fontSize: 22,
-          color: Colors.blue,
+          color: Colors.green,
           fontWeight: FontWeight.bold,
         )),
       ),
@@ -97,7 +105,7 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
                     controller: _searchController,
                     style: const TextStyle(
                       fontSize: 22,
-                      color: Colors.blue,
+                      color: Colors.green,
                       fontWeight: FontWeight.bold,
                     ),
                     decoration: InputDecoration(
@@ -174,23 +182,23 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
               children: [
                 Expanded(
                   flex: 5,
-                  child: Text('Title', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
+                  child: Text('Title', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
                 ),
                 Expanded(
                   flex: 2,
-                  child: Text('Composer', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
+                  child: Text('Composer', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
                 ),
                 Expanded(
                   flex: 2,
-                  child: Text('Style', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
+                  child: Text('Style', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
                 ),
                 Expanded(
                   flex: 2,
-                  child: Text('Instrument', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
+                  child: Text('Instrument', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
                 ),
                 Expanded(
                   flex: 2,
-                  child: Text('Edited', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
+                  child: Text('Edited', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
                 ),
                 SizedBox(width: 44), // aligns with the edit icon column
               ],

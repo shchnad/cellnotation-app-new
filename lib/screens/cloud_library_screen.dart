@@ -61,12 +61,15 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
           labelText: label,
           labelStyle: const TextStyle(
             fontSize: 22,
-            color: Colors.black,
+            // color: Colors.black,
           ),
           isDense: true,
           border: const OutlineInputBorder(),
           prefixIcon: Icon(icon, size: 20),
-          suffixIcon: const Icon(Icons.arrow_drop_down, color: Colors.blue),
+          suffixIcon: const Icon(
+            Icons.arrow_drop_down,
+            color: Colors.blue,
+          ),
         ),
         onTap: () {
           FocusScope.of(context).unfocus();
@@ -97,12 +100,19 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        // Explicit leading icon (green) — the default automatic back
+        // arrow AppBar provides otherwise uses the theme's own
+        // default color, not green.
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.blue),
+          onPressed: () => Navigator.pop(context),
+        ),
         // Same size/weight as CompositionsListScreen's "My
         // Compositions" title — only difference (per request) is the
         // color: black here instead of blue.
         title: const Text('Cloud Library', style: TextStyle(
           fontSize: 22,
-          color: Colors.black,
+          color: Colors.blue,
           fontWeight: FontWeight.bold,
         )),
       ),
@@ -211,27 +221,54 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
               children: [
                 Expanded(
                   flex: 5,
-                  child: Text('Title', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
+                  child: Text('Title',
+                      style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18)
+                  ),
                 ),
                 Expanded(
                   flex: 2,
-                  child: Text('Composer', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
+                  child: Text('Composer',
+                      style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18)
+                  ),
                 ),
                 Expanded(
                   flex: 2,
-                  child: Text('Shared by', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
+                  child: Text('Shared by',
+                      style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18)
+                  ),
                 ),
                 Expanded(
                   flex: 2,
-                  child: Text('Style', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
+                  child: Text('Style',
+                      style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18)),
                 ),
                 Expanded(
                   flex: 2,
-                  child: Text('Instrument', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
+                  child: Text('Instrument',
+                      style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18)),
                 ),
                 SizedBox(
                   width: 110,
-                  child: Text('Likes', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
+                  child: Text('Likes',
+                      style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18)),
                 ),
                 SizedBox(width: 40),
               ],
@@ -284,7 +321,8 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
 
                 if (compositions.isEmpty) {
                   return const Center(
-                    child: Text('No public compositions found', style: TextStyle(fontSize: 22)),
+                    child: Text('No public compositions found',
+                        style: TextStyle(fontSize: 22)),
                   );
                 }
 
@@ -343,7 +381,7 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
                               child: Text(
                                 comp.userName,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 16, color: Colors.black),
+                                style: const TextStyle(fontSize: 22, color: Colors.black),
                               ),
                             ),
                             Expanded(
@@ -365,7 +403,7 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
                             if (isMine)
                               const Padding(
                                 padding: EdgeInsets.only(right: 8),
-                                child: Text('(yours)', style: TextStyle(fontSize: 12, color: Colors.blue)),
+                                child: Text('(yours)', style: TextStyle(fontSize: 16, color: Colors.blue)),
                               ),
                             IconButton(
                               icon: Icon(

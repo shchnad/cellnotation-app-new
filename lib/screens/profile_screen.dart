@@ -107,7 +107,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               Center(
                 child: SizedBox(
-                  width: 500,
+                  width: (MediaQuery.of(context).size.width - 48).clamp(0, 500),
                   child: Column(
                     children: [
                       CircleAvatar(
@@ -167,15 +167,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const SizedBox(height: 10),
 
                       SizedBox(
-                        width: double.infinity,
+                        width: 300,
+                        height: 100,
                         child: ElevatedButton(
                           onPressed: _saving
                               ? null
                               : _saveName,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            // foregroundColor: Colors.white,
-                            minimumSize: const Size(double.infinity, 50),
+                            backgroundColor: Colors.grey.shade300,
+                            // foregroundColor: Colors.black,
+                            minimumSize: const Size(300, 100),
                             elevation: 0,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(4),
@@ -196,13 +197,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               : const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.save, color: Colors.white, size: 22),
+                              SizedBox(
+                                  child: Icon(
+                                    Icons.save,
+                                    color: Colors.black,
+                                    size: 22,
+                                  )
+                              ),
                               SizedBox(width: 8),
-                              Text('Save',
-                                  style: TextStyle(
-                                    fontSize: 22,
-                                    color: Colors.white,
-                                  )),
+                              SizedBox(
+                                child: Text('Save',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      color: Colors.black,
+                                    )),
+                              ),
                             ],
                           ),
                         ),
@@ -217,25 +226,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 60),
 
-              StreamBuilder<List<Composition>>(
-                stream: _compositionService.getUserCompositions(),
-                builder: (context, snapshot) {
-                  final compositions = snapshot.data ?? [];
-                  final publicCount = compositions.where((c) => c.isPublic).length;
-                  final totalLikes = compositions.fold<int>(
-                    0,
-                        (sum, c) => sum + c.likeCount,
-                  );
+              Center(
+                child: SizedBox(
+                  width: (MediaQuery.of(context).size.width - 48).clamp(0, 500),
+                  child: StreamBuilder<List<Composition>>(
+                    stream: _compositionService.getUserCompositions(),
+                    builder: (context, snapshot) {
+                      final compositions = snapshot.data ?? [];
+                      final publicCount = compositions.where((c) => c.isPublic).length;
+                      final totalLikes = compositions.fold<int>(
+                        0,
+                            (sum, c) => sum + c.likeCount,
+                      );
 
-                  return Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _StatTile(label: 'Compositions', value: '${compositions.length}'),
-                      _StatTile(label: 'Public', value: '$publicCount'),
-                      _StatTile(label: 'Likes received', value: '$totalLikes'),
-                    ],
-                  );
-                },
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _StatTile(label: 'Compositions', value: '${compositions.length}'),
+                          _StatTile(label: 'Public', value: '$publicCount'),
+                          _StatTile(label: 'Likes received', value: '$totalLikes'),
+                        ],
+                      );
+                    },
+                  ),
+                ),
               ),
             ],
           ),
