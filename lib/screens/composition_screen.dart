@@ -57,6 +57,11 @@ class _CompositionScreenState extends State<CompositionScreen>
   bool _isPlaying = false;
   bool _toShowTitle = false;
 
+  // When on, tapping any toolbar icon shows a help dialog explaining
+  // that button instead of performing its normal action. Toggled by
+  // the new help icon below the theme-change icon.
+  bool _helpMode = false;
+
   // Rows whose note is CURRENTLY sounding at the current playback
   // tick (startTick <= tick < endTick) — used to highlight those
   // rows green in the pitch column while a note is actively playing.
@@ -256,6 +261,45 @@ class _CompositionScreenState extends State<CompositionScreen>
     if (mounted) setState(() {});
   }
 
+
+  /// Wraps a button's normal [action] so that, while help mode is on,
+  /// tapping the button shows [helpText] in a dialog instead of
+  /// performing [action]. When help mode is off, behaves exactly like
+  /// [action] (including staying null/disabled if [action] is null).
+  VoidCallback? _withHelp(String helpText, VoidCallback? action) {
+    if (_helpMode) {
+      return () => _showHelpDialog(helpText);
+    }
+    return action;
+  }
+
+  void _showHelpDialog(String text) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        title: const Text(
+          'Help',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blue),
+        ),
+        content: Text(text, style: const TextStyle(fontSize: 20)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text(
+              'Close',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   void _showTitle() {
     setState(() => _toShowTitle = !_toShowTitle);
@@ -500,12 +544,15 @@ class _CompositionScreenState extends State<CompositionScreen>
                           ),
                         ),
                         tooltip: 'Home',
-                        onPressed: () {
-                          saveExitDialog(
-                            context,
-                            onSave: () => _saveComposition(context),
-                          );
-                        },
+                        onPressed: _withHelp(
+                            'Home: save and exit the composition, '
+                                'returning to the main menu.',
+                                () {
+                              saveExitDialog(
+                                context,
+                                onSave: () => _saveComposition(context),
+                              );
+                            }),
                       ),
 
                       // GRID DARK MODE
@@ -524,20 +571,40 @@ class _CompositionScreenState extends State<CompositionScreen>
                         tooltip: controller.isDarkMode
                             ? 'Grid Dark Mode: On'
                             : 'Grid Dark Mode: Off',
-                        onPressed: () {
-                          controller.toggleDarkMode();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                controller.isDarkMode ? 'Dark mode on.' : 'Dark mode off.',
-                                style: const TextStyle(fontSize: 22),
-                              ),
-                            ),
-                          );
-                        },
+                        onPressed: _withHelp(
+                            'Grid Dark Mode: toggles a dark background '
+                                'for the note grid.',
+                                () {
+                              controller.toggleDarkMode();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    controller.isDarkMode ? 'Dark mode on.' : 'Dark mode off.',
+                                    style: const TextStyle(fontSize: 22),
+                                  ),
+                                ),
+                              );
+                            }),
                       ),
 
-                      SizedBox(height: 36),
+                      // HELP MODE
+                      IconButton(
+                        icon: Transform.rotate(
+                          angle: controller.rotatePitchText ? -pi / 2 : 0,
+                          child: Icon(
+                            Icons.help_outline,
+                            color: _helpMode ? Colors.blue : Colors.black,
+                          ),
+                        ),
+                        tooltip: _helpMode
+                            ? 'Help Mode: On'
+                            : 'Help Mode: Off',
+                        onPressed: () {
+                          setState(() {
+                            _helpMode = !_helpMode;
+                          });
+                        },
+                      ),
 
                       // TO SHOW TITLE
                       IconButton(
@@ -554,9 +621,12 @@ class _CompositionScreenState extends State<CompositionScreen>
                         tooltip: _toShowTitle
                             ? 'title is hidden'
                             : 'title is shown',
-                        onPressed: () {
-                          _showTitle();
-                        },
+                        onPressed: _withHelp(
+                            'Toggles a column showing the composition '
+                                'title and composer.',
+                                () {
+                              _showTitle();
+                            }),
                       ),
 
 
@@ -579,17 +649,20 @@ class _CompositionScreenState extends State<CompositionScreen>
                         tooltip: controller.hideFingerNumbers
                             ? 'Hide Finger Numbers: On'
                             : 'Hide Finger Numbers: Off',
-                        onPressed: () {
-                          controller.toggleHideFingerNumbers();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                controller.hideFingerNumbers ? 'Fingers hidden.' : 'Fingers visible.',
-                                style: const TextStyle(fontSize: 22),
-                              ),
-                            ),
-                          );
-                        },
+                        onPressed: _withHelp(
+                            'Hide Finger Numbers: hides/shows the '
+                                'fingering numbers on notes.',
+                                () {
+                              controller.toggleHideFingerNumbers();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    controller.hideFingerNumbers ? 'Fingers hidden.' : 'Fingers visible.',
+                                    style: const TextStyle(fontSize: 22),
+                                  ),
+                                ),
+                              );
+                            }),
                       ),
 
 
@@ -607,17 +680,20 @@ class _CompositionScreenState extends State<CompositionScreen>
                         tooltip: controller.highlightAccidentalNotes
                             ? 'Highlight Accidental Notes: On'
                             : 'Highlight Accidental Notes: Off',
-                        onPressed: () {
-                          controller.toggleHighlightAccidentalNotes();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                controller.highlightAccidentalNotes ? 'Highlight on.' : 'Highlight off.',
-                                style: const TextStyle(fontSize: 22),
-                              ),
-                            ),
-                          );
-                        },
+                        onPressed: _withHelp(
+                            'Highlight Accidental Notes: colors notes '
+                                'outside the current scale.',
+                                () {
+                              controller.toggleHighlightAccidentalNotes();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    controller.highlightAccidentalNotes ? 'Highlight on.' : 'Highlight off.',
+                                    style: const TextStyle(fontSize: 22),
+                                  ),
+                                ),
+                              );
+                            }),
                       ),
 
                       // RAISE SCALE
@@ -629,17 +705,20 @@ class _CompositionScreenState extends State<CompositionScreen>
                           ),
                         ),
                         tooltip: 'Raise scales',
-                        onPressed: () {
-                          controller.raiseAllScales();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Raised a semitone.',
-                                style: TextStyle(fontSize: 22),
-                              ),
-                            ),
-                          );
-                        },
+                        onPressed: _withHelp(
+                            'Raise scales: raises the whole '
+                                'composition up a semitone.',
+                                () {
+                              controller.raiseAllScales();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Raised a semitone.',
+                                    style: TextStyle(fontSize: 22),
+                                  ),
+                                ),
+                              );
+                            }),
                       ),
 
 
@@ -652,17 +731,20 @@ class _CompositionScreenState extends State<CompositionScreen>
                           ),
                         ),
                         tooltip: 'Reset scales',
-                        onPressed: () {
-                          controller.resetAllScales();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Scale reset.',
-                                style: TextStyle(fontSize: 22),
-                              ),
-                            ),
-                          );
-                        },
+                        onPressed: _withHelp(
+                            'Reset scales: reverts the composition '
+                                'back to its original starting scale.',
+                                () {
+                              controller.resetAllScales();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Scale reset.',
+                                    style: TextStyle(fontSize: 22),
+                                  ),
+                                ),
+                              );
+                            }),
                       ),
 
 
@@ -675,17 +757,20 @@ class _CompositionScreenState extends State<CompositionScreen>
                           ),
                         ),
                         tooltip: 'Lower scales',
-                        onPressed: () {
-                          controller.lowerAllScales();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Lowered a semitone.',
-                                style: TextStyle(fontSize: 22),
-                              ),
-                            ),
-                          );
-                        },
+                        onPressed: _withHelp(
+                            'Lower scales: lowers the whole '
+                                'composition down a semitone.',
+                                () {
+                              controller.lowerAllScales();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Lowered a semitone.',
+                                    style: TextStyle(fontSize: 22),
+                                  ),
+                                ),
+                              );
+                            }),
                       ),
 
 
@@ -709,13 +794,17 @@ class _CompositionScreenState extends State<CompositionScreen>
                         tooltip: controller.rotatePitchText
                             ? 'Rotate Pitch Text: On'
                             : 'Rotate Pitch Text: Off',
-                        onPressed: () {
-                          controller.toggleRotatePitchText();
-                          _setOrientationLocked(
-                            context,
-                            controller.rotatePitchText,
-                          );
-                        },
+                        onPressed: _withHelp(
+                            'Rotate Pitch Text: rotates the pitch '
+                                'digits/labels for reading with the device '
+                                'turned sideways.',
+                                () {
+                              controller.toggleRotatePitchText();
+                              _setOrientationLocked(
+                                context,
+                                controller.rotatePitchText,
+                              );
+                            }),
                       ),
 
                       // MAGIC MODE
@@ -731,25 +820,28 @@ class _CompositionScreenState extends State<CompositionScreen>
                         tooltip: controller.showCompensatedNotation
                             ? 'Compensated Notation: On'
                             : 'Compensated Notation: Off',
-                        onPressed: () {
-                          controller.toggleCompensatedNotation();
-                          // Keep Scroll Lock in sync with Easy Read
-                          // Mode, per request — turning Easy Read on
-                          // turns Scroll Lock on too, and turning Easy
-                          // Read off turns Scroll Lock off too.
-                          if (controller.showCompensatedNotation !=
-                              controller.inputLocked) {
-                            controller.toggleInputLocked();
-                          }
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                controller.showCompensatedNotation ? 'Easy Read on.' : 'Easy Read off.',
-                                style: const TextStyle(fontSize: 22),
-                              ),
-                            ),
-                          );
-                        },
+                        onPressed: _withHelp(
+                            'Easy Read: shows a simplified notation '
+                                'and locks scrolling while on.',
+                                () {
+                              controller.toggleCompensatedNotation();
+                              // Keep Scroll Lock in sync with Easy Read
+                              // Mode, per request — turning Easy Read on
+                              // turns Scroll Lock on too, and turning Easy
+                              // Read off turns Scroll Lock off too.
+                              if (controller.showCompensatedNotation !=
+                                  controller.inputLocked) {
+                                controller.toggleInputLocked();
+                              }
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    controller.showCompensatedNotation ? 'Easy Read on.' : 'Easy Read off.',
+                                    style: const TextStyle(fontSize: 22),
+                                  ),
+                                ),
+                              );
+                            }),
                       ),
 
                       // SCROLL LOCK
@@ -768,17 +860,21 @@ class _CompositionScreenState extends State<CompositionScreen>
                         tooltip: controller.inputLocked
                             ? 'Scroll Lock: On'
                             : 'Scroll Lock: Off',
-                        onPressed: () {
-                          controller.toggleInputLocked();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                controller.inputLocked ? 'Lock on.' : 'Lock off.',
-                                style: const TextStyle(fontSize: 22),
-                              ),
-                            ),
-                          );
-                        },
+                        onPressed: _withHelp(
+                            'Scroll Lock: while on, tapping the grid '
+                                'controls playback instead of editing '
+                                'notes.',
+                                () {
+                              controller.toggleInputLocked();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    controller.inputLocked ? 'Lock on.' : 'Lock off.',
+                                    style: const TextStyle(fontSize: 22),
+                                  ),
+                                ),
+                              );
+                            }),
                       ),
 
 
@@ -797,12 +893,14 @@ class _CompositionScreenState extends State<CompositionScreen>
                           ),
                         ),
                         tooltip: 'Zoom In',
-                        onPressed: () {
-                          controller.setZoom(
-                            controller.zoomX + 1,
-                            controller.zoomY + 0.1,
-                          );
-                        },
+                        onPressed: _withHelp(
+                            'Zoom In: enlarges the note grid.',
+                                () {
+                              controller.setZoom(
+                                controller.zoomX + 1,
+                                controller.zoomY + 0.1,
+                              );
+                            }),
                       ),
 
                       // ZOOM OUT
@@ -815,12 +913,14 @@ class _CompositionScreenState extends State<CompositionScreen>
                           ),
                         ),
                         tooltip: 'Zoom Out',
-                        onPressed: () {
-                          controller.setZoom(
-                            controller.zoomX - 1,
-                            controller.zoomY - 0.1,
-                          );
-                        },
+                        onPressed: _withHelp(
+                            'Zoom Out: shrinks the note grid.',
+                                () {
+                              controller.setZoom(
+                                controller.zoomX - 1,
+                                controller.zoomY - 0.1,
+                              );
+                            }),
                       ),
 
                       // RESET
@@ -833,8 +933,11 @@ class _CompositionScreenState extends State<CompositionScreen>
                           ),
                         ),
                         tooltip: 'Reset Zoom',
-                        onPressed:
-                        controller.resetZoom,
+                        onPressed: _withHelp(
+                          'Reset Zoom: returns the grid to its '
+                              'default zoom level.',
+                          controller.resetZoom,
+                        ),
                       ),
                     ],
                   ),
@@ -873,9 +976,11 @@ class _CompositionScreenState extends State<CompositionScreen>
                           ),
                         ),
                         tooltip: 'Save Composition',
-                        onPressed: () {
-                          _saveComposition(context);
-                        },
+                        onPressed: _withHelp(
+                            'Save: saves the current composition.',
+                                () {
+                              _saveComposition(context);
+                            }),
                       ),
 
                       // NEW COMPOSITION
@@ -887,9 +992,12 @@ class _CompositionScreenState extends State<CompositionScreen>
                           ),
                         ),
                         tooltip: 'New Composition',
-                        onPressed: () {
-                          _showCreateDialog(context);
-                        },
+                        onPressed: _withHelp(
+                            'New Composition: starts a brand new '
+                                'composition.',
+                                () {
+                              _showCreateDialog(context);
+                            }),
                       ),
 
                       // ADD MEASURES
@@ -901,9 +1009,12 @@ class _CompositionScreenState extends State<CompositionScreen>
                           ),
                         ),
                         tooltip: 'Add Measures',
-                        onPressed: () {
-                          _openAppendMeasuresForm(context);
-                        },
+                        onPressed: _withHelp(
+                            'Add Measures: appends more measures to '
+                                'the composition.',
+                                () {
+                              _openAppendMeasuresForm(context);
+                            }),
                       ),
 
                       // GRID FONT SIZE
@@ -922,20 +1033,23 @@ class _CompositionScreenState extends State<CompositionScreen>
                             DefaultValues.gridFontSizeLarge
                             ? 'Grid Font Size: Large'
                             : 'Grid Font Size: Normal',
-                        onPressed: () {
-                          controller.toggleGridFontSize();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                controller.gridFontSize ==
-                                    DefaultValues.gridFontSizeLarge
-                                    ? 'Labels larger.'
-                                    : 'Labels normal.',
-                                style: const TextStyle(fontSize: 22),
-                              ),
-                            ),
-                          );
-                        },
+                        onPressed: _withHelp(
+                            'Grid Font Size: toggles larger labels on '
+                                'the grid.',
+                                () {
+                              controller.toggleGridFontSize();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    controller.gridFontSize ==
+                                        DefaultValues.gridFontSizeLarge
+                                        ? 'Labels larger.'
+                                        : 'Labels normal.',
+                                    style: const TextStyle(fontSize: 22),
+                                  ),
+                                ),
+                              );
+                            }),
                       ),
 
                       SizedBox(height: 30),
@@ -954,17 +1068,20 @@ class _CompositionScreenState extends State<CompositionScreen>
                           ),
                         ),
                         tooltip: 'Hand',
-                        onPressed: () {
-                          controller.toggleHand();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                controller.currentHand == Hand.right ? 'Right hand.' : 'Left hand.',
-                                style: const TextStyle(fontSize: 22),
-                              ),
-                            ),
-                          );
-                        },
+                        onPressed: _withHelp(
+                            'Hand: switches which hand new notes are '
+                                'entered for.',
+                                () {
+                              controller.toggleHand();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    controller.currentHand == Hand.right ? 'Right hand.' : 'Left hand.',
+                                    style: const TextStyle(fontSize: 22),
+                                  ),
+                                ),
+                              );
+                            }),
                       ),
 
 
@@ -977,12 +1094,15 @@ class _CompositionScreenState extends State<CompositionScreen>
                           ),
                         ),
                         tooltip: 'Note Duration',
-                        onPressed: () {
-                          globalDurationDialog(
-                            context,
-                            controller,
-                          );
-                        },
+                        onPressed: _withHelp(
+                            'Note Duration: sets the duration used '
+                                'for newly entered notes.',
+                                () {
+                              globalDurationDialog(
+                                context,
+                                controller,
+                              );
+                            }),
                       ),
 
                       // GRACE NOTES
@@ -999,18 +1119,21 @@ class _CompositionScreenState extends State<CompositionScreen>
                         tooltip: controller.isAddingGraceNotes
                             ? 'Add Grace Note Mode: On'
                             : 'Add Grace Note Mode: Off',
-                        onPressed: () {
-                          final wasOn = controller.isAddingGraceNotes;
-                          controller.stopAddingGraceNotes();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                wasOn ? 'Grace note off.' : 'Tap a note to add.',
-                                style: const TextStyle(fontSize: 22),
-                              ),
-                            ),
-                          );
-                        },
+                        onPressed: _withHelp(
+                            'Grace Notes: enter grace-note mode by '
+                                'tapping a note afterward.',
+                                () {
+                              final wasOn = controller.isAddingGraceNotes;
+                              controller.stopAddingGraceNotes();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    wasOn ? 'Grace note off.' : 'Tap a note to add.',
+                                    style: const TextStyle(fontSize: 22),
+                                  ),
+                                ),
+                              );
+                            }),
                       ),
 
                       // LEGATO
@@ -1027,17 +1150,20 @@ class _CompositionScreenState extends State<CompositionScreen>
                         tooltip: controller.legatoMode
                             ? 'Legato Mode: On'
                             : 'Legato Mode: Off',
-                        onPressed: () {
-                          controller.toggleLegatoMode();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                controller.legatoMode ? 'Legato on.' : 'Legato off.',
-                                style: const TextStyle(fontSize: 22),
-                              ),
-                            ),
-                          );
-                        },
+                        onPressed: _withHelp(
+                            'Legato: marks tapped notes as played '
+                                'legato.',
+                                () {
+                              controller.toggleLegatoMode();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    controller.legatoMode ? 'Legato on.' : 'Legato off.',
+                                    style: const TextStyle(fontSize: 22),
+                                  ),
+                                ),
+                              );
+                            }),
                       ),
 
 
@@ -1053,25 +1179,27 @@ class _CompositionScreenState extends State<CompositionScreen>
                           ),
                         ),
                         tooltip: 'Paste',
-                        onPressed: () {
-                          if (controller.pasteMode) {
-                            controller.exitPasteMode();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                    DefaultValues.snackBarMessageForCopying.toString()
-                                ),
-                              ),
-                            );
-                          } else {
-                            simpleMessageDialog(
-                              context,
-                              DefaultValues.titleOfMessageForCopying.toString(),
-                              DefaultValues.messageForCopying.toString(),
-                            );
-                          }
+                        onPressed: _withHelp(
+                            'Paste: pastes previously copied notes.',
+                                () {
+                              if (controller.pasteMode) {
+                                controller.exitPasteMode();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                        DefaultValues.snackBarMessageForCopying.toString()
+                                    ),
+                                  ),
+                                );
+                              } else {
+                                simpleMessageDialog(
+                                  context,
+                                  DefaultValues.titleOfMessageForCopying.toString(),
+                                  DefaultValues.messageForCopying.toString(),
+                                );
+                              }
 
-                        },
+                            }),
                       ),
 
                       SizedBox(height: 30),
@@ -1095,7 +1223,11 @@ class _CompositionScreenState extends State<CompositionScreen>
                           ),
                         ),
                         tooltip: _isPlaying ? 'Pause' : 'Play',
-                        onPressed: hasMeasures ? _togglePlayback : null,
+                        onPressed: _withHelp(
+                          'Play/Pause: starts or pauses playback of '
+                              'the composition.',
+                          hasMeasures ? _togglePlayback : null,
+                        ),
                       ),
 
                       // SCROLL TO START
@@ -1108,11 +1240,15 @@ class _CompositionScreenState extends State<CompositionScreen>
                           ),
                         ),
                         tooltip: 'Scroll to Start',
-                        onPressed: hasMeasures
-                            ? () {
-                          _scrollToStart();
-                        }
-                            : null,
+                        onPressed: _withHelp(
+                          'Scroll to Start: jumps the grid back to '
+                              'the beginning.',
+                          hasMeasures
+                              ? () {
+                            _scrollToStart();
+                          }
+                              : null,
+                        ),
                       ),
 
                       // SOUND
@@ -1129,17 +1265,19 @@ class _CompositionScreenState extends State<CompositionScreen>
                         tooltip: controller.soundEnabled
                             ? 'Sound On'
                             : 'Sound Off',
-                        onPressed: () {
-                          controller.toggleSound();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                controller.soundEnabled ? 'Sound on.' : 'Sound off.',
-                                style: const TextStyle(fontSize: 22),
-                              ),
-                            ),
-                          );
-                        },
+                        onPressed: _withHelp(
+                            'Sound: toggles audio playback of notes.',
+                                () {
+                              controller.toggleSound();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    controller.soundEnabled ? 'Sound on.' : 'Sound off.',
+                                    style: const TextStyle(fontSize: 22),
+                                  ),
+                                ),
+                              );
+                            }),
                       ),
 
                       SizedBox(height: 30),
@@ -1153,12 +1291,15 @@ class _CompositionScreenState extends State<CompositionScreen>
                           ),
                         ),
                         tooltip: 'Cell Width',
-                        onPressed: () {
-                          cellWidthDialog(
-                            context,
-                            controller,
-                          );
-                        },
+                        onPressed: _withHelp(
+                            'Cell Width: adjusts the width of grid '
+                                'cells.',
+                                () {
+                              cellWidthDialog(
+                                context,
+                                controller,
+                              );
+                            }),
                       ),
 
                       // EXPORT
@@ -1171,66 +1312,69 @@ class _CompositionScreenState extends State<CompositionScreen>
                           ),
                         ),
                         tooltip: 'Export Measures as Text',
-                        onPressed: () {
-                          measureRangeDialog(
-                            context: context,
-                            controller: controller,
-                            title: 'Export Measures',
-                            actionLabel: 'Export',
-                            actionColor: Colors.black,
-                            onConfirm: (from, to) {
-                              final exported =
-                              controller.exportMeasureRange(from, to);
-                              final dynamicsText = controller
-                                  .exportDynamicsAndHairpinsText(from, to);
-                              final text =
-                                  formatImportMeasuresAsText(exported) +
-                                      '\nDynamics / Dynamic Changes\n' +
-                                      dynamicsText;
-                              Future.delayed(Duration.zero, () {
-                                showDialog(
-                                  context: context,
-                                  builder: (resultContext) => AlertDialog(
-                                    backgroundColor: Colors.white,
-                                    surfaceTintColor: Colors.white,
-                                    title: const Text(
-                                      'Exported Measures',
-                                      style: TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    content: SizedBox(
-                                      width: 400,
-                                      height: 400,
-                                      child: SingleChildScrollView(
-                                        child: SelectableText(
-                                          text,
-                                          style: const TextStyle(
-                                              fontSize: 18),
-                                        ),
-                                      ),
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(resultContext),
-                                        child: const Text(
-                                          'Close',
+                        onPressed: _withHelp(
+                            'Export: exports a range of measures as '
+                                'plain text.',
+                                () {
+                              measureRangeDialog(
+                                context: context,
+                                controller: controller,
+                                title: 'Export Measures',
+                                actionLabel: 'Export',
+                                actionColor: Colors.black,
+                                onConfirm: (from, to) {
+                                  final exported =
+                                  controller.exportMeasureRange(from, to);
+                                  final dynamicsText = controller
+                                      .exportDynamicsAndHairpinsText(from, to);
+                                  final text =
+                                      formatImportMeasuresAsText(exported) +
+                                          '\nDynamics / Dynamic Changes\n' +
+                                          dynamicsText;
+                                  Future.delayed(Duration.zero, () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (resultContext) => AlertDialog(
+                                        backgroundColor: Colors.white,
+                                        surfaceTintColor: Colors.white,
+                                        title: const Text(
+                                          'Exported Measures',
                                           style: TextStyle(
                                             fontSize: 22,
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.black,
                                           ),
                                         ),
+                                        content: SizedBox(
+                                          width: 400,
+                                          height: 400,
+                                          child: SingleChildScrollView(
+                                            child: SelectableText(
+                                              text,
+                                              style: const TextStyle(
+                                                  fontSize: 18),
+                                            ),
+                                          ),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(resultContext),
+                                            child: const Text(
+                                              'Close',
+                                              style: TextStyle(
+                                                fontSize: 22,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.black,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                );
-                              });
-                            },
-                          );
-                        },
+                                    );
+                                  });
+                                },
+                              );
+                            }),
                       ),
 
                       // IMPORT
@@ -1243,174 +1387,177 @@ class _CompositionScreenState extends State<CompositionScreen>
                           ),
                         ),
                         tooltip: 'Import Transcription',
-                        onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (dialogContext) {
-                              return StatefulBuilder(
-                                builder: (dialogContext, setDialogState) {
-                                  return AlertDialog(
-                                    backgroundColor: Colors.white,
-                                    surfaceTintColor: Colors.white,
-                                    title: const Text(
-                                      'Import Transcription',
-                                      style: TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    content: SizedBox(
-                                      width: 400,
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          for (final batch
-                                          in availableImportBatches)
-                                            Builder(
-                                              builder: (_) {
-                                                final done = controller
-                                                    .importedBatchLabels
-                                                    .contains(
-                                                    batch.label);
-                                                return ListTile(
-                                                  title: Text(
-                                                    batch.label,
-                                                    style: TextStyle(
-                                                      fontSize: 22,
-                                                      fontWeight:
-                                                      FontWeight.bold,
-                                                      color: done
-                                                          ? Colors.grey
-                                                          : Colors.black,
-                                                    ),
-                                                  ),
-                                                  trailing: Icon(
-                                                    done
-                                                        ? Icons
-                                                        .check_circle
-                                                        : Icons
-                                                        .file_download,
-                                                    color: done
-                                                        ? Colors.green
-                                                        : Colors.black,
-                                                  ),
-                                                  onLongPress: done
-                                                      ? () {
-                                                    controller
-                                                        .resetImportedBatch(
-                                                        batch.label);
-                                                    setDialogState(
-                                                            () {});
-                                                    ScaffoldMessenger.of(
-                                                        context)
-                                                        .showSnackBar(
-                                                      SnackBar(
-                                                        content: Text(
-                                                          'Can re-import.',
-                                                          style: const TextStyle(
-                                                              fontSize: 22),
-                                                        ),
-                                                      ),
-                                                    );
-                                                  }
-                                                      : null,
-                                                  onTap: done
-                                                      ? null
-                                                      : () {
-                                                    final warnings =
-                                                    controller
-                                                        .importBatch(
-                                                        batch);
-                                                    setDialogState(
-                                                            () {});
-                                                    showDialog(
-                                                      context:
-                                                      dialogContext,
-                                                      builder:
-                                                          (resultContext) =>
-                                                          AlertDialog(
-                                                            backgroundColor:
-                                                            Colors.white,
-                                                            surfaceTintColor:
-                                                            Colors.white,
-                                                            title: Text(
-                                                              warnings
-                                                                  .isEmpty
-                                                                  ? 'Import Complete'
-                                                                  : 'Import Complete — '
-                                                                  '${warnings.length} warning'
-                                                                  '${warnings.length == 1 ? '' : 's'}',
-                                                              style: const TextStyle(
-                                                                fontSize: 22,
-                                                                fontWeight: FontWeight.bold,
-                                                              ),
-                                                            ),
-                                                            content: SizedBox(
-                                                              width: 400,
-                                                              child: warnings.isEmpty
-                                                                  ? Text(
-                                                                'All notes from ${batch.label} were created successfully.',
-                                                                style: const TextStyle(fontSize: 22),
-                                                              )
-                                                                  : SingleChildScrollView(
-                                                                child: Column(
-                                                                  mainAxisSize: MainAxisSize.min,
-                                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                                  children: [
-                                                                    for (final w in warnings)
-                                                                      Padding(
-                                                                        padding: const EdgeInsets.only(bottom: 8),
-                                                                        child: Text(
-                                                                          w.toString(),
-                                                                          style: const TextStyle(fontSize: 18, color: Colors.red),
-                                                                        ),
-                                                                      ),
-                                                                  ],
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            actions: [
-                                                              TextButton(
-                                                                onPressed: () => Navigator.pop(resultContext),
-                                                                child: const Text(
-                                                                  'Close',
-                                                                  style: TextStyle(
-                                                                    fontSize: 22,
-                                                                    fontWeight: FontWeight.bold,
-                                                                    color: Colors.black,
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                    );
-                                                  },
-                                                );
-                                              },
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(dialogContext),
-                                        child: const Text(
-                                          'Close',
+                        onPressed: _withHelp(
+                            'Import: imports a batch of transcribed '
+                                'measures.',
+                                () {
+                              showDialog(
+                                context: context,
+                                builder: (dialogContext) {
+                                  return StatefulBuilder(
+                                    builder: (dialogContext, setDialogState) {
+                                      return AlertDialog(
+                                        backgroundColor: Colors.white,
+                                        surfaceTintColor: Colors.white,
+                                        title: const Text(
+                                          'Import Transcription',
                                           style: TextStyle(
                                             fontSize: 22,
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.black,
                                           ),
                                         ),
-                                      ),
-                                    ],
+                                        content: SizedBox(
+                                          width: 400,
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              for (final batch
+                                              in availableImportBatches)
+                                                Builder(
+                                                  builder: (_) {
+                                                    final done = controller
+                                                        .importedBatchLabels
+                                                        .contains(
+                                                        batch.label);
+                                                    return ListTile(
+                                                      title: Text(
+                                                        batch.label,
+                                                        style: TextStyle(
+                                                          fontSize: 22,
+                                                          fontWeight:
+                                                          FontWeight.bold,
+                                                          color: done
+                                                              ? Colors.grey
+                                                              : Colors.black,
+                                                        ),
+                                                      ),
+                                                      trailing: Icon(
+                                                        done
+                                                            ? Icons
+                                                            .check_circle
+                                                            : Icons
+                                                            .file_download,
+                                                        color: done
+                                                            ? Colors.green
+                                                            : Colors.black,
+                                                      ),
+                                                      onLongPress: done
+                                                          ? () {
+                                                        controller
+                                                            .resetImportedBatch(
+                                                            batch.label);
+                                                        setDialogState(
+                                                                () {});
+                                                        ScaffoldMessenger.of(
+                                                            context)
+                                                            .showSnackBar(
+                                                          SnackBar(
+                                                            content: Text(
+                                                              'Can re-import.',
+                                                              style: const TextStyle(
+                                                                  fontSize: 22),
+                                                            ),
+                                                          ),
+                                                        );
+                                                      }
+                                                          : null,
+                                                      onTap: done
+                                                          ? null
+                                                          : () {
+                                                        final warnings =
+                                                        controller
+                                                            .importBatch(
+                                                            batch);
+                                                        setDialogState(
+                                                                () {});
+                                                        showDialog(
+                                                          context:
+                                                          dialogContext,
+                                                          builder:
+                                                              (resultContext) =>
+                                                              AlertDialog(
+                                                                backgroundColor:
+                                                                Colors.white,
+                                                                surfaceTintColor:
+                                                                Colors.white,
+                                                                title: Text(
+                                                                  warnings
+                                                                      .isEmpty
+                                                                      ? 'Import Complete'
+                                                                      : 'Import Complete — '
+                                                                      '${warnings.length} warning'
+                                                                      '${warnings.length == 1 ? '' : 's'}',
+                                                                  style: const TextStyle(
+                                                                    fontSize: 22,
+                                                                    fontWeight: FontWeight.bold,
+                                                                  ),
+                                                                ),
+                                                                content: SizedBox(
+                                                                  width: 400,
+                                                                  child: warnings.isEmpty
+                                                                      ? Text(
+                                                                    'All notes from ${batch.label} were created successfully.',
+                                                                    style: const TextStyle(fontSize: 22),
+                                                                  )
+                                                                      : SingleChildScrollView(
+                                                                    child: Column(
+                                                                      mainAxisSize: MainAxisSize.min,
+                                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                                      children: [
+                                                                        for (final w in warnings)
+                                                                          Padding(
+                                                                            padding: const EdgeInsets.only(bottom: 8),
+                                                                            child: Text(
+                                                                              w.toString(),
+                                                                              style: const TextStyle(fontSize: 18, color: Colors.red),
+                                                                            ),
+                                                                          ),
+                                                                      ],
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                actions: [
+                                                                  TextButton(
+                                                                    onPressed: () => Navigator.pop(resultContext),
+                                                                    child: const Text(
+                                                                      'Close',
+                                                                      style: TextStyle(
+                                                                        fontSize: 22,
+                                                                        fontWeight: FontWeight.bold,
+                                                                        color: Colors.black,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                        );
+                                                      },
+                                                    );
+                                                  },
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(dialogContext),
+                                            child: const Text(
+                                              'Close',
+                                              style: TextStyle(
+                                                fontSize: 22,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.black,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    },
                                   );
                                 },
                               );
-                            },
-                          );
-                        },
+                            }),
                       ),
 
 
