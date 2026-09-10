@@ -321,6 +321,146 @@ class CompositionController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Maps a "measureIndex_beatIndex" key to the number-of-beats
+  /// multiplier currently applied there via a fermata (see
+  /// [applyFermataToBeat]) — lets the grid know how much wider than
+  /// an ordinary beat this column actually is (so its beat line and
+  /// "fz" label are drawn in the right place — see grid_widget.dart)
+  /// and lets [deleteFermata] revert it back to a normal-width beat
+  /// exactly. Session-scoped only, like [importedBatchLabels] — not
+  /// persisted with the composition itself.
+  final Map<String, int> fermataMultipliers = {};
+
+  String _fermataKey(int measureIndex, int beatIndex) =>
+      '${measureIndex}_$beatIndex';
+
+  /// The fermata multiplier currently applied to
+  /// [measureIndex]/[beatIndex], or null if that beat has no fermata.
+  int? getFermataMultiplier(int measureIndex, int beatIndex) =>
+      fermataMultipliers[_fermataKey(measureIndex, beatIndex)];
+
+  /// Stretches beat [beatIndex] of measure [measureIndex] (a fermata)
+  /// so it lasts as long as [numberOfBeats] ordinary beats instead of
+  /// just 1 — every note whose startTick falls within the ORIGINAL
+  /// beat is repositioned and lengthened by that same factor, keeping
+  /// its proportional position within the beat (a note that started
+  /// halfway through the beat still starts halfway through the
+  /// stretched beat) and its proportional duration relative to the
+  /// beat's own new length. Everything at or after the beat's END —
+  /// later beats in this measure, and every later measure — is
+  /// pushed forward by the extra time added, via [_shiftTicksFrom],
+  /// the same helper [insertMeasureAt]/[removeBeatFromMeasure] use
+  /// for the same kind of "make room" shift. [numberOfBeats] <= 1 is
+  /// a no-op (fermata must actually lengthen the beat).
+  ///
+  /// If this beat already has a fermata applied (see
+  /// [fermataMultipliers]), that one is fully reverted first via
+  /// [deleteFermata] before the new multiplier is applied — otherwise
+  /// calling this again with a different number would compound on
+  /// top of the previous stretch rather than replacing it.
+  void applyFermataToBeat(
+      int measureIndex,
+      int beatIndex,
+      int numberOfBeats,
+      ) {
+    if (measureIndex < 0 || measureIndex >= measures.length) return;
+    if (numberOfBeats <= 1) return;
+
+    if (getFermataMultiplier(measureIndex, beatIndex) != null) {
+      deleteFermata(measureIndex, beatIndex);
+    }
+
+    final measure = measures[measureIndex];
+    final ticksPerBeat = measure.timeSignature.ticksPerBeat;
+    // getBeatTick (not the naive startTick + beatIndex*ticksPerBeat)
+    // — correctly accounts for any EARLIER beat in this same measure
+    // that's already fermata-stretched, so this beat's own start is
+    // computed from where it actually sits now, not where it would
+    // sit if every beat were a uniform width.
+    final beatStart = getBeatTick(measureIndex, beatIndex);
+    final beatEnd = beatStart + ticksPerBeat;
+    final extraTicks = ticksPerBeat * (numberOfBeats - 1);
+
+    // Make room for the extra time first — everything from the
+    // beat's original END onward (later beats, later measures, tempo/
+    // dynamic/dynamic-change events, etc.) shifts later. Notes INSIDE
+    // this beat (startTick < beatEnd) are untouched by this call, so
+    // they're still at their original ticks for the loop below.
+    _shiftTicksFrom(beatEnd, extraTicks);
+
+    for (int i = 0; i < notes.length; i++) {
+      final note = notes[i];
+      if (note.startTick >= beatStart && note.startTick < beatEnd) {
+        final offsetFromBeatStart = note.startTick - beatStart;
+        final newStartTick = beatStart + offsetFromBeatStart * numberOfBeats;
+        final newDuration = note.durationTicks * numberOfBeats;
+        notes[i] = note.copyWith(
+          startTick: newStartTick,
+          durationTicks: newDuration,
+        );
+      }
+    }
+
+    fermataMultipliers[_fermataKey(measureIndex, beatIndex)] = numberOfBeats;
+    // Folds the extra time into the MEASURE's own duration too — see
+    // Measure.fermataExtraTicks — and rebuilds the timeline so every
+    // LATER measure's startTick correctly shifts forward as well.
+    // Without this, only the notes/events themselves would have moved
+    // (via _shiftTicksFrom above); the measure's own boundary and
+    // every later measure's position would stay stale, cutting off or
+    // squeezing the rest of this measure's beats and misaligning
+    // everything after it.
+    measure.fermataExtraTicks += extraTicks;
+    timeline.rebuild();
+    notifyListeners();
+  }
+
+  /// Reverses whatever fermata is currently applied to
+  /// [measureIndex]/[beatIndex] (if any) — the exact inverse of
+  /// [applyFermataToBeat]: every note within the STRETCHED beat is
+  /// un-scaled and repositioned back to where it was before the
+  /// fermata, the beat's own width reverts to a normal single beat,
+  /// and everything after it shifts back by the extra ticks that are
+  /// now being removed. A no-op if no fermata is currently applied to
+  /// this beat.
+  void deleteFermata(int measureIndex, int beatIndex) {
+    final multiplier = getFermataMultiplier(measureIndex, beatIndex);
+    if (multiplier == null || multiplier <= 1) return;
+    if (measureIndex < 0 || measureIndex >= measures.length) return;
+
+    final measure = measures[measureIndex];
+    final ticksPerBeat = measure.timeSignature.ticksPerBeat;
+    final beatStart = getBeatTick(measureIndex, beatIndex);
+    final stretchedBeatEnd = beatStart + ticksPerBeat * multiplier;
+    final extraTicks = ticksPerBeat * (multiplier - 1);
+
+    for (int i = 0; i < notes.length; i++) {
+      final note = notes[i];
+      if (note.startTick >= beatStart && note.startTick < stretchedBeatEnd) {
+        final offsetFromBeatStart = note.startTick - beatStart;
+        final originalOffset = offsetFromBeatStart ~/ multiplier;
+        final originalDuration =
+        (note.durationTicks ~/ multiplier).clamp(1, 1 << 30);
+        notes[i] = note.copyWith(
+          startTick: beatStart + originalOffset,
+          durationTicks: originalDuration,
+        );
+      }
+    }
+
+    // Everything after the STRETCHED beat's end shifts back by the
+    // extra ticks the fermata had added.
+    _shiftTicksFrom(stretchedBeatEnd, -extraTicks);
+
+    fermataMultipliers.remove(_fermataKey(measureIndex, beatIndex));
+    // Inverse of the same fold applyFermataToBeat does — shrinks the
+    // measure's own duration back down and rebuilds the timeline so
+    // every later measure's startTick shifts back correctly too.
+    measure.fermataExtraTicks -= extraTicks;
+    timeline.rebuild();
+    notifyListeners();
+  }
+
 
   int getBeatTick(
       int measureIndex,
@@ -330,11 +470,19 @@ class CompositionController extends ChangeNotifier {
         measureIndex >= measures.length){
       return 0;
     }
-    final measure =
-    measures[measureIndex];
-    return measure.startTick +
-        beatIndex *
-            measure.timeSignature.ticksPerBeat;
+    final measure = measures[measureIndex];
+    final ticksPerBeat = measure.timeSignature.ticksPerBeat;
+    // Walks beat-by-beat rather than assuming every beat in this
+    // measure is the same width — a fermata-stretched EARLIER beat
+    // (see getFermataMultiplier/applyFermataToBeat) is wider than an
+    // ordinary one, so every beat after it sits further along than
+    // the naive `beatIndex * ticksPerBeat` would put it.
+    int tick = measure.startTick;
+    for (int b = 0; b < beatIndex; b++) {
+      final multiplier = getFermataMultiplier(measureIndex, b) ?? 1;
+      tick += ticksPerBeat * multiplier;
+    }
+    return tick;
   }
 
 
@@ -1044,7 +1192,16 @@ class CompositionController extends ChangeNotifier {
     // in the measure (from an earlier note), the new note is born
     // carrying that same accidental — not left null and merely
     // "computed as correct" via getEffectiveAccidental.
-    final inherited = getEffectiveAccidental(note);
+    //
+    // Uses _accidentalInEffectAt (tick/row), NOT getEffectiveAccidental
+    // (note) — the note was just added to composition.notes above, so
+    // by this point getEffectiveAccidental would find the note itself
+    // (own startTick, own still-null accidental) as the "nearest"
+    // note on this row and incorrectly return null every time,
+    // silently preventing inheritance entirely. _accidentalInEffectAt
+    // is built specifically to search strictly-earlier notes only,
+    // sidestepping this exact problem.
+    final inherited = _accidentalInEffectAt(tick, row);
     if (inherited != null) {
       final index = composition.notes.indexWhere((n) => n.id == note.id);
       note = note.copyWith(accidental: inherited);

@@ -16,7 +16,7 @@ import 'note_block_widget.dart';
 /// tempo — blue in light mode, white in dark mode (see
 /// AppColors.gridLabelText) for legibility against the black grid.
 TextStyle _tempoLabelStyle(double fontSize, bool isDarkMode) => TextStyle(
-  color: AppColors.gridLabelText(isDarkMode),
+  color: Colors.blue,
   fontSize: fontSize,
   fontWeight: FontWeight.bold,
 );
@@ -98,6 +98,17 @@ class _ScaleLabelHit {
   _ScaleLabelHit(this.measureIndex, this.rect);
 }
 
+// Tap target for a fermata-stretched beat's "fz" label (see
+// GridPainter's beat-line-drawing loop, which computes the exact same
+// position this mirrors). Tapping it re-opens the fermata dialog so
+// it can be changed or deleted.
+class _FermataHit {
+  final int measureIndex;
+  final int beatIndex;
+  final Rect rect;
+  _FermataHit(this.measureIndex, this.beatIndex, this.rect);
+}
+
 // Tap target for a dynamic change (crescendo/diminuendo start/finish)
 // vertical line. Tapping it opens the dynamic change dialog.
 class _DynamicChangeLineHit {
@@ -175,6 +186,15 @@ TextPainter _measureLabelTextPainter(String text, double fontSize, bool isDarkMo
 int _beatDenominator(dynamic beatDuration) {
   final wholeNoteTicks = NoteDuration.quarter.ticks * 4;
   return (wholeNoteTicks / beatDuration.ticks).round();
+}
+
+/// e.g. "fz=1/8x3" for a fermata stretching an eighth-note beat to
+/// last 3 beats long — the beat's own ORIGINAL duration (as a
+/// fraction of a whole note, via [_beatDenominator]) plus the
+/// fermata's multiplier, per request.
+String _fermataLabelText(dynamic beatDuration, int multiplier) {
+  final denominator = _beatDenominator(beatDuration);
+  return 'fz=1/${denominator}x$multiplier';
 }
 
 /// e.g. "1" for the 1st measure (1-based) — shown at the TOP of the
@@ -298,6 +318,63 @@ List<_ScaleLabelHit> _computeScaleLabelHits(
   return hits;
 }
 
+/// Computes tap-target rects for every fermata-stretched beat's "fz"
+/// label — mirrors GridPainter's own beat-line-drawing loop exactly
+/// (same beat-by-beat walk, same per-beat width accounting for a
+/// fermata multiplier, same centered label position), so the tap
+/// target always lines up with what's actually visible.
+List<_FermataHit> _computeFermataHits(
+    CompositionController controller,
+    double pixelsPerTick,
+    double gridHeight,
+    ) {
+  final hits = <_FermataHit>[];
+  final fontSize = controller.gridFontSize;
+  final measures = controller.measures;
+
+  for (int i = 0; i < measures.length; i++) {
+    final measure = measures[i];
+    final beatTicks = measure.timeSignature.beatDuration.ticks;
+    int cursorTick = measure.startTick;
+    int beatIdx = 0;
+    while (cursorTick < measure.endTick) {
+      final multiplier = controller.getFermataMultiplier(i, beatIdx) ?? 1;
+      final thisBeatTicks = beatTicks * multiplier;
+      final beatStartX = cursorTick * pixelsPerTick;
+      cursorTick += thisBeatTicks;
+
+      if (multiplier > 1) {
+        final beatWidthPx = thisBeatTicks * pixelsPerTick;
+        final tp = TextPainter(
+          text: TextSpan(
+            text: _fermataLabelText(measure.timeSignature.beatDuration, multiplier),
+            style: TextStyle(
+              color: Colors.blue,
+              fontSize: fontSize,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        final labelLeft = beatStartX + beatWidthPx / 2 - tp.width / 2;
+        final labelTop =
+            gridHeight - _measureLabelReferenceHeight(fontSize) - _bottomMargin;
+        hits.add(
+          _FermataHit(
+            i,
+            beatIdx,
+            Rect.fromLTWH(labelLeft, labelTop, tp.width, tp.height),
+          ),
+        );
+      }
+
+      beatIdx++;
+    }
+  }
+
+  return hits;
+}
+
 /// Computes tap-target rects for the green crescendo/diminuendo start &
 /// finish lines. Each line spans the full grid height, so the hit rect is
 /// just a thin vertical strip centered on the line's x position.
@@ -352,6 +429,195 @@ int visualRowToLogicalRow(CompositionController controller, int visualRow) {
   return controller.totalRows - 1 - visualRow;
 }
 
+/// The LOGICAL beat index within [measure] that [tick] falls into —
+/// walks beat-by-beat from the measure's own start, accounting for
+/// any EARLIER fermata-stretched beat (see
+/// CompositionController.getFermataMultiplier/applyFermataToBeat),
+/// the same way getBeatTick and _computeFermataHits already do.
+/// Unlike the naive `(tick - measure.startTick) ~/ ticksPerBeat`
+/// formula — which silently gives the WRONG beat index once any
+/// earlier beat in the measure is fermata-stretched wider than a
+/// single beat's own tick span — this always lines up with the
+/// beat the person actually tapped on, visually.
+int beatIndexAtTick(
+    CompositionController controller,
+    int measureIndex,
+    dynamic measure,
+    int tick,
+    ) {
+  final int beatTicks = measure.timeSignature.beatDuration.ticks;
+  int cursorTick = measure.startTick;
+  int beatIdx = 0;
+  while (cursorTick < measure.endTick) {
+    final multiplier =
+        controller.getFermataMultiplier(measureIndex, beatIdx) ?? 1;
+    final int thisBeatTicks = beatTicks * multiplier;
+    if (tick < cursorTick + thisBeatTicks) {
+      return beatIdx;
+    }
+    cursorTick += thisBeatTicks;
+    beatIdx++;
+  }
+  // Tick is at or past the measure's own end (shouldn't normally
+  // happen given callers clamp to maxTicks - 1 first) — fall back to
+  // the last beat index reached.
+  return beatIdx > 0 ? beatIdx - 1 : 0;
+}
+
+// Shared look for the small help-mode callout labels attached to the
+// tempo/scale name containers — a bright, high-contrast pill so they
+// read clearly against either the light or dark grid background.
+Widget _helpCallout(String text, {double? maxWidth, double fontSize = 22}) {
+  final textWidget = Text(
+    text,
+    style: TextStyle(
+      color: Colors.black,
+      fontSize: fontSize,
+      fontWeight: FontWeight.bold,
+    ),
+  );
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+    decoration: BoxDecoration(
+      color: Colors.blue.shade100,
+      borderRadius: BorderRadius.circular(4),
+      border: Border.all(color: Colors.black, width: 1),
+    ),
+    child: maxWidth != null
+        ? SizedBox(width: maxWidth, child: textWidget)
+        : textWidget,
+  );
+}
+
+// Which side of a speech bubble its pointer/tail sticks out from —
+// used by the sample-note help illustration below, where one bubble
+// points DOWN at the note (pointer on its own bottom edge) and the
+// other points UP at it (pointer on its own top edge).
+enum _BubblePointerSide { top, bottom, left, right }
+
+/// Draws a rounded speech-bubble shape with a small triangular
+/// pointer on one side, per request — a round callout that visibly
+/// points at its target, rather than a plain rectangular label.
+class _SpeechBubblePainter extends CustomPainter {
+  final _BubblePointerSide pointerSide;
+  final Color color;
+
+  _SpeechBubblePainter({required this.pointerSide, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const pointerHeight = 10.0;
+    const pointerWidth = 16.0;
+    const radius = 12.0;
+
+    final bodyTop = pointerSide == _BubblePointerSide.top ? pointerHeight : 0.0;
+    final bodyBottom = pointerSide == _BubblePointerSide.bottom
+        ? size.height - pointerHeight
+        : size.height;
+    // Only the `left`/`right` cases actually inset the body's
+    // corresponding edge — top/bottom cases keep the body spanning
+    // the full width, same as before.
+    final bodyLeft = pointerSide == _BubblePointerSide.left ? pointerHeight : 0.0;
+    final bodyRight = pointerSide == _BubblePointerSide.right
+        ? size.width - pointerHeight
+        : size.width;
+
+    final path = Path()
+      ..addRRect(
+        RRect.fromLTRBR(
+          bodyLeft,
+          bodyTop,
+          bodyRight,
+          bodyBottom,
+          const Radius.circular(radius),
+        ),
+      );
+
+    final centerX = size.width / 2;
+    final centerY = size.height / 2;
+    switch (pointerSide) {
+      case _BubblePointerSide.top:
+        path.moveTo(centerX - pointerWidth / 2, bodyTop);
+        path.lineTo(centerX, 0);
+        path.lineTo(centerX + pointerWidth / 2, bodyTop);
+        path.close();
+        break;
+      case _BubblePointerSide.bottom:
+        path.moveTo(centerX - pointerWidth / 2, bodyBottom);
+        path.lineTo(centerX, size.height);
+        path.lineTo(centerX + pointerWidth / 2, bodyBottom);
+        path.close();
+        break;
+      case _BubblePointerSide.left:
+        path.moveTo(bodyLeft, centerY - pointerWidth / 2);
+        path.lineTo(0, centerY);
+        path.lineTo(bodyLeft, centerY + pointerWidth / 2);
+        path.close();
+        break;
+      case _BubblePointerSide.right:
+        path.moveTo(bodyRight, centerY - pointerWidth / 2);
+        path.lineTo(size.width, centerY);
+        path.lineTo(bodyRight, centerY + pointerWidth / 2);
+        path.close();
+        break;
+    }
+
+    canvas.drawPath(path, Paint()..color = color);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = Colors.black
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _SpeechBubblePainter oldDelegate) {
+    return oldDelegate.pointerSide != pointerSide || oldDelegate.color != color;
+  }
+}
+
+/// A rounded speech-bubble callout with [text] inside, pointing
+/// toward its target from whichever side [pointerSide] selects —
+/// `bottom` puts the pointer on the bubble's own bottom edge (so it
+/// sits above something and points down at it); `top` puts it on the
+/// top edge (so it sits below something and points up at it); `left`
+/// puts it on the left edge (so it sits to the right of something and
+/// points left at it).
+Widget _speechBubble(
+    String text, {
+      required _BubblePointerSide pointerSide,
+      double? maxWidth,
+    }) {
+  final textWidget = Text(
+    text,
+    textAlign: TextAlign.center,
+    style: const TextStyle(
+      color: Colors.black,
+      fontSize: 22,
+      fontWeight: FontWeight.bold,
+    ),
+  );
+  return CustomPaint(
+    painter: _SpeechBubblePainter(
+      pointerSide: pointerSide,
+      color: Colors.blue.shade100,
+    ),
+    child: Padding(
+      padding: EdgeInsets.fromLTRB(
+        pointerSide == _BubblePointerSide.left ? 18 : 12,
+        pointerSide == _BubblePointerSide.top ? 18 : 8,
+        pointerSide == _BubblePointerSide.right ? 18 : 12,
+        pointerSide == _BubblePointerSide.bottom ? 18 : 8,
+      ),
+      child: maxWidth != null
+          ? SizedBox(width: maxWidth, child: textWidget)
+          : textWidget,
+    ),
+  );
+}
+
 class GridWidget extends StatelessWidget {
   final CompositionController controller;
   final double cellHeight;
@@ -375,6 +641,13 @@ class GridWidget extends StatelessWidget {
   // editing behavior.
   final bool isPlaying;
   final VoidCallback? onTapWhilePlaying;
+  // While on, overlays short instructional callouts explaining how to
+  // edit tempo/scale (attached right next to their own labels) plus a
+  // fixed banner (pinned to the viewport, not the scrollable content)
+  // covering time signature, dynamics, and note editing — per
+  // request. Purely visual; doesn't change any tap/gesture behavior
+  // in this widget itself.
+  final bool helpMode;
 
   const GridWidget({
     super.key,
@@ -385,6 +658,7 @@ class GridWidget extends StatelessWidget {
     this.leadingPadding = 0,
     this.isPlaying = false,
     this.onTapWhilePlaying,
+    this.helpMode = false,
   });
 
 
@@ -397,326 +671,497 @@ class GridWidget extends StatelessWidget {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, child) {
-        return SingleChildScrollView(
-          scrollDirection: Axis.vertical,
-          controller: verticalScrollController,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            controller: horizontalScrollController,
-            padding: EdgeInsets.only(left: leadingPadding),
-            child: SizedBox(
-              width: gridWidth,
-              height: gridHeight,
-              child: Stack(
-                children: [
-                  // GRID BACKGROUND
-                  Positioned.fill(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      // Deliberately onTapUp (fires only once a tap is
-                      // confirmed to NOT be the first half of a double
-                      // tap), not onTapDown (which fires immediately on
-                      // every touch regardless of what follows).
-                      // Providing both this and onDoubleTapDown below
-                      // makes Flutter insert the standard double-tap
-                      // disambiguation delay before this fires — the
-                      // tradeoff that buys double-tapping empty grid
-                      // space (onDoubleTapDown) without a note getting
-                      // created first. A double-tap directly ON an
-                      // existing note is unaffected by any of this — the
-                      // note's own GestureDetector (see NoteBlockWidget)
-                      // sits on top in the Stack and captures the touch
-                      // before it ever reaches this background detector.
-                      onTapUp: (details) {
-                        // While playback is active, ANY tap on the
-                        // grid pauses it instead of doing its normal
-                        // note-creation/editing thing — tapping again
-                        // later resumes from that same spot via the
-                        // ordinary Play button logic, since pausing
-                        // (unlike stopping) never resets the playback
-                        // position.
-                        if (isPlaying) {
-                          onTapWhilePlaying?.call();
-                          return;
-                        }
-                        if (controller.editingBlocked) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                controller.editingBlockedMessage,
-                                style: const TextStyle(fontSize: 22),
-                              ),
-                            ),
-                          );
-                          return;
-                        }
+        final scaleLabelHits = helpMode
+            ? _computeScaleLabelHits(controller, pixelsPerTick)
+            : const <_ScaleLabelHit>[];
+        final labelHits = helpMode
+            ? _computeLabelHits(controller, pixelsPerTick, gridHeight)
+            : const <_LabelHit>[];
 
-                        // 0. If a glissando end-row pick is pending
-                        //    (see CompositionController.
-                        //    startGlissandoPick, kicked off from
-                        //    NoteDialog's Glissando field), this tap
-                        //    ONLY completes that — it doesn't select a
-                        //    measure, open a label dialog, or create a
-                        //    note. An invalid pick (wrong side of the
-                        //    note, or off-grid) shows a message and
-                        //    stays in picking mode so the person can
-                        //    just tap again.
-                        if (controller.isPickingGlissandoEndRow) {
-                          final visualRow =
-                          (details.localPosition.dy / cellHeight).floor();
-                          final row = visualRowToLogicalRow(controller, visualRow);
-                          final errorMessage =
-                          controller.finishGlissandoPick(row);
-                          if (errorMessage != null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  errorMessage,
-                                  style: const TextStyle(fontSize: 22),
+        return Stack(
+          children: [
+            SingleChildScrollView(
+              scrollDirection: Axis.vertical,
+              controller: verticalScrollController,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                controller: horizontalScrollController,
+                padding: EdgeInsets.only(left: leadingPadding),
+                child: SizedBox(
+                  width: gridWidth,
+                  height: gridHeight,
+                  child: Stack(
+                    children: [
+                      // GRID BACKGROUND
+                      Positioned.fill(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          // Deliberately onTapUp (fires only once a tap is
+                          // confirmed to NOT be the first half of a double
+                          // tap), not onTapDown (which fires immediately on
+                          // every touch regardless of what follows).
+                          // Providing both this and onDoubleTapDown below
+                          // makes Flutter insert the standard double-tap
+                          // disambiguation delay before this fires — the
+                          // tradeoff that buys double-tapping empty grid
+                          // space (onDoubleTapDown) without a note getting
+                          // created first. A double-tap directly ON an
+                          // existing note is unaffected by any of this — the
+                          // note's own GestureDetector (see NoteBlockWidget)
+                          // sits on top in the Stack and captures the touch
+                          // before it ever reaches this background detector.
+                          onTapUp: (details) {
+                            // While playback is active, ANY tap on the
+                            // grid pauses it instead of doing its normal
+                            // note-creation/editing thing — tapping again
+                            // later resumes from that same spot via the
+                            // ordinary Play button logic, since pausing
+                            // (unlike stopping) never resets the playback
+                            // position.
+                            if (isPlaying) {
+                              onTapWhilePlaying?.call();
+                              return;
+                            }
+                            // Skipped in Help Mode — otherwise this
+                            // early return (triggered because Help
+                            // Mode forces Scroll Lock on) would also
+                            // block reaching the fermata/scale/tempo/
+                            // dynamic label checks below, which SHOULD
+                            // still work while Help Mode is on. Note
+                            // creation itself is separately blocked
+                            // further down (see the helpMode check
+                            // right before it).
+                            if (!helpMode && controller.editingBlocked) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    controller.editingBlockedMessage,
+                                    style: const TextStyle(fontSize: 22),
+                                  ),
                                 ),
-                              ),
-                            );
-                          }
-                          return;
-                        }
+                              );
+                              return;
+                            }
 
-                        // 1. If "Add Grace Note" mode is on (see
-                        //    CompositionController.
-                        //    startAddingGraceNotes, kicked off from
-                        //    NoteDialog's Grace Notes field), this tap
-                        //    ONLY adds one more grace note — it
-                        //    doesn't select a measure, open a label
-                        //    dialog, or create an ordinary note.
-                        //    Unlike glissando's pick, this mode stays
-                        //    on for MANY taps — it's only turned off
-                        //    via the app-bar toggle (see
-                        //    CompositionController.
-                        //    stopAddingGraceNotes), not automatically
-                        //    after one tap. A failed add (already at
-                        //    the max, or off-grid) just shows a
-                        //    message; the mode stays on either way.
-                        if (controller.isAddingGraceNotes) {
-                          final visualRow =
-                          (details.localPosition.dy / cellHeight).floor();
-                          final row = visualRowToLogicalRow(controller, visualRow);
-                          final errorMessage =
-                          controller.addGraceNoteAtRow(row);
-                          if (errorMessage != null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  errorMessage,
-                                  style: const TextStyle(fontSize: 22),
+                            // 0. If a glissando end-row pick is pending
+                            //    (see CompositionController.
+                            //    startGlissandoPick, kicked off from
+                            //    NoteDialog's Glissando field), this tap
+                            //    ONLY completes that — it doesn't select a
+                            //    measure, open a label dialog, or create a
+                            //    note. An invalid pick (wrong side of the
+                            //    note, or off-grid) shows a message and
+                            //    stays in picking mode so the person can
+                            //    just tap again.
+                            if (controller.isPickingGlissandoEndRow) {
+                              final visualRow =
+                              (details.localPosition.dy / cellHeight).floor();
+                              final row = visualRowToLogicalRow(controller, visualRow);
+                              final errorMessage =
+                              controller.finishGlissandoPick(row);
+                              if (errorMessage != null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      errorMessage,
+                                      style: const TextStyle(fontSize: 22),
+                                    ),
+                                  ),
+                                );
+                              }
+                              return;
+                            }
+
+                            // 1. If "Add Grace Note" mode is on (see
+                            //    CompositionController.
+                            //    startAddingGraceNotes, kicked off from
+                            //    NoteDialog's Grace Notes field), this tap
+                            //    ONLY adds one more grace note — it
+                            //    doesn't select a measure, open a label
+                            //    dialog, or create an ordinary note.
+                            //    Unlike glissando's pick, this mode stays
+                            //    on for MANY taps — it's only turned off
+                            //    via the app-bar toggle (see
+                            //    CompositionController.
+                            //    stopAddingGraceNotes), not automatically
+                            //    after one tap. A failed add (already at
+                            //    the max, or off-grid) just shows a
+                            //    message; the mode stays on either way.
+                            if (controller.isAddingGraceNotes) {
+                              final visualRow =
+                              (details.localPosition.dy / cellHeight).floor();
+                              final row = visualRowToLogicalRow(controller, visualRow);
+                              final errorMessage =
+                              controller.addGraceNoteAtRow(row);
+                              if (errorMessage != null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      errorMessage,
+                                      style: const TextStyle(fontSize: 22),
+                                    ),
+                                  ),
+                                );
+                              }
+                              return;
+                            }
+
+                            // 2. Whatever else this tap does, it also tells us
+                            //    which measure the person is pointing at — so
+                            //    the pitch column can switch to that measure's
+                            //    scale.
+                            final tappedTick =
+                            (details.localPosition.dx / pixelsPerTick)
+                                .floor()
+                                .clamp(0, controller.maxTicks - 1);
+                            if (controller.maxTicks > 0) {
+                              controller.selectMeasureAtTick(tappedTick);
+                            }
+
+                            // 3. Check any fermata "fz" labels next —
+                            //    tapping one reopens the fermata
+                            //    dialog (to change or delete it)
+                            //    instead of creating a note.
+                            final fermataHits = _computeFermataHits(
+                              controller,
+                              pixelsPerTick,
+                              gridHeight,
+                            );
+
+                            for (final hit in fermataHits) {
+                              if (hit.rect.contains(details.localPosition)) {
+                                fermataDialog(
+                                  context: context,
+                                  controller: controller,
+                                  measureIndex: hit.measureIndex,
+                                  beatIndex: hit.beatIndex,
+                                );
+                                return; // don't fall through to note creation
+                              }
+                            }
+
+                            // 4. Check the scale name label at the top —
+                            //    tapping it opens a scale picker for that
+                            //    measure, not creating a note.
+                            final scaleLabelHits = _computeScaleLabelHits(
+                              controller,
+                              pixelsPerTick,
+                            );
+
+                            for (final hit in scaleLabelHits) {
+                              if (hit.rect.contains(details.localPosition)) {
+                                final measure =
+                                controller.measures[hit.measureIndex];
+                                scaleDialog(
+                                  context: context,
+                                  controller: controller,
+                                  currentScale: measure.scaleName,
+                                  onSelected: (newScale) {
+                                    controller.updateMeasureScale(
+                                      hit.measureIndex,
+                                      newScale,
+                                    );
+                                  },
+                                );
+                                return; // don't fall through to note creation
+                              }
+                            }
+
+                            // 5. Check tempo/dynamic labels next — tapping a
+                            //    label should open its edit dialog, not create
+                            //    a note.
+                            final labelHits = _computeLabelHits(
+                              controller,
+                              pixelsPerTick,
+                              gridHeight,
+                            );
+
+                            for (final hit in labelHits) {
+                              if (hit.rect.contains(details.localPosition)) {
+                                if (hit.isTempo) {
+                                  tempoDialog(context, controller, hit.tick);
+                                } else {
+                                  dynamicDialog(context, controller, hit.tick);
+                                }
+                                return; // don't fall through to note creation
+                              }
+                            }
+
+                            // 6. Check crescendo/diminuendo start & finish
+                            //    lines next — tapping one opens the dynamic
+                            //    change dialog instead of creating a note.
+                            final dynamicChangeLineHits =
+                            _computeDynamicChangeLineHits(
+                              controller,
+                              pixelsPerTick,
+                              gridHeight,
+                            );
+
+                            for (final hit in dynamicChangeLineHits) {
+                              if (hit.rect.contains(details.localPosition)) {
+                                dynamicChangeDialog(context, controller, hit.tick);
+                                return; // don't fall through to note creation
+                              }
+                            }
+
+                            // 7. Otherwise, normal grid/note tap handling.
+                            // While Help Mode is on, tapping the grid
+                            // never creates a note — per request, this
+                            // mode is purely informational, not for
+                            // editing. Everything above this point
+                            // (fermata/scale/tempo/dynamic labels) still
+                            // works normally even in Help Mode, since
+                            // those already open their own dialogs
+                            // rather than creating a note.
+                            if (helpMode) {
+                              return;
+                            }
+                            // The tapped screen position is converted to a
+                            // musical row: row 0 (lowest pitch) sits at the
+                            // BOTTOM of the grid, so a tap near the bottom
+                            // (large visualRow) should map to a small row
+                            // number.
+                            final visualRow =
+                            (details.localPosition.dy / cellHeight).floor();
+                            final row = visualRowToLogicalRow(controller, visualRow);
+
+                            final rawTick =
+                            (details.localPosition.dx / pixelsPerTick).floor();
+
+                            if (row >= 0 && row < controller.totalRows) {
+                              final existing = controller.getNoteAtPosition(
+                                rawTick,
+                                row,
+                              );
+
+                              if (existing == null) {
+                                if (controller.pasteMode) {
+                                  controller.pasteNoteAt(rawTick, row);
+                                } else {
+                                  controller.handleGridTap(rawTick, row);
+                                }
+                              }
+                            }
+                          },
+                          // Double-tapping empty grid space (no note there —
+                          // a tap on an actual note is captured by that
+                          // note's own detector first, see the comment
+                          // above) opens the edit-measure-beat dialog
+                          // directly, computed straight from the tapped
+                          // position — no note is created as a side effect
+                          // first.
+                          onDoubleTapDown: (details) {
+                            // Skipped in Help Mode for the same reason
+                            // as onTapUp above — double-tap only opens
+                            // a dialog here, never creates a note, so
+                            // there's no reason to block it, and the
+                            // help illustrations promise this still
+                            // works.
+                            if (!helpMode && controller.editingBlocked) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    controller.editingBlockedMessage,
+                                    style: const TextStyle(fontSize: 22),
+                                  ),
                                 ),
-                              ),
+                              );
+                              return;
+                            }
+
+                            // While waiting for a glissando end-row tap
+                            // (see onTapUp above), a double-tap shouldn't
+                            // open the measure/beat dialog either — it's
+                            // still just an ordinary single tap as far as
+                            // that pending pick is concerned, and onTapUp
+                            // already handles it.
+                            if (controller.isPickingGlissandoEndRow) {
+                              return;
+                            }
+
+                            // Same idea while "Add Grace Note" mode is on
+                            // — a double-tap is still just an ordinary
+                            // single tap as far as adding a grace note is
+                            // concerned, and onTapUp already handles it.
+                            if (controller.isAddingGraceNotes) {
+                              return;
+                            }
+
+                            final rawTick =
+                            (details.localPosition.dx / pixelsPerTick)
+                                .floor()
+                                .clamp(0, controller.maxTicks - 1);
+
+                            if (controller.maxTicks > 0) {
+                              controller.selectMeasureAtTick(rawTick);
+                            }
+
+                            final measure = controller.getMeasureAtTick(rawTick);
+                            final measureIndex =
+                            controller.measures.indexOf(measure);
+                            final beatIndex = beatIndexAtTick(
+                              controller,
+                              measureIndex,
+                              measure,
+                              rawTick,
                             );
-                          }
-                          return;
-                        }
 
-                        // 2. Whatever else this tap does, it also tells us
-                        //    which measure the person is pointing at — so
-                        //    the pitch column can switch to that measure's
-                        //    scale.
-                        final tappedTick =
-                        (details.localPosition.dx / pixelsPerTick)
-                            .floor()
-                            .clamp(0, controller.maxTicks - 1);
-                        if (controller.maxTicks > 0) {
-                          controller.selectMeasureAtTick(tappedTick);
-                        }
-
-                        // 3. Check the scale name label at the top —
-                        //    tapping it opens a scale picker for that
-                        //    measure, not creating a note.
-                        final scaleLabelHits = _computeScaleLabelHits(
-                          controller,
-                          pixelsPerTick,
-                        );
-
-                        for (final hit in scaleLabelHits) {
-                          if (hit.rect.contains(details.localPosition)) {
-                            final measure =
-                            controller.measures[hit.measureIndex];
-                            scaleDialog(
+                            editMeasureBeatDialog(
                               context: context,
                               controller: controller,
-                              currentScale: measure.scaleName,
-                              onSelected: (newScale) {
-                                controller.updateMeasureScale(
-                                  hit.measureIndex,
-                                  newScale,
-                                );
-                              },
+                              measureIndex: measureIndex,
+                              beatIndex: beatIndex,
                             );
-                            return; // don't fall through to note creation
-                          }
-                        }
-
-                        // 4. Check tempo/dynamic labels next — tapping a
-                        //    label should open its edit dialog, not create
-                        //    a note.
-                        final labelHits = _computeLabelHits(
-                          controller,
-                          pixelsPerTick,
-                          gridHeight,
-                        );
-
-                        for (final hit in labelHits) {
-                          if (hit.rect.contains(details.localPosition)) {
-                            if (hit.isTempo) {
-                              tempoDialog(context, controller, hit.tick);
-                            } else {
-                              dynamicDialog(context, controller, hit.tick);
-                            }
-                            return; // don't fall through to note creation
-                          }
-                        }
-
-                        // 5. Check crescendo/diminuendo start & finish
-                        //    lines next — tapping one opens the dynamic
-                        //    change dialog instead of creating a note.
-                        final dynamicChangeLineHits =
-                        _computeDynamicChangeLineHits(
-                          controller,
-                          pixelsPerTick,
-                          gridHeight,
-                        );
-
-                        for (final hit in dynamicChangeLineHits) {
-                          if (hit.rect.contains(details.localPosition)) {
-                            dynamicChangeDialog(context, controller, hit.tick);
-                            return; // don't fall through to note creation
-                          }
-                        }
-
-                        // 6. Otherwise, normal grid/note tap handling.
-                        // The tapped screen position is converted to a
-                        // musical row: row 0 (lowest pitch) sits at the
-                        // BOTTOM of the grid, so a tap near the bottom
-                        // (large visualRow) should map to a small row
-                        // number.
-                        final visualRow =
-                        (details.localPosition.dy / cellHeight).floor();
-                        final row = visualRowToLogicalRow(controller, visualRow);
-
-                        final rawTick =
-                        (details.localPosition.dx / pixelsPerTick).floor();
-
-                        if (row >= 0 && row < controller.totalRows) {
-                          final existing = controller.getNoteAtPosition(
-                            rawTick,
-                            row,
-                          );
-
-                          if (existing == null) {
-                            if (controller.pasteMode) {
-                              controller.pasteNoteAt(rawTick, row);
-                            } else {
-                              controller.handleGridTap(rawTick, row);
-                            }
-                          }
-                        }
-                      },
-                      // Double-tapping empty grid space (no note there —
-                      // a tap on an actual note is captured by that
-                      // note's own detector first, see the comment
-                      // above) opens the edit-measure-beat dialog
-                      // directly, computed straight from the tapped
-                      // position — no note is created as a side effect
-                      // first.
-                      onDoubleTapDown: (details) {
-                        if (controller.editingBlocked) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                controller.editingBlockedMessage,
-                                style: const TextStyle(fontSize: 22),
-                              ),
+                          },
+                          child: CustomPaint(
+                            painter: GridPainter(
+                              controller: controller,
+                              cellHeight: cellHeight,
+                              pixelsPerTick: pixelsPerTick,
                             ),
-                          );
-                          return;
-                        }
-
-                        // While waiting for a glissando end-row tap
-                        // (see onTapUp above), a double-tap shouldn't
-                        // open the measure/beat dialog either — it's
-                        // still just an ordinary single tap as far as
-                        // that pending pick is concerned, and onTapUp
-                        // already handles it.
-                        if (controller.isPickingGlissandoEndRow) {
-                          return;
-                        }
-
-                        // Same idea while "Add Grace Note" mode is on
-                        // — a double-tap is still just an ordinary
-                        // single tap as far as adding a grace note is
-                        // concerned, and onTapUp already handles it.
-                        if (controller.isAddingGraceNotes) {
-                          return;
-                        }
-
-                        final rawTick =
-                        (details.localPosition.dx / pixelsPerTick)
-                            .floor()
-                            .clamp(0, controller.maxTicks - 1);
-
-                        if (controller.maxTicks > 0) {
-                          controller.selectMeasureAtTick(rawTick);
-                        }
-
-                        final measure = controller.getMeasureAtTick(rawTick);
-                        final measureIndex =
-                        controller.measures.indexOf(measure);
-                        final beatIndex = (rawTick - measure.startTick) ~/
-                            measure.timeSignature.ticksPerBeat;
-
-                        editMeasureBeatDialog(
-                          context: context,
-                          controller: controller,
-                          measureIndex: measureIndex,
-                          beatIndex: beatIndex,
-                        );
-                      },
-                      child: CustomPaint(
-                        painter: GridPainter(
-                          controller: controller,
-                          cellHeight: cellHeight,
-                          pixelsPerTick: pixelsPerTick,
+                          ),
                         ),
                       ),
-                    ),
-                  ),
 
-                  // NOTES — displayNotes expands any note carrying an
-                  // ornament into its ghost sequence (see Ornament.shiftMap /
-                  // CompositionController.displayNotes). Only the ghost(s)
-                  // at the ornament's own unaltered/base pitch (raw
-                  // shift == 0) are clickable and carry an
-                  // interactionNote pointing back at the real note —
-                  // every other ghost in the sequence is display-only.
-                  // Each ghost's raw shift is passed through as
-                  // ornamentShift so NoteBlockWidget can interpret it
-                  // according to the compensated-notation toggle.
-                  ...controller.displayNotes.map(
-                        (entry) => NoteBlockWidget(
-                      key: ValueKey(entry.note.id),
-                      note: entry.note,
-                      pixelsPerTick: pixelsPerTick,
-                      cellHeight: cellHeight,
-                      controller: controller,
-                      isCompensatedGhost: entry.isGhost,
-                      isClickable: entry.isClickable,
-                      interactionNote: entry.interactionNote,
-                      ornamentShift: entry.shift,
-                      isPlaying: isPlaying,
-                      onTapWhilePlaying: onTapWhilePlaying,
-                    ),
+                      // NOTES — displayNotes expands any note carrying an
+                      // ornament into its ghost sequence (see Ornament.shiftMap /
+                      // CompositionController.displayNotes). Only the ghost(s)
+                      // at the ornament's own unaltered/base pitch (raw
+                      // shift == 0) are clickable and carry an
+                      // interactionNote pointing back at the real note —
+                      // every other ghost in the sequence is display-only.
+                      // Each ghost's raw shift is passed through as
+                      // ornamentShift so NoteBlockWidget can interpret it
+                      // according to the compensated-notation toggle.
+                      ...controller.displayNotes.map(
+                            (entry) => NoteBlockWidget(
+                          key: ValueKey(entry.note.id),
+                          note: entry.note,
+                          pixelsPerTick: pixelsPerTick,
+                          cellHeight: cellHeight,
+                          controller: controller,
+                          isCompensatedGhost: entry.isGhost,
+                          isClickable: entry.isClickable,
+                          interactionNote: entry.interactionNote,
+                          ornamentShift: entry.shift,
+                          isPlaying: isPlaying,
+                          onTapWhilePlaying: onTapWhilePlaying,
+                        ),
+                      ),
+
+                      // HELP MODE — tempo callouts, positioned just
+                      // below each tempo label's own rect.
+                      if (helpMode)
+                        ...labelHits.where((h) => h.isTempo).map(
+                              (hit) => Positioned(
+                            left: hit.rect.left,
+                            // Positioned via `bottom` (relative to the
+                            // stack's own bottom edge) rather than
+                            // `top`, since the callout's own rendered
+                            // height isn't known in advance here —
+                            // this puts its bottom edge 2px above the
+                            // tempo label's own top edge, i.e. ABOVE
+                            // the tempo name, per request (previously
+                            // below it).
+                            bottom: gridHeight - hit.rect.top + 2,
+                            child: _helpCallout(
+                              'Tap Tempo name to edit',
+                            ),
+                          ),
+                        ),
+
+                      // HELP MODE — scale callouts, positioned just
+                      // below each scale name label's own rect.
+                      if (helpMode)
+                        ...scaleLabelHits.map(
+                              (hit) => Positioned(
+                            left: hit.rect.left,
+                            top: hit.rect.bottom + 2,
+                            child: _helpCallout(
+                              'Tap scale name to edit',
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
-          ),
+
+            // HELP MODE — instructional banners about note editing,
+            // pinned to the viewport itself (outside the scrollable
+            // content above) so they stay visible regardless of
+            // scroll position, rather than scrolling away with the
+            // grid. No longer draws a sample note — per request, this
+            // mode shouldn't create/show any note (even an
+            // illustrative one) — so these use the plain, pointer-
+            // less _helpCallout style instead of speech bubbles
+            // pointing at a note that no longer exists.
+            if (helpMode)
+              Positioned.fill(
+                child: Align(
+                  alignment: const Alignment(0, 0.5),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      _helpCallout('Single tap note to edit'),
+                      const SizedBox(height: 8),
+                      _helpCallout('Drag note to move it'),
+                      const SizedBox(height: 8),
+                      _helpCallout(
+                        "Long tap note to copy it, paste it, to stop pasting tap icon 'Paste mode'",
+                        maxWidth: 260,
+                      ),
+                      const SizedBox(height: 8),
+                      _helpCallout('Double tap beat to edit'),
+                    ],
+                  ),
+                ),
+              ),
+
+            // HELP MODE — points at the toolbar icons sitting just
+            // outside the grid's own left edge (in CompositionScreen's
+            // app-bar columns), per request. Positioned in the TOP-left
+            // band (not vertically centered) so it never overlaps the
+            // sample-note illustration group below, which sits at
+            // Alignment.center — the two previously shared the same
+            // vertical band (centerLeft vs center both sit at the
+            // viewport's own vertical middle), so a wide sample-note
+            // group could overlap this bubble.
+            if (helpMode)
+              Positioned.fill(
+                child: Align(
+                  alignment: const Alignment(-1, -0.5),
+                  child: _speechBubble(
+                    'Tap icon to\nknow what it does',
+                    pointerSide: _BubblePointerSide.left,
+                  ),
+                ),
+              ),
+
+            // HELP MODE — a plain, pointer-less banner (per request —
+            // this one doesn't point at any specific spot on the grid,
+            // so it uses the same square _helpCallout style as the
+            // tempo/scale callouts rather than a speech bubble),
+            // explaining hand/duration setup before tapping the grid.
+            // Positioned at the BOTTOM of the viewport, well clear of
+            // the upper-left icon bubble and the centered sample-note
+            // group, so none of the three banners cover each other.
+            if (helpMode)
+              Positioned.fill(
+                child: Align(
+                  alignment: const Alignment(0, -0.3),
+                  child: _helpCallout(
+                    "To start set hand by tapping icon 'Hand change', set note "
+                        "duration by tapping icon 'Note duration', then tap "
+                        "grid to create note.",
+                    maxWidth: 320,
+                    fontSize: 22,
+                  ),
+                ),
+              ),
+          ],
         );
       },
     );
@@ -1116,13 +1561,52 @@ class GridPainter extends CustomPainter {
       );
 
       final beatTicks = measure.timeSignature.beatDuration.ticks;
-      for (
-      int tick = measure.startTick + beatTicks;
-      tick < measure.endTick;
-      tick += beatTicks
-      ) {
-        final x = tick * pixelsPerTick;
-        canvas.drawLine(Offset(x, 0), Offset(x, size.height), beatPaint);
+      // Walks beat-by-beat rather than assuming every beat in this
+      // measure is the same width — a fermata-stretched beat (see
+      // CompositionController.getFermataMultiplier/
+      // applyFermataToBeat) is wider than an ordinary one, so its
+      // beat line needs to be drawn further along, and it gets a
+      // blue "fz" label centered in its own (wider) column.
+      int cursorTick = measure.startTick;
+      int beatIdx = 0;
+      while (cursorTick < measure.endTick) {
+        final fermataMultiplier =
+            controller.getFermataMultiplier(i, beatIdx) ?? 1;
+        final thisBeatTicks = beatTicks * fermataMultiplier;
+        final beatStartX = cursorTick * pixelsPerTick;
+        cursorTick += thisBeatTicks;
+
+        if (cursorTick < measure.endTick) {
+          final x = cursorTick * pixelsPerTick;
+          canvas.drawLine(Offset(x, 0), Offset(x, size.height), beatPaint);
+        }
+
+        if (fermataMultiplier > 1) {
+          final beatWidthPx = thisBeatTicks * pixelsPerTick;
+          final fermataTp = TextPainter(
+            text: TextSpan(
+              text: _fermataLabelText(
+                measure.timeSignature.beatDuration,
+                fermataMultiplier,
+              ),
+              style: TextStyle(
+                color: Colors.blue,
+                fontSize: fontSize,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            textDirection: TextDirection.ltr,
+          )..layout();
+          fermataTp.paint(
+            canvas,
+            Offset(
+              beatStartX + beatWidthPx / 2 - fermataTp.width / 2,
+              size.height - _measureLabelReferenceHeight(fontSize) - _bottomMargin,
+            ),
+          );
+        }
+
+        beatIdx++;
       }
     }
 

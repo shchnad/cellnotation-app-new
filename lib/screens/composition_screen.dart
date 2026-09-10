@@ -57,6 +57,19 @@ class _CompositionScreenState extends State<CompositionScreen>
   bool _isPlaying = false;
   bool _toShowTitle = false;
 
+  // Anchors for the Hand/Note-Duration help labels — see
+  // _toolbarLabel's doc. CompositedTransformTarget (wrapping each
+  // icon) + CompositedTransformFollower (wrapping the label, placed
+  // in an OUTER Stack on top of the whole Row) track the icon's real
+  // rendered position regardless of the toolbar's own spaceEvenly
+  // layout, and — critically — paint AFTER (on top of) the pitch
+  // column/grid, which a plain Positioned overflowing the toolbar's
+  // own 46px-wide Stack could not do (Row paints later siblings over
+  // earlier ones' overflow, which is what was covering the labels).
+  final LayerLink _handIconLink = LayerLink();
+  final LayerLink _durationIconLink = LayerLink();
+  final LayerLink _pasteIconLink = LayerLink();
+
   // When on, tapping any toolbar icon shows a help dialog explaining
   // that button instead of performing its normal action. Toggled by
   // the new help icon below the theme-change icon.
@@ -274,16 +287,25 @@ class _CompositionScreenState extends State<CompositionScreen>
   }
 
   void _showHelpDialog(String text) {
+    // Every help string here follows the pattern "Name: \nDescription"
+    // (see every _withHelp call above) — split on that separator so
+    // the button's own NAME becomes the dialog's title (in blue),
+    // replacing the old generic "Help" title, per request.
+    final separatorIndex = text.indexOf(': \n');
+    final name = separatorIndex != -1 ? text.substring(0, separatorIndex) : text;
+    final description =
+    separatorIndex != -1 ? text.substring(separatorIndex + 3) : '';
+
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
-        title: const Text(
-          'Help',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blue),
+        title: Text(
+          name,
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blue),
         ),
-        content: Text(text, style: const TextStyle(fontSize: 20)),
+        content: Text(description, style: const TextStyle(fontSize: 22, color: Colors.black)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
@@ -297,6 +319,39 @@ class _CompositionScreenState extends State<CompositionScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// A small label banner pointing at a specific toolbar icon while
+  /// Help Mode is on. Uses CompositedTransformFollower (paired with a
+  /// CompositedTransformTarget wrapping the icon itself) rather than
+  /// a plain Positioned overflowing the toolbar's own narrow column —
+  /// a plain Positioned got painted OVER by the pitch column/grid,
+  /// since Row paints later siblings on top of earlier ones'
+  /// overflow. This is placed directly in the OUTER Stack (wrapping
+  /// the whole screen Row), which paints last, so it's always on top
+  /// regardless of what's underneath, while still tracking the
+  /// icon's exact real position via [link].
+  Widget _toolbarLabel(LayerLink link, String text) {
+    return CompositedTransformFollower(
+      link: link,
+      offset: const Offset(46, 0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+        decoration: BoxDecoration(
+          color: Colors.blue.shade100,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: Colors.black, width: 1),
+        ),
+        child: Text(
+          text,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
+        ),
       ),
     );
   }
@@ -508,1173 +563,1181 @@ class _CompositionScreenState extends State<CompositionScreen>
               controller.pixelsPerTick
               : 0;
 
-          return Row(
+          return Stack(
             children: [
+              Row(
+                children: [
 
-              Container(
-                width: 46,
-                color: Colors.grey.shade300,
-                child: Theme(
-                  data: Theme.of(context).copyWith(
-                    iconButtonTheme: IconButtonThemeData(
-                      style: IconButton.styleFrom(
-                        padding: const EdgeInsets.all(4),
-                        minimumSize: const Size(44, 44),
-                        iconSize: 28,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-
-                      SizedBox(
-                        height: 30,
-                      ),
-
-                      // HOME
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: const Icon(
-                            Icons.arrow_back,
-                            color: Colors.black,
+                  Container(
+                    width: 46,
+                    color: Colors.grey.shade300,
+                    child: Theme(
+                      data: Theme.of(context).copyWith(
+                        iconButtonTheme: IconButtonThemeData(
+                          style: IconButton.styleFrom(
+                            padding: const EdgeInsets.all(4),
+                            minimumSize: const Size(44, 44),
+                            iconSize: 28,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.compact,
                           ),
                         ),
-                        tooltip: 'Home',
-                        onPressed: _withHelp(
-                            'Home: save and exit the composition, '
-                                'returning to the main menu.',
-                                () {
-                              saveExitDialog(
-                                context,
-                                onSave: () => _saveComposition(context),
-                              );
-                            }),
                       ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
 
-                      // GRID DARK MODE
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: Icon(
-                            controller.isDarkMode
-                                ? Icons.dark_mode
-                                : Icons.light_mode,
-                            color: controller.isDarkMode
-                                ? Colors.blue
-                                : Colors.black,
+                          SizedBox(
+                            height: 30,
                           ),
-                        ),
-                        tooltip: controller.isDarkMode
-                            ? 'Grid Dark Mode: On'
-                            : 'Grid Dark Mode: Off',
-                        onPressed: _withHelp(
-                            'Grid Dark Mode: toggles a dark background '
-                                'for the note grid.',
-                                () {
-                              controller.toggleDarkMode();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    controller.isDarkMode ? 'Dark mode on.' : 'Dark mode off.',
-                                    style: const TextStyle(fontSize: 22),
-                                  ),
-                                ),
-                              );
-                            }),
-                      ),
 
-                      // HELP MODE
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: Icon(
-                            Icons.help_outline,
-                            color: _helpMode ? Colors.blue : Colors.black,
+                          // HOME
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: const Icon(
+                                Icons.arrow_back,
+                                color: Colors.black,
+                              ),
+                            ),
+                            tooltip: 'Home',
+                            onPressed: _withHelp(
+                                'Home: \nSaves and exits the composition returning to the main menu.',
+                                    () {
+                                  saveExitDialog(
+                                    context,
+                                    onSave: () => _saveComposition(context),
+                                  );
+                                }),
                           ),
-                        ),
-                        tooltip: _helpMode
-                            ? 'Help Mode: On'
-                            : 'Help Mode: Off',
-                        onPressed: () {
-                          setState(() {
-                            _helpMode = !_helpMode;
-                          });
-                        },
-                      ),
 
-                      // TO SHOW TITLE
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: Icon(
-                            Icons.info_outline,
-                            color: controller.gridFontSize ==
-                                DefaultValues.gridFontSizeLarge
-                                ? Colors.blue
-                                : Colors.black,
+                          // GRID DARK MODE
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: Icon(
+                                controller.isDarkMode
+                                    ? Icons.dark_mode
+                                    : Icons.light_mode,
+                                color: controller.isDarkMode
+                                    ? Colors.blue
+                                    : Colors.black,
+                              ),
+                            ),
+                            tooltip: controller.isDarkMode
+                                ? 'Grid Dark Mode: On'
+                                : 'Grid Dark Mode: Off',
+                            onPressed: _withHelp(
+                                'Dark or Light Mode: \nToggles a background color.',
+                                    () {
+                                  controller.toggleDarkMode();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        controller.isDarkMode ? 'Dark mode on.' : 'Dark mode off.',
+                                        style: const TextStyle(fontSize: 22),
+                                      ),
+                                    ),
+                                  );
+                                }),
                           ),
-                        ),
-                        tooltip: _toShowTitle
-                            ? 'title is hidden'
-                            : 'title is shown',
-                        onPressed: _withHelp(
-                            'Toggles a column showing the composition '
-                                'title and composer.',
-                                () {
-                              _showTitle();
-                            }),
-                      ),
 
-
-                      SizedBox(
-                        height: 30,
-                      ),
-
-
-                      // HIDE FINGER
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: Icon(
-                            Icons.touch_app,
-                            color: controller.hideFingerNumbers
-                                ? Colors.red
-                                : Colors.black,
-                          ),
-                        ),
-                        tooltip: controller.hideFingerNumbers
-                            ? 'Hide Finger Numbers: On'
-                            : 'Hide Finger Numbers: Off',
-                        onPressed: _withHelp(
-                            'Hide Finger Numbers: hides/shows the '
-                                'fingering numbers on notes.',
-                                () {
-                              controller.toggleHideFingerNumbers();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    controller.hideFingerNumbers ? 'Fingers hidden.' : 'Fingers visible.',
-                                    style: const TextStyle(fontSize: 22),
-                                  ),
-                                ),
-                              );
-                            }),
-                      ),
-
-
-                      // SHOW ACCIDENTAL
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: Icon(
-                            Icons.open_in_full_sharp,
-                            color: controller.highlightAccidentalNotes
-                                ? Colors.green
-                                : Colors.black,
-                          ),
-                        ),
-                        tooltip: controller.highlightAccidentalNotes
-                            ? 'Highlight Accidental Notes: On'
-                            : 'Highlight Accidental Notes: Off',
-                        onPressed: _withHelp(
-                            'Highlight Accidental Notes: colors notes '
-                                'outside the current scale.',
-                                () {
-                              controller.toggleHighlightAccidentalNotes();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    controller.highlightAccidentalNotes ? 'Highlight on.' : 'Highlight off.',
-                                    style: const TextStyle(fontSize: 22),
-                                  ),
-                                ),
-                              );
-                            }),
-                      ),
-
-                      // RAISE SCALE
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: const Icon(Icons.arrow_upward,
-                            color: Colors.black,
-                          ),
-                        ),
-                        tooltip: 'Raise scales',
-                        onPressed: _withHelp(
-                            'Raise scales: raises the whole '
-                                'composition up a semitone.',
-                                () {
-                              controller.raiseAllScales();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Raised a semitone.',
-                                    style: TextStyle(fontSize: 22),
-                                  ),
-                                ),
-                              );
-                            }),
-                      ),
-
-
-                      // RESET SCALE
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: const Icon(Icons.adjust,
-                            color: Colors.black,
-                          ),
-                        ),
-                        tooltip: 'Reset scales',
-                        onPressed: _withHelp(
-                            'Reset scales: reverts the composition '
-                                'back to its original starting scale.',
-                                () {
-                              controller.resetAllScales();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Scale reset.',
-                                    style: TextStyle(fontSize: 22),
-                                  ),
-                                ),
-                              );
-                            }),
-                      ),
-
-
-                      // LOWER SCALE
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: const Icon(Icons.arrow_downward,
-                            color: Colors.black,
-                          ),
-                        ),
-                        tooltip: 'Lower scales',
-                        onPressed: _withHelp(
-                            'Lower scales: lowers the whole '
-                                'composition down a semitone.',
-                                () {
-                              controller.lowerAllScales();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Lowered a semitone.',
-                                    style: TextStyle(fontSize: 22),
-                                  ),
-                                ),
-                              );
-                            }),
-                      ),
-
-
-                      SizedBox(
-                        height: 30,
-                      ),
-
-                      // ROTATE
-                      IconButton(
-                        // Icon itself rotated 180° while the mode is
-                        // on, per request, so the button visually
-                        // matches the rotated state it represents.
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: Icon(Icons.rotate_left,
-                            color: controller.rotatePitchText
-                                ? Colors.blue
-                                : Colors.black,
-                          ),
-                        ),
-                        tooltip: controller.rotatePitchText
-                            ? 'Rotate Pitch Text: On'
-                            : 'Rotate Pitch Text: Off',
-                        onPressed: _withHelp(
-                            'Rotate Pitch Text: rotates the pitch '
-                                'digits/labels for reading with the device '
-                                'turned sideways.',
-                                () {
-                              controller.toggleRotatePitchText();
-                              _setOrientationLocked(
-                                context,
-                                controller.rotatePitchText,
-                              );
-                            }),
-                      ),
-
-                      // MAGIC MODE
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: Icon(Icons.auto_fix_high,
-                            color: controller.showCompensatedNotation
-                                ? Colors.red
-                                : Colors.black,
-                          ),
-                        ),
-                        tooltip: controller.showCompensatedNotation
-                            ? 'Compensated Notation: On'
-                            : 'Compensated Notation: Off',
-                        onPressed: _withHelp(
-                            'Easy Read: shows a simplified notation '
-                                'and locks scrolling while on.',
-                                () {
-                              controller.toggleCompensatedNotation();
-                              // Keep Scroll Lock in sync with Easy Read
-                              // Mode, per request — turning Easy Read on
-                              // turns Scroll Lock on too, and turning Easy
-                              // Read off turns Scroll Lock off too.
-                              if (controller.showCompensatedNotation !=
-                                  controller.inputLocked) {
+                          // HELP MODE
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: Icon(
+                                Icons.help_outline,
+                                color: _helpMode ? Colors.blue : Colors.black,
+                              ),
+                            ),
+                            tooltip: _helpMode
+                                ? 'Help Mode: On'
+                                : 'Help Mode: Off',
+                            onPressed: () {
+                              setState(() {
+                                _helpMode = !_helpMode;
+                              });
+                              // Help Mode and Scroll Lock now move
+                              // together in both directions, per request
+                              // — turning Help Mode on locks editing, and
+                              // turning it back off releases the lock
+                              // too, rather than leaving it stuck on.
+                              if (_helpMode && !controller.inputLocked) {
+                                controller.toggleInputLocked();
+                              } else if (!_helpMode && controller.inputLocked) {
                                 controller.toggleInputLocked();
                               }
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    controller.showCompensatedNotation ? 'Easy Read on.' : 'Easy Read off.',
-                                    style: const TextStyle(fontSize: 22),
-                                  ),
-                                ),
-                              );
-                            }),
-                      ),
-
-                      // SCROLL LOCK
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: Icon(
-                            controller.inputLocked
-                                ? Icons.lock
-                                : Icons.lock_open,
-                            color: controller.inputLocked
-                                ? Colors.red
-                                : Colors.black,
+                            },
                           ),
-                        ),
-                        tooltip: controller.inputLocked
-                            ? 'Scroll Lock: On'
-                            : 'Scroll Lock: Off',
-                        onPressed: _withHelp(
-                            'Scroll Lock: while on, tapping the grid '
-                                'controls playback instead of editing '
-                                'notes.',
-                                () {
-                              controller.toggleInputLocked();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    controller.inputLocked ? 'Lock on.' : 'Lock off.',
-                                    style: const TextStyle(fontSize: 22),
-                                  ),
-                                ),
-                              );
-                            }),
-                      ),
 
-
-                      SizedBox(
-                        height: 30,
-                      ),
-
-
-                      // ZOOM IN
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: const Icon(
-                            Icons.zoom_in,
-                            color: Colors.black,
+                          // TO SHOW TITLE
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: Icon(
+                                Icons.info_outline,
+                                color: _toShowTitle
+                                    ? Colors.blue
+                                    : Colors.black,
+                              ),
+                            ),
+                            tooltip: _toShowTitle
+                                ? 'title is hidden'
+                                : 'title is shown',
+                            onPressed: _withHelp(
+                                'Title: \nShows/Hides the title and composer.',
+                                    () {
+                                  _showTitle();
+                                }),
                           ),
-                        ),
-                        tooltip: 'Zoom In',
-                        onPressed: _withHelp(
-                            'Zoom In: enlarges the note grid.',
-                                () {
-                              controller.setZoom(
-                                controller.zoomX + 1,
-                                controller.zoomY + 0.1,
-                              );
-                            }),
-                      ),
 
-                      // ZOOM OUT
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: const Icon(
-                            Icons.zoom_out,
-                            color: Colors.black,
+
+                          SizedBox(
+                            height: 30,
                           ),
-                        ),
-                        tooltip: 'Zoom Out',
-                        onPressed: _withHelp(
-                            'Zoom Out: shrinks the note grid.',
-                                () {
-                              controller.setZoom(
-                                controller.zoomX - 1,
-                                controller.zoomY - 0.1,
-                              );
-                            }),
-                      ),
 
-                      // RESET
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: const Icon(
-                            Icons.center_focus_strong,
-                            color: Colors.black,
+
+                          // HIDE FINGER
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: Icon(
+                                Icons.touch_app,
+                                color: controller.hideFingerNumbers
+                                    ? Colors.red
+                                    : Colors.black,
+                              ),
+                            ),
+                            tooltip: controller.hideFingerNumbers
+                                ? 'Hide Finger Numbers: On'
+                                : 'Hide Finger Numbers: Off',
+                            onPressed: _withHelp(
+                                'Finger Numbers: \nHides/Shows the fingering numbers on notes.',
+                                    () {
+                                  controller.toggleHideFingerNumbers();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        controller.hideFingerNumbers ? 'Fingers hidden.' : 'Fingers visible.',
+                                        style: const TextStyle(fontSize: 22),
+                                      ),
+                                    ),
+                                  );
+                                }),
                           ),
-                        ),
-                        tooltip: 'Reset Zoom',
-                        onPressed: _withHelp(
-                          'Reset Zoom: returns the grid to its '
-                              'default zoom level.',
-                          controller.resetZoom,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
 
 
-              Container(
-                width: 46,
-                height: double.infinity,
-                color: Colors.grey.shade300,
-                child: Theme(
-                  data: Theme.of(context).copyWith(
-                    iconButtonTheme: IconButtonThemeData(
-                      style: IconButton.styleFrom(
-                        padding: const EdgeInsets.all(4),
-                        minimumSize: const Size(44, 44),
-                        iconSize: 28,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        visualDensity: VisualDensity.compact,
+                          // SHOW ACCIDENTAL
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: Icon(
+                                Icons.open_in_full_sharp,
+                                color: controller.highlightAccidentalNotes
+                                    ? Colors.green
+                                    : Colors.black,
+                              ),
+                            ),
+                            tooltip: controller.highlightAccidentalNotes
+                                ? 'Highlight Accidental Notes: On'
+                                : 'Highlight Accidental Notes: Off',
+                            onPressed: _withHelp(
+                                'Accidental Notes: \nHighlights notes outside the current scale.',
+                                    () {
+                                  controller.toggleHighlightAccidentalNotes();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        controller.highlightAccidentalNotes ? 'Highlight on.' : 'Highlight off.',
+                                        style: const TextStyle(fontSize: 22),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                          ),
+
+                          // RAISE SCALE
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: const Icon(Icons.arrow_upward,
+                                color: Colors.black,
+                              ),
+                            ),
+                            tooltip: 'Raise scales',
+                            onPressed: _withHelp(
+                                'Raise scales: \nRaises the whole composition up a semitone.',
+                                    () {
+                                  controller.raiseAllScales();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Raised a semitone.',
+                                        style: TextStyle(fontSize: 22),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                          ),
+
+
+                          // RESET SCALE
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: const Icon(Icons.adjust,
+                                color: Colors.black,
+                              ),
+                            ),
+                            tooltip: 'Reset scales',
+                            onPressed: _withHelp(
+                                'Reset scales: \nReverts the composition back to its original starting scale.',
+                                    () {
+                                  controller.resetAllScales();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Scale reset.',
+                                        style: TextStyle(fontSize: 22),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                          ),
+
+
+                          // LOWER SCALE
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: const Icon(Icons.arrow_downward,
+                                color: Colors.black,
+                              ),
+                            ),
+                            tooltip: 'Lower scales',
+                            onPressed: _withHelp(
+                                'Lower scales: \nLowers the whole composition down a semitone.',
+                                    () {
+                                  controller.lowerAllScales();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Lowered a semitone.',
+                                        style: TextStyle(fontSize: 22),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                          ),
+
+
+                          SizedBox(
+                            height: 30,
+                          ),
+
+                          // ROTATE
+                          IconButton(
+                            // Icon itself rotated 180° while the mode is
+                            // on, per request, so the button visually
+                            // matches the rotated state it represents.
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: Icon(Icons.rotate_left,
+                                color: controller.rotatePitchText
+                                    ? Colors.blue
+                                    : Colors.black,
+                              ),
+                            ),
+                            tooltip: controller.rotatePitchText
+                                ? 'Rotate Pitch Text: On'
+                                : 'Rotate Pitch Text: Off',
+                            onPressed: _withHelp(
+                                'Rotate: \nRotates labels for reading with the device turned sideways.',
+                                    () {
+                                  controller.toggleRotatePitchText();
+                                  _setOrientationLocked(
+                                    context,
+                                    controller.rotatePitchText,
+                                  );
+                                }),
+                          ),
+
+                          // MAGIC MODE
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: Icon(Icons.auto_fix_high,
+                                color: controller.showCompensatedNotation
+                                    ? Colors.red
+                                    : Colors.black,
+                              ),
+                            ),
+                            tooltip: controller.showCompensatedNotation
+                                ? 'Compensated Notation: On'
+                                : 'Compensated Notation: Off',
+                            onPressed: _withHelp(
+                                'Easy Read: \nShows a simplified notation and prevents from editing.',
+                                    () {
+                                  controller.toggleCompensatedNotation();
+                                  // Keep Scroll Lock in sync with Easy Read
+                                  // Mode, per request — turning Easy Read on
+                                  // turns Scroll Lock on too, and turning Easy
+                                  // Read off turns Scroll Lock off too.
+                                  if (controller.showCompensatedNotation !=
+                                      controller.inputLocked) {
+                                    controller.toggleInputLocked();
+                                  }
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        controller.showCompensatedNotation ? 'Easy Read on.' : 'Easy Read off.',
+                                        style: const TextStyle(fontSize: 22),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                          ),
+
+                          // SCROLL LOCK
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: Icon(
+                                controller.inputLocked
+                                    ? Icons.lock
+                                    : Icons.lock_open,
+                                color: controller.inputLocked
+                                    ? Colors.red
+                                    : Colors.black,
+                              ),
+                            ),
+                            tooltip: controller.inputLocked
+                                ? 'Scroll Lock: On'
+                                : 'Scroll Lock: Off',
+                            onPressed: _withHelp(
+                                'Lock Mode: \nPrevents from editing.',
+                                    () {
+                                  controller.toggleInputLocked();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        controller.inputLocked ? 'Lock on.' : 'Lock off.',
+                                        style: const TextStyle(fontSize: 22),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                          ),
+
+
+                          SizedBox(
+                            height: 30,
+                          ),
+
+
+                          // ZOOM IN
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: const Icon(
+                                Icons.zoom_in,
+                                color: Colors.black,
+                              ),
+                            ),
+                            tooltip: 'Zoom In',
+                            onPressed: _withHelp(
+                                'Zoom In: \nEnlarges the grid.',
+                                    () {
+                                  controller.setZoom(
+                                    controller.zoomX + 1,
+                                    controller.zoomY + 0.1,
+                                  );
+                                }),
+                          ),
+
+                          // ZOOM OUT
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: const Icon(
+                                Icons.zoom_out,
+                                color: Colors.black,
+                              ),
+                            ),
+                            tooltip: 'Zoom Out',
+                            onPressed: _withHelp(
+                                'Zoom Out: \nShrinks the grid.',
+                                    () {
+                                  controller.setZoom(
+                                    controller.zoomX - 1,
+                                    controller.zoomY - 0.1,
+                                  );
+                                }),
+                          ),
+
+                          // RESET
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: const Icon(
+                                Icons.center_focus_strong,
+                                color: Colors.black,
+                              ),
+                            ),
+                            tooltip: 'Reset Zoom',
+                            onPressed: _withHelp(
+                              'Reset Zoom: \nReturns the grid to its default zoom level.',
+                              controller.resetZoom,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
 
-                      SizedBox(height: 30),
 
-                      // SAVE
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: const Icon(Icons.save,
-                            color: Colors.black,
+                  Container(
+                    width: 46,
+                    height: double.infinity,
+                    color: Colors.grey.shade300,
+                    child: Theme(
+                      data: Theme.of(context).copyWith(
+                        iconButtonTheme: IconButtonThemeData(
+                          style: IconButton.styleFrom(
+                            padding: const EdgeInsets.all(4),
+                            minimumSize: const Size(44, 44),
+                            iconSize: 28,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.compact,
                           ),
                         ),
-                        tooltip: 'Save Composition',
-                        onPressed: _withHelp(
-                            'Save: saves the current composition.',
-                                () {
-                              _saveComposition(context);
-                            }),
                       ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
 
-                      // NEW COMPOSITION
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: const Icon(Icons.library_add,
-                            color: Colors.black,
+                          SizedBox(height: 30),
+
+                          // SAVE
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: const Icon(Icons.save,
+                                color: Colors.black,
+                              ),
+                            ),
+                            tooltip: 'Save Composition',
+                            onPressed: _withHelp(
+                                'Save: \nSaves the current composition.',
+                                    () {
+                                  _saveComposition(context);
+                                }),
                           ),
-                        ),
-                        tooltip: 'New Composition',
-                        onPressed: _withHelp(
-                            'New Composition: starts a brand new '
-                                'composition.',
-                                () {
-                              _showCreateDialog(context);
-                            }),
-                      ),
 
-                      // ADD MEASURES
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: const Icon(Icons.copy,
-                            color: Colors.black,
+                          // NEW COMPOSITION
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: const Icon(Icons.library_add,
+                                color: Colors.black,
+                              ),
+                            ),
+                            tooltip: 'New Composition',
+                            onPressed: _withHelp(
+                                'New Composition: \nStarts a brand new composition.',
+                                    () {
+                                  _showCreateDialog(context);
+                                }),
                           ),
-                        ),
-                        tooltip: 'Add Measures',
-                        onPressed: _withHelp(
-                            'Add Measures: appends more measures to '
-                                'the composition.',
-                                () {
-                              _openAppendMeasuresForm(context);
-                            }),
-                      ),
 
-                      // GRID FONT SIZE
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: Icon(
-                            Icons.format_size,
-                            color: controller.gridFontSize ==
+                          // ADD MEASURES
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: const Icon(Icons.copy,
+                                color: Colors.black,
+                              ),
+                            ),
+                            tooltip: 'Add Measures',
+                            onPressed: _withHelp(
+                                'Add Measures: \nAppends more measures to the composition.',
+                                    () {
+                                  _openAppendMeasuresForm(context);
+                                }),
+                          ),
+
+                          // GRID FONT SIZE
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: Icon(
+                                Icons.format_size,
+                                color: controller.gridFontSize ==
+                                    DefaultValues.gridFontSizeLarge
+                                    ? Colors.blue
+                                    : Colors.black,
+                              ),
+                            ),
+                            tooltip: controller.gridFontSize ==
                                 DefaultValues.gridFontSizeLarge
-                                ? Colors.blue
-                                : Colors.black,
-                          ),
-                        ),
-                        tooltip: controller.gridFontSize ==
-                            DefaultValues.gridFontSizeLarge
-                            ? 'Grid Font Size: Large'
-                            : 'Grid Font Size: Normal',
-                        onPressed: _withHelp(
-                            'Grid Font Size: toggles larger labels on '
-                                'the grid.',
-                                () {
-                              controller.toggleGridFontSize();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    controller.gridFontSize ==
-                                        DefaultValues.gridFontSizeLarge
-                                        ? 'Labels larger.'
-                                        : 'Labels normal.',
-                                    style: const TextStyle(fontSize: 22),
-                                  ),
-                                ),
-                              );
-                            }),
-                      ),
-
-                      SizedBox(height: 30),
-
-                      // HAND
-                      IconButton(
-                        // Rotated the same way as every other toolbar
-                        // icon now, matching request — my earlier
-                        // exclusion of this one was wrong.
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: Icon(Icons.pan_tool,
-                            color:  controller.currentHand == Hand.right
-                                ? Colors.black
-                                : Colors.blue,
-                          ),
-                        ),
-                        tooltip: 'Hand',
-                        onPressed: _withHelp(
-                            'Hand: switches which hand new notes are '
-                                'entered for.',
-                                () {
-                              controller.toggleHand();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    controller.currentHand == Hand.right ? 'Right hand.' : 'Left hand.',
-                                    style: const TextStyle(fontSize: 22),
-                                  ),
-                                ),
-                              );
-                            }),
-                      ),
-
-
-                      // DURATION
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: const Icon(Icons.av_timer,
-                            color: Colors.black,
-                          ),
-                        ),
-                        tooltip: 'Note Duration',
-                        onPressed: _withHelp(
-                            'Note Duration: sets the duration used '
-                                'for newly entered notes.',
-                                () {
-                              globalDurationDialog(
-                                context,
-                                controller,
-                              );
-                            }),
-                      ),
-
-                      // GRACE NOTES
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: Icon(
-                            Icons.grain,
-                            color: controller.isAddingGraceNotes
-                                ? Colors.blue
-                                : Colors.black,
-                          ),
-                        ),
-                        tooltip: controller.isAddingGraceNotes
-                            ? 'Add Grace Note Mode: On'
-                            : 'Add Grace Note Mode: Off',
-                        onPressed: _withHelp(
-                            'Grace Notes: enter grace-note mode by '
-                                'tapping a note afterward.',
-                                () {
-                              final wasOn = controller.isAddingGraceNotes;
-                              controller.stopAddingGraceNotes();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    wasOn ? 'Grace note off.' : 'Tap a note to add.',
-                                    style: const TextStyle(fontSize: 22),
-                                  ),
-                                ),
-                              );
-                            }),
-                      ),
-
-                      // LEGATO
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: Icon(
-                            Icons.airline_stops_outlined,
-                            color: controller.legatoMode
-                                ? Colors.red
-                                : Colors.black,
-                          ),
-                        ),
-                        tooltip: controller.legatoMode
-                            ? 'Legato Mode: On'
-                            : 'Legato Mode: Off',
-                        onPressed: _withHelp(
-                            'Legato: marks tapped notes as played '
-                                'legato.',
-                                () {
-                              controller.toggleLegatoMode();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    controller.legatoMode ? 'Legato on.' : 'Legato off.',
-                                    style: const TextStyle(fontSize: 22),
-                                  ),
-                                ),
-                              );
-                            }),
-                      ),
-
-
-                      // PASTE
-                      // if (controller.canPaste)
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: Icon(Icons.control_point_duplicate,
-                            color: controller.pasteMode
-                                ? Colors.blue
-                                : Colors.black,
-                          ),
-                        ),
-                        tooltip: 'Paste',
-                        onPressed: _withHelp(
-                            'Paste: pastes previously copied notes.',
-                                () {
-                              if (controller.pasteMode) {
-                                controller.exitPasteMode();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                        DefaultValues.snackBarMessageForCopying.toString()
+                                ? 'Grid Font Size: Large'
+                                : 'Grid Font Size: Normal',
+                            onPressed: _withHelp(
+                                'Label Size: \nToggles size of labels on the grid.',
+                                    () {
+                                  controller.toggleGridFontSize();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        controller.gridFontSize ==
+                                            DefaultValues.gridFontSizeLarge
+                                            ? 'Labels larger.'
+                                            : 'Labels normal.',
+                                        style: const TextStyle(fontSize: 22),
+                                      ),
                                     ),
-                                  ),
-                                );
-                              } else {
-                                simpleMessageDialog(
-                                  context,
-                                  DefaultValues.titleOfMessageForCopying.toString(),
-                                  DefaultValues.messageForCopying.toString(),
-                                );
-                              }
-
-                            }),
-                      ),
-
-                      SizedBox(height: 30),
-
-                      // PLAYBACK - PAUSE
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: Icon(
-                            _isPlaying ? Icons.pause : Icons.play_arrow,
-                            // Pause icon (shown while scrolling) is
-                            // always red. Play icon (shown while paused)
-                            // is red only for an actual mid-piece pause
-                            // with Lock Mode on — black if back at the
-                            // beginning, or Lock Mode is off.
-                            color: _isPlaying
-                                ? Colors.red
-                                : ((!_isAtBeginning && controller.inputLocked)
-                                ? Colors.red
-                                : Colors.black),
+                                  );
+                                }),
                           ),
-                        ),
-                        tooltip: _isPlaying ? 'Pause' : 'Play',
-                        onPressed: _withHelp(
-                          'Play/Pause: starts or pauses playback of '
-                              'the composition.',
-                          hasMeasures ? _togglePlayback : null,
-                        ),
-                      ),
 
-                      // SCROLL TO START
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: const Icon(
-                            Icons.first_page,
-                            color: Colors.black,
-                          ),
-                        ),
-                        tooltip: 'Scroll to Start',
-                        onPressed: _withHelp(
-                          'Scroll to Start: jumps the grid back to '
-                              'the beginning.',
-                          hasMeasures
-                              ? () {
-                            _scrollToStart();
-                          }
-                              : null,
-                        ),
-                      ),
+                          SizedBox(height: 30),
 
-                      // SOUND
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: Icon(
-                            controller.soundEnabled
-                                ? Icons.volume_up
-                                : Icons.volume_off,
-                            color: Colors.black,
-                          ),
-                        ),
-                        tooltip: controller.soundEnabled
-                            ? 'Sound On'
-                            : 'Sound Off',
-                        onPressed: _withHelp(
-                            'Sound: toggles audio playback of notes.',
-                                () {
-                              controller.toggleSound();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    controller.soundEnabled ? 'Sound on.' : 'Sound off.',
-                                    style: const TextStyle(fontSize: 22),
-                                  ),
+                          // HAND
+                          CompositedTransformTarget(
+                            link: _handIconLink,
+                            child: IconButton(
+                              // Rotated the same way as every other toolbar
+                              // icon now, matching request — my earlier
+                              // exclusion of this one was wrong.
+                              icon: Transform.rotate(
+                                angle: controller.rotatePitchText ? -pi / 2 : 0,
+                                child: Icon(Icons.pan_tool,
+                                  color:  controller.currentHand == Hand.right
+                                      ? Colors.black
+                                      : Colors.blue,
                                 ),
-                              );
-                            }),
-                      ),
-
-                      SizedBox(height: 30),
-
-                      // GRID SIZE
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: const Icon(Icons.grid_on,
-                            color: Colors.black,
-                          ),
-                        ),
-                        tooltip: 'Cell Width',
-                        onPressed: _withHelp(
-                            'Cell Width: adjusts the width of grid '
-                                'cells.',
-                                () {
-                              cellWidthDialog(
-                                context,
-                                controller,
-                              );
-                            }),
-                      ),
-
-                      // EXPORT
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: const Icon(
-                            Icons.file_upload,
-                            color: Colors.black,
-                          ),
-                        ),
-                        tooltip: 'Export Measures as Text',
-                        onPressed: _withHelp(
-                            'Export: exports a range of measures as '
-                                'plain text.',
-                                () {
-                              measureRangeDialog(
-                                context: context,
-                                controller: controller,
-                                title: 'Export Measures',
-                                actionLabel: 'Export',
-                                actionColor: Colors.black,
-                                onConfirm: (from, to) {
-                                  final exported =
-                                  controller.exportMeasureRange(from, to);
-                                  final dynamicsText = controller
-                                      .exportDynamicsAndHairpinsText(from, to);
-                                  final text =
-                                      formatImportMeasuresAsText(exported) +
-                                          '\nDynamics / Dynamic Changes\n' +
-                                          dynamicsText;
-                                  Future.delayed(Duration.zero, () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (resultContext) => AlertDialog(
-                                        backgroundColor: Colors.white,
-                                        surfaceTintColor: Colors.white,
-                                        title: const Text(
-                                          'Exported Measures',
-                                          style: TextStyle(
-                                            fontSize: 22,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                              ),
+                              tooltip: 'Hand',
+                              onPressed: _withHelp(
+                                  'Hand change: \nSwitches hand for newly entered notes.',
+                                      () {
+                                    controller.toggleHand();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          controller.currentHand == Hand.right ? 'Right hand.' : 'Left hand.',
+                                          style: const TextStyle(fontSize: 22),
                                         ),
-                                        content: SizedBox(
-                                          width: 400,
-                                          height: 400,
-                                          child: SingleChildScrollView(
-                                            child: SelectableText(
-                                              text,
-                                              style: const TextStyle(
-                                                  fontSize: 18),
-                                            ),
-                                          ),
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.pop(resultContext),
-                                            child: const Text(
-                                              'Close',
-                                              style: TextStyle(
-                                                fontSize: 22,
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.black,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
                                       ),
                                     );
-                                  });
-                                },
-                              );
-                            }),
-                      ),
-
-                      // IMPORT
-                      IconButton(
-                        icon: Transform.rotate(
-                          angle: controller.rotatePitchText ? -pi / 2 : 0,
-                          child: const Icon(
-                            Icons.file_download,
-                            color: Colors.black,
+                                  }),
+                            ),
                           ),
-                        ),
-                        tooltip: 'Import Transcription',
-                        onPressed: _withHelp(
-                            'Import: imports a batch of transcribed '
-                                'measures.',
-                                () {
-                              showDialog(
-                                context: context,
-                                builder: (dialogContext) {
-                                  return StatefulBuilder(
-                                    builder: (dialogContext, setDialogState) {
-                                      return AlertDialog(
-                                        backgroundColor: Colors.white,
-                                        surfaceTintColor: Colors.white,
-                                        title: const Text(
-                                          'Import Transcription',
-                                          style: TextStyle(
-                                            fontSize: 22,
-                                            fontWeight: FontWeight.bold,
+
+
+                          // DURATION
+                          CompositedTransformTarget(
+                            link: _durationIconLink,
+                            child: IconButton(
+                              icon: Transform.rotate(
+                                angle: controller.rotatePitchText ? -pi / 2 : 0,
+                                child: const Icon(Icons.av_timer,
+                                  color: Colors.black,
+                                ),
+                              ),
+                              tooltip: 'Note Duration',
+                              onPressed: _withHelp(
+                                  'Note Duration: \nSets the duration used for newly entered notes.',
+                                      () {
+                                    globalDurationDialog(
+                                      context,
+                                      controller,
+                                    );
+                                  }),
+                            ),
+                          ),
+
+                          // GRACE NOTES
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: Icon(
+                                Icons.grain,
+                                color: controller.isAddingGraceNotes
+                                    ? Colors.blue
+                                    : Colors.black,
+                              ),
+                            ),
+                            tooltip: controller.isAddingGraceNotes
+                                ? 'Add Grace Note Mode: On'
+                                : 'Add Grace Note Mode: Off',
+                            onPressed: _withHelp(
+                                'Grace Notes Adding Mode: \nStops adding grace notes.',
+                                    () {
+                                  final wasOn = controller.isAddingGraceNotes;
+                                  controller.stopAddingGraceNotes();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        wasOn ? 'Grace note off.' : 'Tap a note to add.',
+                                        style: const TextStyle(fontSize: 22),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                          ),
+
+                          // LEGATO
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: Icon(
+                                Icons.airline_stops_outlined,
+                                color: controller.legatoMode
+                                    ? Colors.red
+                                    : Colors.black,
+                              ),
+                            ),
+                            tooltip: controller.legatoMode
+                                ? 'Legato Mode: On'
+                                : 'Legato Mode: Off',
+                            onPressed: _withHelp(
+                                'Legato: \nSets legato on each tapped note.',
+                                    () {
+                                  controller.toggleLegatoMode();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        controller.legatoMode ? 'Legato on.' : 'Legato off.',
+                                        style: const TextStyle(fontSize: 22),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                          ),
+
+
+                          // PASTE
+                          // if (controller.canPaste)
+                          CompositedTransformTarget(
+                            link: _pasteIconLink,
+                            child: IconButton(
+                              icon: Transform.rotate(
+                                angle: controller.rotatePitchText ? -pi / 2 : 0,
+                                child: Icon(Icons.control_point_duplicate,
+                                  color: controller.pasteMode
+                                      ? Colors.blue
+                                      : Colors.black,
+                                ),
+                              ),
+                              tooltip: 'Paste',
+                              onPressed: _withHelp(
+                                  'Paste Mode: \nStops pasting previously copied note.',
+                                      () {
+                                    if (controller.pasteMode) {
+                                      controller.exitPasteMode();
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                              DefaultValues.snackBarMessageForCopying.toString()
                                           ),
                                         ),
-                                        content: SizedBox(
-                                          width: 400,
-                                          child: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              for (final batch
-                                              in availableImportBatches)
-                                                Builder(
-                                                  builder: (_) {
-                                                    final done = controller
-                                                        .importedBatchLabels
-                                                        .contains(
-                                                        batch.label);
-                                                    return ListTile(
-                                                      title: Text(
-                                                        batch.label,
-                                                        style: TextStyle(
-                                                          fontSize: 22,
-                                                          fontWeight:
-                                                          FontWeight.bold,
-                                                          color: done
-                                                              ? Colors.grey
-                                                              : Colors.black,
-                                                        ),
-                                                      ),
-                                                      trailing: Icon(
-                                                        done
-                                                            ? Icons
-                                                            .check_circle
-                                                            : Icons
-                                                            .file_download,
-                                                        color: done
-                                                            ? Colors.green
-                                                            : Colors.black,
-                                                      ),
-                                                      onLongPress: done
-                                                          ? () {
-                                                        controller
-                                                            .resetImportedBatch(
-                                                            batch.label);
-                                                        setDialogState(
-                                                                () {});
-                                                        ScaffoldMessenger.of(
-                                                            context)
-                                                            .showSnackBar(
-                                                          SnackBar(
-                                                            content: Text(
-                                                              'Can re-import.',
-                                                              style: const TextStyle(
-                                                                  fontSize: 22),
-                                                            ),
-                                                          ),
-                                                        );
-                                                      }
-                                                          : null,
-                                                      onTap: done
-                                                          ? null
-                                                          : () {
-                                                        final warnings =
-                                                        controller
-                                                            .importBatch(
-                                                            batch);
-                                                        setDialogState(
-                                                                () {});
-                                                        showDialog(
-                                                          context:
-                                                          dialogContext,
-                                                          builder:
-                                                              (resultContext) =>
-                                                              AlertDialog(
-                                                                backgroundColor:
-                                                                Colors.white,
-                                                                surfaceTintColor:
-                                                                Colors.white,
-                                                                title: Text(
-                                                                  warnings
-                                                                      .isEmpty
-                                                                      ? 'Import Complete'
-                                                                      : 'Import Complete — '
-                                                                      '${warnings.length} warning'
-                                                                      '${warnings.length == 1 ? '' : 's'}',
-                                                                  style: const TextStyle(
-                                                                    fontSize: 22,
-                                                                    fontWeight: FontWeight.bold,
-                                                                  ),
-                                                                ),
-                                                                content: SizedBox(
-                                                                  width: 400,
-                                                                  child: warnings.isEmpty
-                                                                      ? Text(
-                                                                    'All notes from ${batch.label} were created successfully.',
-                                                                    style: const TextStyle(fontSize: 22),
-                                                                  )
-                                                                      : SingleChildScrollView(
-                                                                    child: Column(
-                                                                      mainAxisSize: MainAxisSize.min,
-                                                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                                                      children: [
-                                                                        for (final w in warnings)
-                                                                          Padding(
-                                                                            padding: const EdgeInsets.only(bottom: 8),
-                                                                            child: Text(
-                                                                              w.toString(),
-                                                                              style: const TextStyle(fontSize: 18, color: Colors.red),
-                                                                            ),
-                                                                          ),
-                                                                      ],
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                                actions: [
-                                                                  TextButton(
-                                                                    onPressed: () => Navigator.pop(resultContext),
-                                                                    child: const Text(
-                                                                      'Close',
-                                                                      style: TextStyle(
-                                                                        fontSize: 22,
-                                                                        fontWeight: FontWeight.bold,
-                                                                        color: Colors.black,
-                                                                      ),
-                                                                    ),
-                                                                  ),
-                                                                ],
-                                                              ),
-                                                        );
-                                                      },
-                                                    );
-                                                  },
-                                                ),
-                                            ],
-                                          ),
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.pop(dialogContext),
-                                            child: const Text(
-                                              'Close',
+                                      );
+                                    } else {
+                                      simpleMessageDialog(
+                                        context,
+                                        DefaultValues.titleOfMessageForCopying.toString(),
+                                        DefaultValues.messageForCopying.toString(),
+                                      );
+                                    }
+
+                                  }),
+                            ),
+                          ),
+
+                          SizedBox(height: 30),
+
+                          // PLAYBACK - PAUSE
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: Icon(
+                                _isPlaying ? Icons.pause : Icons.play_arrow,
+                                // Pause icon (shown while scrolling) is
+                                // always red. Play icon (shown while paused)
+                                // is red only for an actual mid-piece pause
+                                // with Lock Mode on — black if back at the
+                                // beginning, or Lock Mode is off.
+                                color: _isPlaying
+                                    ? Colors.red
+                                    : ((!_isAtBeginning && controller.inputLocked)
+                                    ? Colors.red
+                                    : Colors.black),
+                              ),
+                            ),
+                            tooltip: _isPlaying ? 'Pause' : 'Play',
+                            onPressed: _withHelp(
+                              'Play/Pause: \nStarts/Pauses playback of the composition.',
+                              hasMeasures ? _togglePlayback : null,
+                            ),
+                          ),
+
+                          // SCROLL TO START
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: const Icon(
+                                Icons.first_page,
+                                color: Colors.black,
+                              ),
+                            ),
+                            tooltip: 'Scroll to Start',
+                            onPressed: _withHelp(
+                              'Scroll to Start: \nJumps the grid back to the beginning.',
+                              hasMeasures
+                                  ? () {
+                                _scrollToStart();
+                              }
+                                  : null,
+                            ),
+                          ),
+
+                          // SOUND
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: Icon(
+                                controller.soundEnabled
+                                    ? Icons.volume_up
+                                    : Icons.volume_off,
+                                color: Colors.black,
+                              ),
+                            ),
+                            tooltip: controller.soundEnabled
+                                ? 'Sound On'
+                                : 'Sound Off',
+                            onPressed: _withHelp(
+                                'Sound: \nSet audio off/on.',
+                                    () {
+                                  controller.toggleSound();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        controller.soundEnabled ? 'Sound on.' : 'Sound off.',
+                                        style: const TextStyle(fontSize: 22),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                          ),
+
+                          SizedBox(height: 30),
+
+                          // GRID SIZE
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: const Icon(Icons.grid_on,
+                                color: Colors.black,
+                              ),
+                            ),
+                            tooltip: 'Cell Width',
+                            onPressed: _withHelp(
+                                'Cell Width: \nAdjusts the width of cells.',
+                                    () {
+                                  cellWidthDialog(
+                                    context,
+                                    controller,
+                                  );
+                                }),
+                          ),
+
+                          // EXPORT
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: const Icon(
+                                Icons.file_upload,
+                                color: Colors.black,
+                              ),
+                            ),
+                            tooltip: 'Export Measures as Text',
+                            onPressed: _withHelp(
+                                'Export: \nExports a range of measures as plain text.',
+                                    () {
+                                  measureRangeDialog(
+                                    context: context,
+                                    controller: controller,
+                                    title: 'Export Measures',
+                                    actionLabel: 'Export',
+                                    actionColor: Colors.black,
+                                    onConfirm: (from, to) {
+                                      final exported =
+                                      controller.exportMeasureRange(from, to);
+                                      final dynamicsText = controller
+                                          .exportDynamicsAndHairpinsText(from, to);
+                                      final text =
+                                          formatImportMeasuresAsText(exported) +
+                                              '\nDynamics / Dynamic Changes\n' +
+                                              dynamicsText;
+                                      Future.delayed(Duration.zero, () {
+                                        showDialog(
+                                          context: context,
+                                          builder: (resultContext) => AlertDialog(
+                                            backgroundColor: Colors.white,
+                                            surfaceTintColor: Colors.white,
+                                            title: const Text(
+                                              'Exported Measures',
                                               style: TextStyle(
                                                 fontSize: 22,
                                                 fontWeight: FontWeight.bold,
-                                                color: Colors.black,
                                               ),
                                             ),
+                                            content: SizedBox(
+                                              width: 400,
+                                              height: 400,
+                                              child: SingleChildScrollView(
+                                                child: SelectableText(
+                                                  text,
+                                                  style: const TextStyle(
+                                                      fontSize: 18),
+                                                ),
+                                              ),
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(resultContext),
+                                                child: const Text(
+                                                  'Close',
+                                                  style: TextStyle(
+                                                    fontSize: 22,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.black,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                        ],
+                                        );
+                                      });
+                                    },
+                                  );
+                                }),
+                          ),
+
+                          // IMPORT
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: const Icon(
+                                Icons.file_download,
+                                color: Colors.black,
+                              ),
+                            ),
+                            tooltip: 'Import Transcription',
+                            onPressed: _withHelp(
+                                'Import: \nImports a batch of transcribed measures.',
+                                    () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (dialogContext) {
+                                      return StatefulBuilder(
+                                        builder: (dialogContext, setDialogState) {
+                                          return AlertDialog(
+                                            backgroundColor: Colors.white,
+                                            surfaceTintColor: Colors.white,
+                                            title: const Text(
+                                              'Import Transcription',
+                                              style: TextStyle(
+                                                fontSize: 22,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            content: SizedBox(
+                                              width: 400,
+                                              child: Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  for (final batch
+                                                  in availableImportBatches)
+                                                    Builder(
+                                                      builder: (_) {
+                                                        final done = controller
+                                                            .importedBatchLabels
+                                                            .contains(
+                                                            batch.label);
+                                                        return ListTile(
+                                                          title: Text(
+                                                            batch.label,
+                                                            style: TextStyle(
+                                                              fontSize: 22,
+                                                              fontWeight:
+                                                              FontWeight.bold,
+                                                              color: done
+                                                                  ? Colors.grey
+                                                                  : Colors.black,
+                                                            ),
+                                                          ),
+                                                          trailing: Icon(
+                                                            done
+                                                                ? Icons
+                                                                .check_circle
+                                                                : Icons
+                                                                .file_download,
+                                                            color: done
+                                                                ? Colors.green
+                                                                : Colors.black,
+                                                          ),
+                                                          onLongPress: done
+                                                              ? () {
+                                                            controller
+                                                                .resetImportedBatch(
+                                                                batch.label);
+                                                            setDialogState(
+                                                                    () {});
+                                                            ScaffoldMessenger.of(
+                                                                context)
+                                                                .showSnackBar(
+                                                              SnackBar(
+                                                                content: Text(
+                                                                  'Can re-import.',
+                                                                  style: const TextStyle(
+                                                                      fontSize: 22),
+                                                                ),
+                                                              ),
+                                                            );
+                                                          }
+                                                              : null,
+                                                          onTap: done
+                                                              ? null
+                                                              : () {
+                                                            final warnings =
+                                                            controller
+                                                                .importBatch(
+                                                                batch);
+                                                            setDialogState(
+                                                                    () {});
+                                                            showDialog(
+                                                              context:
+                                                              dialogContext,
+                                                              builder:
+                                                                  (resultContext) =>
+                                                                  AlertDialog(
+                                                                    backgroundColor:
+                                                                    Colors.white,
+                                                                    surfaceTintColor:
+                                                                    Colors.white,
+                                                                    title: Text(
+                                                                      warnings
+                                                                          .isEmpty
+                                                                          ? 'Import Complete'
+                                                                          : 'Import Complete — '
+                                                                          '${warnings.length} warning'
+                                                                          '${warnings.length == 1 ? '' : 's'}',
+                                                                      style: const TextStyle(
+                                                                        fontSize: 22,
+                                                                        fontWeight: FontWeight.bold,
+                                                                      ),
+                                                                    ),
+                                                                    content: SizedBox(
+                                                                      width: 400,
+                                                                      child: warnings.isEmpty
+                                                                          ? Text(
+                                                                        'All notes from ${batch.label} were created successfully.',
+                                                                        style: const TextStyle(fontSize: 22),
+                                                                      )
+                                                                          : SingleChildScrollView(
+                                                                        child: Column(
+                                                                          mainAxisSize: MainAxisSize.min,
+                                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                                          children: [
+                                                                            for (final w in warnings)
+                                                                              Padding(
+                                                                                padding: const EdgeInsets.only(bottom: 8),
+                                                                                child: Text(
+                                                                                  w.toString(),
+                                                                                  style: const TextStyle(fontSize: 18, color: Colors.red),
+                                                                                ),
+                                                                              ),
+                                                                          ],
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                                    actions: [
+                                                                      TextButton(
+                                                                        onPressed: () => Navigator.pop(resultContext),
+                                                                        child: const Text(
+                                                                          'Close',
+                                                                          style: TextStyle(
+                                                                            fontSize: 22,
+                                                                            fontWeight: FontWeight.bold,
+                                                                            color: Colors.black,
+                                                                          ),
+                                                                        ),
+                                                                      ),
+                                                                    ],
+                                                                  ),
+                                                            );
+                                                          },
+                                                        );
+                                                      },
+                                                    ),
+                                                ],
+                                              ),
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(dialogContext),
+                                                child: const Text(
+                                                  'Close',
+                                                  style: TextStyle(
+                                                    fontSize: 22,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.black,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          );
+                                        },
                                       );
                                     },
                                   );
-                                },
-                              );
-                            }),
+                                }),
+                          ),
+
+
+
+                        ],
                       ),
-
-
-
-                    ],
+                    ),
                   ),
-                ),
-              ),
 
-              //INFO OF TITLE
-              _toShowTitle
-                  ? Container(
-                width: 46,
-                color: Colors.grey.shade300,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => _showEditDialog(context),
-                  child: Center(
-                    child: RotatedBox(
-                      quarterTurns: 3,
-                      child: Text(
-                        '${controller.composition.composer} - ${controller.composition.title}',
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                  //INFO OF TITLE
+                  _toShowTitle
+                      ? Container(
+                    width: 46,
+                    color: Colors.black,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => _showEditDialog(context),
+                      child: Center(
+                        child: RotatedBox(
+                          quarterTurns: 3,
+                          child: Text(
+                            '${controller.composition.composer} - ${controller.composition.title}',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                      : SizedBox(),
+
+                  SafeArea(
+                    child: PitchColumnWidget(
+                      controller: controller,
+                      cellHeight: cellHeight,
+                      scrollController: _pitchVerticalController,
+                      activeNoteRows: _activeNoteRows,
+                    ),
+                  ),
+
+
+                  Expanded(
+                    child: !hasMeasures
+                        ? Center(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey.shade300,
+                          foregroundColor: Colors.black,
+                        ),
+                        icon: Transform.rotate(
+                          angle: controller.rotatePitchText ? -pi / 2 : 0,
+                          child: const Icon(
+                            Icons.copy,
+                            size: 22,
+                          ),
+                        ),
+                        label: const Text(
+                          'Add Measures',
+                          style: TextStyle(
+                            fontSize: 22,
+                          ),
+                        ),
+                        onPressed: () {
+                          _openAppendMeasuresForm(context);
+                        },
+                      ),
+                    )
+                        : SafeArea(
+                      child: NotificationListener<ScrollNotification>(
+                        onNotification: (notification) {
+                          if (_isPlaying &&
+                              notification.metrics.axis == Axis.horizontal &&
+                              notification is ScrollUpdateNotification &&
+                              notification.dragDetails != null) {
+                            _playbackTicker?.stop();
+                            _playbackTicker?.dispose();
+                            _playbackTicker = null;
+
+                            if (!_pauseScheduled) {
+                              _pauseScheduled = true;
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                _pauseScheduled = false;
+                                if (mounted) {
+                                  setState(() => _isPlaying = false);
+                                }
+                              });
+                            }
+                          }
+                          return false;
+                        },
+                        child: GridWidget(
+                          controller: controller,
+                          cellHeight: cellHeight,
+                          verticalScrollController: _gridVerticalController,
+                          horizontalScrollController: _gridHorizontalController,
+                          leadingPadding: _leadingPadding,
+                          // Overlays help callouts on tempo/scale labels
+                          // plus a general instructions banner, per
+                          // request — see GridWidget's own helpMode doc.
+                          helpMode: _helpMode,
+                          // Scroll Lock is what controls this now — on
+                          // means grid taps pause/resume playback
+                          // instead of creating/editing notes; off means
+                          // normal editing. Starting playback
+                          // automatically turns Scroll Lock on (see
+                          // _startPlayback); it stays on across a pause
+                          // (so a second tap resumes) until explicitly
+                          // turned off via its own button.
+                          isPlaying: controller.inputLocked,
+                          onTapWhilePlaying: _togglePlayback,
                         ),
                       ),
                     ),
                   ),
-                ),
-              )
-                  : SizedBox(),
 
-              SafeArea(
-                child: PitchColumnWidget(
-                  controller: controller,
-                  cellHeight: cellHeight,
-                  scrollController: _pitchVerticalController,
-                  activeNoteRows: _activeNoteRows,
-                ),
+                ],
+
               ),
 
-
-              Expanded(
-                child: !hasMeasures
-                    ? Center(
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey.shade300,
-                      foregroundColor: Colors.black,
-                    ),
-                    icon: Transform.rotate(
-                      angle: controller.rotatePitchText ? -pi / 2 : 0,
-                      child: const Icon(
-                        Icons.copy,
-                        size: 22,
-                      ),
-                    ),
-                    label: const Text(
-                      'Add Measures',
-                      style: TextStyle(
-                        fontSize: 22,
-                      ),
-                    ),
-                    onPressed: () {
-                      _openAppendMeasuresForm(context);
-                    },
-                  ),
-                )
-                    : SafeArea(
-                  child: NotificationListener<ScrollNotification>(
-                    onNotification: (notification) {
-                      if (_isPlaying &&
-                          notification.metrics.axis == Axis.horizontal &&
-                          notification is ScrollUpdateNotification &&
-                          notification.dragDetails != null) {
-                        _playbackTicker?.stop();
-                        _playbackTicker?.dispose();
-                        _playbackTicker = null;
-
-                        if (!_pauseScheduled) {
-                          _pauseScheduled = true;
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            _pauseScheduled = false;
-                            if (mounted) {
-                              setState(() => _isPlaying = false);
-                            }
-                          });
-                        }
-                      }
-                      return false;
-                    },
-                    child: GridWidget(
-                      controller: controller,
-                      cellHeight: cellHeight,
-                      verticalScrollController: _gridVerticalController,
-                      horizontalScrollController: _gridHorizontalController,
-                      leadingPadding: _leadingPadding,
-                      // Scroll Lock is what controls this now — on
-                      // means grid taps pause/resume playback
-                      // instead of creating/editing notes; off means
-                      // normal editing. Starting playback
-                      // automatically turns Scroll Lock on (see
-                      // _startPlayback); it stays on across a pause
-                      // (so a second tap resumes) until explicitly
-                      // turned off via its own button.
-                      isPlaying: controller.inputLocked,
-                      onTapWhilePlaying: _togglePlayback,
-                    ),
-                  ),
-                ),
-              ),
-
+              // Icon help labels — placed here, in the OUTER Stack
+              // (painted AFTER the whole Row above, so always on
+              // top), rather than nested inside the toolbar's own
+              // narrow column — see _toolbarLabel's doc for why.
+              if (_helpMode) _toolbarLabel(_handIconLink, 'Hand change'),
+              if (_helpMode) _toolbarLabel(_durationIconLink, 'Note Duration'),
+              if (_helpMode) _toolbarLabel(_pasteIconLink, 'Paste mode'),
             ],
-
           );
 
 

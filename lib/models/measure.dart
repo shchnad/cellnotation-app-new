@@ -14,6 +14,16 @@ class Measure {
   int pitchOffsetSemitones;
   final List<BeatEvent> beatEvents;
 
+  // Extra ticks added to this measure's own duration by any fermata
+  // stretches applied to its beats (see
+  // CompositionController.applyFermataToBeat/deleteFermata) — folded
+  // into [durationTicks] below so [endTick] and, via
+  // Timeline.rebuild(), every LATER measure's own startTick correctly
+  // account for the extra time, rather than a stretched beat silently
+  // overflowing into (or being clipped by) the measure's original,
+  // un-stretched boundary. Zero for a measure with no fermatas.
+  int fermataExtraTicks;
+
   Measure({
     required this.id,
     required this.startTick,
@@ -22,13 +32,14 @@ class Measure {
     String? originalScaleName,
     this.pitchOffsetSemitones = 0,
     List<BeatEvent>? beatEvents,
+    this.fermataExtraTicks = 0,
   }) :
         originalScaleName = originalScaleName ?? scaleName,
         beatEvents = beatEvents ?? [];
 
 
   int get durationTicks =>
-      timeSignature.durationTicks;
+      timeSignature.durationTicks + fermataExtraTicks;
 
   int get endTick =>
       startTick + durationTicks;
@@ -82,6 +93,7 @@ class Measure {
     String? originalScaleName,
     int? pitchOffsetSemitones,
     List<BeatEvent>? beatEvents,
+    int? fermataExtraTicks,
   }) {
     return Measure(
       id: id ?? this.id,
@@ -93,6 +105,7 @@ class Measure {
       pitchOffsetSemitones ?? this.pitchOffsetSemitones,
       beatEvents:
       beatEvents ?? List<BeatEvent>.from(this.beatEvents),
+      fermataExtraTicks: fermataExtraTicks ?? this.fermataExtraTicks,
     );
   }
 
@@ -107,6 +120,7 @@ class Measure {
       'originalScaleName': originalScaleName,
       'pitchOffsetSemitones': pitchOffsetSemitones,
       'beatEvents': beatEvents.map((e) => e.toJson()).toList(),
+      'fermataExtraTicks': fermataExtraTicks,
     };
   }
 
@@ -123,6 +137,9 @@ class Measure {
       beatEvents: (json['beatEvents'] as List<dynamic>)
           .map((e) => BeatEvent.fromJson(e as Map<String, dynamic>))
           .toList(),
+      // Older saved compositions won't have this field — default to
+      // 0 (no fermata stretch) rather than crashing.
+      fermataExtraTicks: json['fermataExtraTicks'] as int? ?? 0,
     );
   }
 

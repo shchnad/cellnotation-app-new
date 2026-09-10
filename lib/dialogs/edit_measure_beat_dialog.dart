@@ -10,6 +10,146 @@ import 'pedal_dialog.dart';
 import 'scale_dialog.dart';
 
 
+/// Asks how many ordinary beats long a fermata-stretched beat should
+/// last, then applies it via CompositionController.applyFermataToBeat
+/// — a few common preset options (2/3/5/10 beats) plus a free-form
+/// number field for anything else, per request. Public (not
+/// file-private) so grid_widget.dart can open this directly when the
+/// blue "fz" label on an already-stretched beat is tapped. If a
+/// fermata is already applied to this beat (see
+/// CompositionController.getFermataMultiplier), a "Delete Fermata"
+/// option is also shown, reverting the beat back to its normal width
+/// via CompositionController.deleteFermata.
+void fermataDialog({
+  required BuildContext context,
+  required CompositionController controller,
+  required int measureIndex,
+  required int beatIndex,
+}) {
+  final customController = TextEditingController();
+  final currentMultiplier =
+  controller.getFermataMultiplier(measureIndex, beatIndex);
+
+  showDialog(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        title: const Text(
+          'Set Fermata',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        ),
+        content: SizedBox(
+          width: 300,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'How many beats long should this beat be held?',
+                style: TextStyle(fontSize: 20),
+              ),
+              const SizedBox(height: 8),
+              for (final n in [2, 3, 5, 10])
+                ListTile(
+                  title: Text(
+                    '$n beats',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  onTap: () {
+                    controller.applyFermataToBeat(
+                      measureIndex,
+                      beatIndex,
+                      n,
+                    );
+                    Navigator.pop(dialogContext);
+                  },
+                ),
+              const Divider(),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: customController,
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'Custom',
+                        labelStyle: TextStyle(fontSize: 18),
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () {
+                      final n = int.tryParse(customController.text.trim());
+                      if (n == null || n <= 1) return;
+                      controller.applyFermataToBeat(
+                        measureIndex,
+                        beatIndex,
+                        n,
+                      );
+                      Navigator.pop(dialogContext);
+                    },
+                    child: const Text(
+                      'Set',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (currentMultiplier != null) ...[
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.delete_outline),
+                  iconColor: Colors.red,
+                  title: const Text(
+                    'Delete Fermata',
+                    style: TextStyle(
+                      fontSize: 22,
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  onTap: () {
+                    controller.deleteFermata(measureIndex, beatIndex);
+                    Navigator.pop(dialogContext);
+                  },
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+
 void editMeasureBeatDialog({
   required BuildContext context,
   required CompositionController controller,
@@ -19,6 +159,14 @@ void editMeasureBeatDialog({
   showDialog(
     context: context,
     builder: (_) {
+      // Read once at build time — the dialog is rebuilt fresh each
+      // time it's opened, so this reflects the current state and the
+      // "Delete Fermata" option below only needs to be correct at
+      // open time (the dialog closes after any action anyway, same
+      // as every other ListTile here).
+      final currentFermataMultiplier =
+      controller.getFermataMultiplier(measureIndex, beatIndex);
+
       return AlertDialog(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
@@ -228,12 +376,12 @@ void editMeasureBeatDialog({
 
                         ListTile(
                           leading: const Icon(Icons.lock_clock),
-                          iconColor: Colors.black,
+                          iconColor: Colors.blue,
                           title: const Text(
                             "Set Tempo",
                             style: TextStyle(
                               fontSize: 22,
-                              color: Colors.black,
+                              color: Colors.blue,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -249,6 +397,8 @@ void editMeasureBeatDialog({
                             );
                           },
                         ),
+
+                        const Divider(),
 
                         ListTile(
                           leading: const Icon(Icons.music_note),
@@ -368,6 +518,34 @@ void editMeasureBeatDialog({
                               beatIndex,
                             );
                             Navigator.pop(context);
+                          },
+                        ),
+                        const Divider(),
+                        // FERMATA — moved into the beat column, per
+                        // request (previously in the measure column
+                        // under Set Tempo). Opens a small picker
+                        // asking how many beats long to stretch this
+                        // beat, then applies it via
+                        // CompositionController.applyFermataToBeat.
+                        ListTile(
+                          leading: const Icon(Icons.pause_circle_outline),
+                          iconColor: Colors.blue,
+                          title: const Text(
+                            "Set Fermata",
+                            style: TextStyle(
+                              fontSize: 22,
+                              color: Colors.blue,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          onTap: () {
+                            Navigator.pop(context);
+                            fermataDialog(
+                              context: context,
+                              controller: controller,
+                              measureIndex: measureIndex,
+                              beatIndex: beatIndex,
+                            );
                           },
                         ),
 

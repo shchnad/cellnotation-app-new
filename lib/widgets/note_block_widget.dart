@@ -444,11 +444,17 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
               width: noteWidth,
               height: _fingerHeight,
               child: Center(
-                child: Text(
-                  note.finger!.value.toString(),
-                  style: _fingerTextStyle(
-                    controller.gridFontSize,
-                    controller.isDarkMode,
+                child: RotatedBox(
+                  // Same rotation as the pitch text above, per
+                  // request — finger numbers rotate along with
+                  // everything else while Rotate Pitch Text is on.
+                  quarterTurns: controller.rotatePitchText ? 3 : 0,
+                  child: Text(
+                    note.finger!.value.toString(),
+                    style: _fingerTextStyle(
+                      controller.gridFontSize,
+                      controller.isDarkMode,
+                    ),
                   ),
                 ),
               ),
