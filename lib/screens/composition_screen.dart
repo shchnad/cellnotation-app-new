@@ -93,7 +93,15 @@ class _CompositionScreenState extends State<CompositionScreen>
   // SAME tempo/time-signature-paced scrolling as real playback (not
   // a fixed pause), so it visibly moves at the actual first
   // measure's speed rather than snapping or feeling arbitrary.
-  static const int _ghostLeadInBeats = 2;
+  static const int _ghostLeadInBeats = 4;
+
+  // A SMALL, fixed leading gap that stays present in EVERY mode, per
+  // request — even outside Scroll Lock, there should always be a bit
+  // of breathing room between the toolbar/pitch column and the
+  // grid's own content, rather than the grid's content starting
+  // flush against them. Independent of zoom/tempo (unlike
+  // _leadingPadding below): a constant number of pixels, not ticks.
+  static const double _minimumLeadingPadding = 20.0;
 
   // Blank scrollable space before tick 0, sized to EXACTLY match
   // _ghostLeadInBeats worth of ticks in pixels (not a fixed screen
@@ -101,6 +109,31 @@ class _CompositionScreenState extends State<CompositionScreen>
   // every build(), since it depends on pixelsPerTick (zoom-
   // dependent) and the first measure's own ticksPerBeat.
   double _leadingPadding = 0;
+
+  /// The leading padding actually applied right now. The FULL
+  /// [_leadingPadding] "runway" only applies while Scroll Lock is on;
+  /// outside that, per request, a small constant
+  /// [_minimumLeadingPadding] still applies instead of dropping to
+  /// exactly 0 — so there's always at least a little breathing room
+  /// between the toolbar/pitch column and the grid's own content,
+  /// in every mode, not just during Scroll Lock. Every place that
+  /// used to read [_leadingPadding] directly (scroll math,
+  /// GridWidget's own prop) now reads this instead, so the whole
+  /// screen stays internally consistent about how much leading space
+  /// currently exists.
+  double get _effectiveLeadingPadding =>
+      controller.inputLocked ? _leadingPadding : _minimumLeadingPadding;
+
+  // Tracks controller.inputLocked (Scroll Lock) across rebuilds so
+  // build() can detect when it CHANGES (from any of the several
+  // places that toggle it — the Scroll Lock button itself, Easy
+  // Read, Help Mode, Rotate Pitch Text, or starting playback) and
+  // re-anchor the scroll position afterward, since
+  // _effectiveLeadingPadding's own gap appears/disappears exactly
+  // when this flips. Null until the very first build so that build
+  // doesn't try to "correct" anything before there's a previous
+  // value to compare against.
+  bool? _lastKnownInputLocked;
 
   void _togglePlayback() {
     if (_isPlaying) {
@@ -114,6 +147,13 @@ class _CompositionScreenState extends State<CompositionScreen>
     if (controller.maxTicks <= 0) {
       return;
     }
+
+    // Captured BEFORE toggling Scroll Lock below — the leading
+    // padding gap tracks Scroll Lock (see _effectiveLeadingPadding),
+    // and the grid widget tree hasn't rebuilt with any new lock
+    // state yet at this point, so the CURRENT scroll offset still
+    // means whatever it meant under the OLD lock state.
+    final hadLeadingPaddingBefore = controller.inputLocked;
 
     // Starting playback ("hitting the scroll icon") automatically
     // turns on Scroll Lock and Easy Read (Compensated Notation) if
@@ -135,11 +175,15 @@ class _CompositionScreenState extends State<CompositionScreen>
     _playbackTicker?.dispose();
     _playbackTicker = null;
 
-    // Subtract leadingPadding before converting back to a tick — the
-    // scroll offset now includes that leading blank space (see
-    // _scrollTo), so the raw offset alone would overstate the tick.
+    // Uses the OLD lock state captured above, NOT
+    // _effectiveLeadingPadding's current value — inputLocked may have
+    // just flipped true above, but the actual on-screen scroll offset
+    // still reflects whatever padding was in effect the LAST time
+    // this screen actually rebuilt.
+    final oldEffectivePadding =
+    hadLeadingPaddingBefore ? _leadingPadding : 0.0;
     final tickFromScroll = _gridHorizontalController.hasClients
-        ? (_gridHorizontalController.offset - _leadingPadding) /
+        ? (_gridHorizontalController.offset - oldEffectivePadding) /
         controller.pixelsPerTick
         : 0.0;
 
@@ -170,6 +214,13 @@ class _CompositionScreenState extends State<CompositionScreen>
     _playbackTicker?.dispose();
     _playbackTicker = null;
     _activeNoteRows.value = {};
+    // No scroll re-anchoring needed here — the leading padding gap
+    // tracks Scroll Lock (see _effectiveLeadingPadding), not playback
+    // state, and Scroll Lock deliberately stays ON across a pause
+    // (see the comment in _startPlayback), so pausing doesn't change
+    // whether the gap exists at all. The generic re-anchor logic in
+    // build() (see _lastKnownInputLocked) handles it if/when Scroll
+    // Lock itself is later toggled off via its own button.
     if (mounted) {
       setState(() => _isPlaying = false);
     }
@@ -246,24 +297,26 @@ class _CompositionScreenState extends State<CompositionScreen>
   /// actual mid-piece pause, not to sitting at the start.
   bool get _isAtBeginning {
     if (!_gridHorizontalController.hasClients) return true;
-    return _gridHorizontalController.offset <= _leadingPadding + 1;
+    return _gridHorizontalController.offset <= _effectiveLeadingPadding + 1;
   }
 
   void _scrollTo(double tick) {
     if (!_gridHorizontalController.hasClients) return;
-    final offset = _leadingPadding + tick * controller.pixelsPerTick;
+    final offset = _effectiveLeadingPadding + tick * controller.pixelsPerTick;
     final maxScroll = _gridHorizontalController.position.maxScrollExtent;
     _gridHorizontalController.jumpTo(offset.clamp(0.0, maxScroll));
   }
 
   Future<void> _scrollToStart() async {
     if (!_gridHorizontalController.hasClients) return;
-    // Targets _leadingPadding (beat 1 at the pitch column), not 0
-    // (which would show the blank leading padding itself) — this
-    // button is for normal navigation/editing, not the pre-playback
-    // "runway" moment (see _startPlayback for that).
+    // Targets 0 (not _effectiveLeadingPadding) — per request, the
+    // grey leading space must stay VISIBLE after scrolling to the
+    // start, rather than being scrolled past so tick 0 sits flush
+    // against the pitch column. At offset 0 the viewport shows the
+    // full leading gap followed by the start of the grid's own
+    // content.
     await _gridHorizontalController.animateTo(
-      _leadingPadding,
+      0,
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOut,
     );
@@ -563,6 +616,32 @@ class _CompositionScreenState extends State<CompositionScreen>
               controller.measures.first.timeSignature.ticksPerBeat *
               controller.pixelsPerTick
               : 0;
+
+          // Detects a CHANGE in controller.inputLocked (Scroll Lock)
+          // since the last build, from ANY of the several places that
+          // toggle it (the Scroll Lock button itself, Easy Read, Help
+          // Mode, Rotate Pitch Text, or _startPlayback) — since the
+          // leading padding gap tracks it directly (see
+          // _effectiveLeadingPadding), a change here means the gap
+          // just appeared or disappeared. Re-anchors the scroll
+          // position, once the grid has actually rebuilt with the new
+          // padding (next frame), to whatever tick the OLD padding
+          // value said was on screen — so the visible content doesn't
+          // visually jump purely because the gap's size changed.
+          final currentInputLocked = controller.inputLocked;
+          if (_lastKnownInputLocked != null &&
+              _lastKnownInputLocked != currentInputLocked) {
+            final oldEffectivePadding =
+            _lastKnownInputLocked! ? _leadingPadding : 0.0;
+            final tickBeforeChange = _gridHorizontalController.hasClients
+                ? (_gridHorizontalController.offset - oldEffectivePadding) /
+                controller.pixelsPerTick
+                : 0.0;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _scrollTo(tickBeforeChange);
+            });
+          }
+          _lastKnownInputLocked = currentInputLocked;
 
           return Stack(
             children: [
@@ -1721,7 +1800,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                           cellHeight: cellHeight,
                           verticalScrollController: _gridVerticalController,
                           horizontalScrollController: _gridHorizontalController,
-                          leadingPadding: _leadingPadding,
+                          leadingPadding: _effectiveLeadingPadding,
                           // Overlays help callouts on tempo/scale labels
                           // plus a general instructions banner, per
                           // request — see GridWidget's own helpMode doc.
