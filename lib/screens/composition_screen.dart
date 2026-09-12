@@ -16,6 +16,7 @@ import '../dialogs/cell_width_dialog.dart';
 import '../dialogs/new_composition_dialog.dart';
 import '../dialogs/global_duration_dialog.dart';
 import '../dialogs/add_measures_dialog.dart';
+import '../dialogs/hand_dialog.dart';
 
 import '../dialogs/simple_message_dialog.dart';
 import '../dialogs/edit_composition_dialog.dart';
@@ -1113,28 +1114,42 @@ class _CompositionScreenState extends State<CompositionScreen>
                               icon: Transform.rotate(
                                 angle: controller.rotatePitchText ? -pi / 2 : 0,
                                 child: Icon(Icons.pan_tool,
-                                  color:  controller.currentHand == Hand.right
+                                  // Three states now that Hand.additional
+                                  // exists: right = black, left = blue,
+                                  // additional = green (per request).
+                                  color: controller.currentHand == Hand.right
                                       ? Colors.black
-                                      : Colors.blue,
+                                      : controller.currentHand == Hand.left
+                                      ? Colors.blue
+                                      : Colors.green,
                                 ),
                               ),
                               tooltip: 'Hand',
                               onPressed: _withHelp(
-                                  'Hand change: \nSwitches hand for newly entered notes.',
+                                  'Hand change: \nOpens a picker for Left, '
+                                      'Right, or Additional hand for newly '
+                                      'entered notes.',
                                       () {
-                                    controller.toggleHand();
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          controller.currentHand == Hand.right ? 'Right hand.' : 'Left hand.',
-                                          style: const TextStyle(fontSize: 22),
-                                        ),
-                                      ),
+                                    // Always opens the 3-way picker now —
+                                    // the separate "Additional Hand Mode"
+                                    // gate was removed, per request, but
+                                    // Hand.additional still needs a way
+                                    // to be reached, so this dialog is
+                                    // now the Hand button's only
+                                    // behavior.
+                                    handDialog(
+                                      context: context,
+                                      controller: controller,
                                     );
                                   }),
                             ),
                           ),
 
+                          // ADDITIONAL HAND MODE toggle removed, per
+                          // request — Hand.additional stays in the enum
+                          // and in handDialog's picker; the Hand button
+                          // below now always opens that dialog instead
+                          // of being gated by a separate mode toggle.
 
                           // DURATION
                           CompositedTransformTarget(

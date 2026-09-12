@@ -1,4 +1,5 @@
 enum Hand {
   left,
-  right
+  right,
+  additional
 }

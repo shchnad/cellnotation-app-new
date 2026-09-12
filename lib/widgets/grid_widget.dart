@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../controllers/composition_controller.dart';
+import '../dialogs/beat_subdivision_dialog.dart';
 import '../dialogs/edit_measure_beat_dialog.dart';
 import '../dialogs/scale_dialog.dart';
 import '../dialogs/tempo_dialog.dart';
@@ -318,8 +319,48 @@ List<_ScaleLabelHit> _computeScaleLabelHits(
   return hits;
 }
 
-/// Computes tap-target rects for every fermata-stretched beat's "fz"
-/// label — mirrors GridPainter's own beat-line-drawing loop exactly
+// Tap target for the time-signature label drawn at the bottom of the
+// grid (see GridPainter's TIME SIGNATURE section). Tapping it opens
+// beatSubdivisionDialog for that measure, per request — every
+// measure gets one of these labels (unlike the scale name above,
+// which only repeats where it changes), matching how GridPainter
+// draws it for EVERY measure.
+class _TimeSignatureLabelHit {
+  final int measureIndex;
+  final Rect rect;
+  _TimeSignatureLabelHit(this.measureIndex, this.rect);
+}
+
+/// Computes tap-target rects for the time-signature label at the
+/// bottom of the grid — mirrors GridPainter's own TIME SIGNATURE
+/// drawing exactly (same position, drawn for EVERY measure), so the
+/// tap target always lines up with what's actually visible.
+List<_TimeSignatureLabelHit> _computeTimeSignatureLabelHits(
+    CompositionController controller,
+    double pixelsPerTick,
+    double gridHeight,
+    ) {
+  final hits = <_TimeSignatureLabelHit>[];
+  final measures = controller.measures;
+  final fontSize = controller.gridFontSize;
+
+  for (int i = 0; i < measures.length; i++) {
+    final measure = measures[i];
+    final x = measure.startTick * pixelsPerTick;
+    final text = _measureLabelText(measure.timeSignature);
+    final tp = _measureLabelTextPainter(text, fontSize, false);
+    final y = gridHeight - tp.height - _bottomMargin;
+    hits.add(
+      _TimeSignatureLabelHit(
+        i,
+        Rect.fromLTWH(x + _labelOffsetX, y, tp.width, tp.height),
+      ),
+    );
+  }
+
+  return hits;
+}
+
 /// (same beat-by-beat walk, same per-beat width accounting for a
 /// fermata multiplier, same centered label position), so the tap
 /// target always lines up with what's actually visible.
@@ -862,6 +903,29 @@ class GridWidget extends StatelessWidget {
                                       newScale,
                                     );
                                   },
+                                );
+                                return; // don't fall through to note creation
+                              }
+                            }
+
+                            // 4.5. Check the time-signature label at
+                            //    the bottom next — tapping it opens
+                            //    beatSubdivisionDialog for that
+                            //    measure (per request), not creating
+                            //    a note.
+                            final timeSignatureLabelHits =
+                            _computeTimeSignatureLabelHits(
+                              controller,
+                              pixelsPerTick,
+                              gridHeight,
+                            );
+
+                            for (final hit in timeSignatureLabelHits) {
+                              if (hit.rect.contains(details.localPosition)) {
+                                beatSubdivisionDialog(
+                                  context: context,
+                                  controller: controller,
+                                  measureIndex: hit.measureIndex,
                                 );
                                 return; // don't fall through to note creation
                               }

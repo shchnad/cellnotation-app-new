@@ -6,7 +6,6 @@ import '../enums/accidental.dart';
 import '../enums/finger.dart';
 import '../enums/glissando_direction.dart';
 import '../enums/grace_note_type.dart';
-import '../enums/hand.dart';
 import '../enums/ornament.dart';
 import '../enums/playing_technique.dart';
 import '../models/note.dart';
@@ -14,6 +13,7 @@ import '../utils/default_values.dart';
 import 'combined_duration_dialog.dart';
 import '../models/note_import.dart';
 import 'note_values_dialog.dart';
+import 'hand_dialog.dart';
 
 class NoteDialog extends StatelessWidget {
   final Note note;
@@ -473,17 +473,20 @@ class NoteDialog extends StatelessWidget {
                       ),
                     ),
                     onTap: () {
-                      noteValuesDialog<Hand>(
+                      // handDialog now — styled to match
+                      // noteValuesDialog (see that file's own doc),
+                      // and reused directly here (rather than the
+                      // generic noteValuesDialog<Hand>) so it can
+                      // offer the 3rd "Additional" hand and its own
+                      // per-hand color coding. Passing `note:
+                      // editedNote` tells it to edit THIS note's hand
+                      // (via CompositionController.setNoteHand) and
+                      // close this whole NoteDialog on selection too
+                      // — matching every other field's picker here.
+                      handDialog(
                         context: context,
-                        allowToCloseNextWindow: true,
-                        currentValue: editedNote.hand,
-                        title: 'Hand',
-                        values: Hand.values,
-                        numberOfColumns: 2,
-                        labelBuilder: (h) => h.name,
-                        onSelected: (hand) {
-                          controller.setNoteHand(editedNote, hand);
-                        },
+                        controller: controller,
+                        note: editedNote,
                       );
                     },
                   ),

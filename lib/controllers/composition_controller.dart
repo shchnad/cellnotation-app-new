@@ -47,6 +47,18 @@ class CompositionController extends ChangeNotifier {
 
   Hand currentHand = Hand.right;
 
+  /// Sets [currentHand] directly to [hand] — used by [handDialog]
+  /// (Left/Right/Additional) since three choices can't be cycled
+  /// through with a single toggle the way [toggleHand] cycles
+  /// between just Left and Right. The Hand toolbar button always
+  /// opens [handDialog] now (there's no separate "Additional Hand
+  /// Mode" gate anymore), so this is the button's only path for
+  /// changing [currentHand].
+  void setCurrentHand(Hand hand) {
+    currentHand = hand;
+    notifyListeners();
+  }
+
   // Duration of newly created notes
   NoteDuration currentDuration = DefaultValues.defaultDuration;
 
@@ -483,6 +495,154 @@ class CompositionController extends ChangeNotifier {
       tick += ticksPerBeat * multiplier;
     }
     return tick;
+  }
+
+  /// Doubles the beat-count "subdivision" of every measure from
+  /// [fromIndex] through [toIndex] (inclusive, 0-based) — e.g. 3
+  /// beats of a quarter note each becomes 6 beats of an eighth note
+  /// each. Purely a re-notation: since NoteDuration's own ticks
+  /// values are a strict halving sequence (see that enum), doubling
+  /// beats while halving beatDuration always leaves the measure's
+  /// TOTAL duration in ticks exactly unchanged
+  /// (2*beats * (ticksPerBeat/2) == beats * ticksPerBeat) — so no
+  /// note, tempo/dynamic/dynamic-change event, or later measure needs
+  /// to shift in time at all; only the affected measure's own
+  /// TimeSignature changes.
+  ///
+  /// [fromIndex]/[toIndex] are treated as (min, max) regardless of
+  /// which is actually larger; out-of-range indices (or an empty
+  /// composition) make this a no-op. A measure whose beatDuration is
+  /// already the shortest available (NoteDuration.sixtyFourth) can't
+  /// be halved further and is skipped (with a warning); a measure
+  /// carrying an existing fermata on any of its beats is also skipped
+  /// (with its own warning) rather than silently producing a wrong
+  /// result — [fermataMultipliers] is keyed by beat index, which this
+  /// operation would invalidate by changing how many beats the
+  /// measure has and what each one means.
+  ///
+  /// Returns a list of short messages describing anything that was
+  /// skipped and why — empty if every measure in the range was
+  /// converted successfully.
+  List<String> doubleSubdivisionForMeasureRange(int fromIndex, int toIndex) {
+    final warnings = <String>[];
+    if (measures.isEmpty) return warnings;
+    final start = fromIndex <= toIndex ? fromIndex : toIndex;
+    final end = fromIndex <= toIndex ? toIndex : fromIndex;
+    if (start < 0 || end >= measures.length) return warnings;
+
+    for (int i = start; i <= end; i++) {
+      final measure = measures[i];
+      final oldDuration = measure.timeSignature.beatDuration;
+      final oldIndex = NoteDuration.values.indexOf(oldDuration);
+      if (oldIndex >= NoteDuration.values.length - 1) {
+        warnings.add(
+          'Measure ${i + 1}: already at the shortest duration '
+              '(${oldDuration.label}) — skipped.',
+        );
+        continue;
+      }
+      // Any beat in this measure carrying a fermata makes the
+      // transform ambiguous — see the method doc.
+      final hasFermata =
+      fermataMultipliers.keys.any((key) => key.startsWith('${i}_'));
+      if (hasFermata) {
+        warnings.add(
+          'Measure ${i + 1}: has a fermata — remove it first, then '
+              'try again.',
+        );
+        continue;
+      }
+
+      final newDuration = NoteDuration.values[oldIndex + 1];
+      measures[i] = measure.copyWith(
+        timeSignature: measure.timeSignature.copyWith(
+          beats: measure.timeSignature.beats * 2,
+          beatDuration: newDuration,
+        ),
+      );
+    }
+
+    notifyListeners();
+    return warnings;
+  }
+
+  /// The exact inverse of [doubleSubdivisionForMeasureRange] — halves
+  /// the beat count and doubles each beat's own duration for every
+  /// measure from [fromIndex] through [toIndex] (inclusive,
+  /// 0-based) — e.g. 6 beats of an eighth note each becomes 3 beats
+  /// of a quarter note each. Same "purely a re-notation" reasoning as
+  /// the doubling direction: the measure's TOTAL duration in ticks is
+  /// exactly unchanged, so nothing needs to shift in time.
+  ///
+  /// [fromIndex]/[toIndex] are treated as (min, max) regardless of
+  /// which is actually larger; out-of-range indices (or an empty
+  /// composition) make this a no-op. Only possible when it's
+  /// actually exact — a measure is skipped (with a warning) rather
+  /// than silently rounding or producing a wrong result whenever:
+  /// - its beat COUNT is odd (halving it wouldn't be a whole number
+  ///   of beats);
+  /// - its beatDuration is already the longest available
+  ///   (NoteDuration.whole — nothing longer to double into); or
+  /// - it carries an existing fermata on any of its beats (same
+  ///   reasoning as the doubling direction — [fermataMultipliers] is
+  ///   keyed by beat index, which changing the beat count would
+  ///   invalidate).
+  ///
+  /// Returns a list of short messages describing anything that was
+  /// skipped and why — empty if every measure in the range was
+  /// converted successfully.
+  List<String> halveSubdivisionForMeasureRange(int fromIndex, int toIndex) {
+    final warnings = <String>[];
+    if (measures.isEmpty) return warnings;
+    final start = fromIndex <= toIndex ? fromIndex : toIndex;
+    final end = fromIndex <= toIndex ? toIndex : fromIndex;
+    if (start < 0 || end >= measures.length) return warnings;
+
+    for (int i = start; i <= end; i++) {
+      final measure = measures[i];
+      final beats = measure.timeSignature.beats;
+
+      if (beats % 2 != 0) {
+        warnings.add(
+          'Measure ${i + 1}: beat count ($beats) is odd — can\'t '
+              'halve evenly — skipped.',
+        );
+        continue;
+      }
+
+      final oldDuration = measure.timeSignature.beatDuration;
+      final oldIndex = NoteDuration.values.indexOf(oldDuration);
+      if (oldIndex <= 0) {
+        warnings.add(
+          'Measure ${i + 1}: already at the longest duration '
+              '(${oldDuration.label}) — skipped.',
+        );
+        continue;
+      }
+
+      // Any beat in this measure carrying a fermata makes the
+      // transform ambiguous — see the method doc.
+      final hasFermata =
+      fermataMultipliers.keys.any((key) => key.startsWith('${i}_'));
+      if (hasFermata) {
+        warnings.add(
+          'Measure ${i + 1}: has a fermata — remove it first, then '
+              'try again.',
+        );
+        continue;
+      }
+
+      final newDuration = NoteDuration.values[oldIndex - 1];
+      measures[i] = measure.copyWith(
+        timeSignature: measure.timeSignature.copyWith(
+          beats: beats ~/ 2,
+          beatDuration: newDuration,
+        ),
+      );
+    }
+
+    notifyListeners();
+    return warnings;
   }
 
 

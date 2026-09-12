@@ -3,6 +3,7 @@ import 'package:music_composer/dialogs/tempo_dialog.dart';
 
 import '../controllers/composition_controller.dart';
 import '../utils/scale_resolver.dart';
+import 'beat_subdivision_dialog.dart';
 import 'dynamic_change_dialog.dart';
 import 'dynamic_dialog.dart';
 import 'measure_range_dialog.dart';
@@ -425,6 +426,35 @@ void editMeasureBeatDialog({
                                   scale,
                                 );
                               },
+                            );
+                          },
+                        ),
+
+                        const Divider(),
+
+                        // CHANGE SUBDIVISION — doubles the beat
+                        // count and halves each beat's own duration
+                        // (e.g. 3 beats of 1/4 -> 6 beats of 1/8),
+                        // per request. Offers "this measure" or a
+                        // measure-range picker (see
+                        // beatSubdivisionDialog).
+                        ListTile(
+                          leading: const Icon(Icons.call_split),
+                          iconColor: Colors.black,
+                          title: const Text(
+                            "Change Subdivision",
+                            style: TextStyle(
+                              fontSize: 22,
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          onTap: () {
+                            Navigator.pop(context);
+                            beatSubdivisionDialog(
+                              context: context,
+                              controller: controller,
+                              measureIndex: measureIndex,
                             );
                           },
                         ),
