@@ -194,8 +194,8 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
                 const SizedBox(width: 8),
                 IconButton(
                   icon: Icon(
-                    _sortByLikes ? Icons.favorite : Icons.access_time,
-                    color: _sortByLikes ? Colors.red : Colors.black,
+                    Icons.favorite,
+                    color: _sortByLikes ? Colors.red : Colors.grey,
                   ),
                   tooltip: _sortByLikes
                       ? 'Sorted by most liked (tap for most recent)'
@@ -214,63 +214,91 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
           // widening it the same way. "Shared by" and "Likes" are
           // extra columns CompositionsListScreen doesn't have, kept
           // here since this screen genuinely needs them.
+          //
+          // horizontal padding matches the DATA ROW Container's own
+          // (16, not the previous 8) — per request, EVERY column
+          // header must align with its data column below, not just
+          // Title. Since Row lays out Expanded columns by dividing
+          // whatever width is left after this Container's own
+          // padding, a mismatched padding here shifted every
+          // column's flex-based width slightly versus the data row
+          // below, not just the first one — matching it here fixes
+          // all of them at once, rather than needing a per-column
+          // compensating Padding hack the way Title alone had before.
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: Colors.grey.shade300,
-            child: const Row(
+            child: Row(
               children: [
                 Expanded(
                   flex: 5,
-                  child: Text('Title',
-                      style: TextStyle(
-                          color: Colors.black,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18)
+                  // Now that this Container's own padding matches the
+                  // data row's, Title only needs the SAME 12 the data
+                  // row's title has (not 20) — see the comment above.
+                  child: const Padding(
+                    padding: EdgeInsets.only(left: 12),
+                    child: Text('Title',
+                        style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 22)
+                    ),
                   ),
                 ),
-                Expanded(
+                const Expanded(
                   flex: 2,
                   child: Text('Composer',
                       style: TextStyle(
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
-                          fontSize: 18)
+                          fontSize: 22)
                   ),
                 ),
-                Expanded(
+                const Expanded(
                   flex: 2,
                   child: Text('Shared by',
                       style: TextStyle(
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
-                          fontSize: 18)
+                          fontSize: 22)
                   ),
                 ),
-                Expanded(
+                const Expanded(
                   flex: 2,
                   child: Text('Style',
                       style: TextStyle(
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
-                          fontSize: 18)),
+                          fontSize: 22)),
                 ),
-                Expanded(
+                const Expanded(
                   flex: 2,
                   child: Text('Instrument',
                       style: TextStyle(
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
-                          fontSize: 18)),
+                          fontSize: 22)),
                 ),
-                SizedBox(
+                // Matches the data row's own fixed-width "(yours)"
+                // slot exactly (see below) — reserved here too, even
+                // though there's no header label for it, purely so
+                // "Likes" and the trailing download-icon slot after
+                // it land at the same pixel as the data row's.
+                const SizedBox(width: 60),
+                const SizedBox(
                   width: 110,
                   child: Text('Likes',
                       style: TextStyle(
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
-                          fontSize: 18)),
+                          fontSize: 22)),
                 ),
-                SizedBox(width: 40),
+                // Matches the data row's own trailing SizedBox width
+                // (48, an IconButton's real Material default tap-
+                // target size) — not the earlier guessed 40, which
+                // didn't actually match how wide an IconButton
+                // renders.
+                const SizedBox(width: 48),
               ],
             ),
           ),
@@ -362,10 +390,19 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
                             // earlier blueGrey/grey coloring).
                             Expanded(
                               flex: 5,
-                              child: Text(
-                                _capitalizeFirst(comp.title),
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                              child: Padding(
+                                // Matches CompositionsListScreen's
+                                // own data-row indent, per request —
+                                // and the header above is indented an
+                                // extra 8 to land at the exact same
+                                // pixel despite this Container's
+                                // larger (16 vs 8) own padding.
+                                padding: const EdgeInsets.only(left: 12),
+                                child: Text(
+                                  _capitalizeFirst(comp.title),
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                                ),
                               ),
                             ),
                             Expanded(
@@ -400,41 +437,72 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
                                 style: const TextStyle(fontSize: 22, color: Colors.black),
                               ),
                             ),
-                            if (isMine)
-                              const Padding(
-                                padding: EdgeInsets.only(right: 8),
-                                child: Text('(yours)', style: TextStyle(fontSize: 16, color: Colors.blue)),
-                              ),
-                            IconButton(
-                              icon: Icon(
-                                comp.isLikedBy(_myUid) ? Icons.favorite : Icons.favorite_border,
-                                size: 20,
-                                color: comp.isLikedBy(_myUid) ? Colors.red : Colors.grey,
-                              ),
-                              tooltip: comp.isLikedBy(_myUid) ? 'Unlike' : 'Like',
-                              onPressed: () async {
-                                if (comp.id == null) return;
-                                try {
-                                  await _service.toggleLike(comp.id!, comp.isLikedBy(_myUid));
-                                } catch (e) {
-                                  if (!context.mounted) return;
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Failed: $e', style: const TextStyle(fontSize: 18))),
-                                  );
-                                }
-                              },
-                            ),
+                            // A FIXED-width slot, always present (not
+                            // just when isMine) — per request, a
+                            // conditional widget here would shift
+                            // every column after it depending on
+                            // whether THIS row happens to be "yours",
+                            // breaking alignment against the header
+                            // (and against other rows) inconsistently
+                            // rather than by a single constant amount.
                             SizedBox(
-                              width: 24,
-                              child: Text(
-                                '${comp.likeCount}',
-                                style: const TextStyle(fontSize: 16, color: Colors.black),
+                              width: 60,
+                              child: isMine
+                                  ? const Text('(yours)',
+                                  style: TextStyle(fontSize: 16, color: Colors.blue))
+                                  : null,
+                            ),
+                            // Heart icon + like count, together in ONE
+                            // fixed-width slot matching the header's
+                            // own declared "Likes" width (110) exactly
+                            // — an IconButton's own rendered width
+                            // (Material's default ~48px tap target)
+                            // doesn't match a guessed header spacer on
+                            // its own, so both must share the SAME
+                            // explicit width declaration rather than
+                            // each guessing independently.
+                            SizedBox(
+                              width: 110,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                children: [
+                                  IconButton(
+                                    icon: Icon(
+                                      comp.isLikedBy(_myUid) ? Icons.favorite : Icons.favorite_border,
+                                      size: 20,
+                                      color: comp.isLikedBy(_myUid) ? Colors.red : Colors.grey,
+                                    ),
+                                    tooltip: comp.isLikedBy(_myUid) ? 'Unlike' : 'Like',
+                                    onPressed: () async {
+                                      if (comp.id == null) return;
+                                      try {
+                                        await _service.toggleLike(comp.id!, comp.isLikedBy(_myUid));
+                                      } catch (e) {
+                                        if (!context.mounted) return;
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Failed: $e', style: const TextStyle(fontSize: 18))),
+                                        );
+                                      }
+                                    },
+                                  ),
+                                  Text(
+                                    '${comp.likeCount}',
+                                    style: const TextStyle(fontSize: 16, color: Colors.black),
+                                  ),
+                                ],
                               ),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.download, size: 20),
-                              tooltip: 'Copy to My Compositions',
-                              onPressed: () => _copyToMyLibrary(context, comp),
+                            // Matches the header's own trailing
+                            // spacer width (48, an IconButton's real
+                            // Material default tap-target size — not
+                            // the earlier guessed 40) exactly.
+                            SizedBox(
+                              width: 48,
+                              child: IconButton(
+                                icon: const Icon(Icons.download, size: 20),
+                                tooltip: 'Copy to My Compositions',
+                                onPressed: () => _copyToMyLibrary(context, comp),
+                              ),
                             ),
                           ],
                         ),

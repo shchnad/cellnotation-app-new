@@ -176,31 +176,51 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
           ),
           const Divider(height: 1),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            // horizontal padding matches the DATA ROW Container's
+            // own (16, not the previous 8) — per request, every
+            // column header must align with its data column below,
+            // the same fix applied to CloudLibraryScreen: Row lays
+            // out Expanded columns by dividing whatever width is
+            // left after this Container's own padding, so a
+            // mismatched padding here shifted every column's
+            // flex-based width slightly versus the data row below.
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: Colors.grey.shade300,
-            child: const Row(
+            child: Row(
               children: [
                 Expanded(
                   flex: 5,
-                  child: Text('Title', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
+                  // Matches the data row's own left indent on Title
+                  // exactly (see below) — now that this Container's
+                  // padding matches the data row's, both need the
+                  // SAME extra indent to land at the same pixel.
+                  child: const Padding(
+                    padding: EdgeInsets.only(left: 12),
+                    child: Text('Title', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
+                  ),
                 ),
-                Expanded(
+                const Expanded(
                   flex: 2,
-                  child: Text('Composer', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
+                  child: Text('Composer', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
                 ),
-                Expanded(
+                const Expanded(
                   flex: 2,
-                  child: Text('Style', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
+                  child: Text('Style', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
                 ),
-                Expanded(
+                const Expanded(
                   flex: 2,
-                  child: Text('Instrument', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
+                  child: Text('Instrument', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
                 ),
-                Expanded(
+                const Expanded(
                   flex: 2,
-                  child: Text('Edited', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
+                  child: Text('Edited', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
                 ),
-                SizedBox(width: 44), // aligns with the edit icon column
+                // Matches the data row's own trailing SizedBox width
+                // (48, an IconButton's real Material default tap-
+                // target size — not the earlier guessed 44, which
+                // didn't actually match how wide an IconButton
+                // renders) — same fix as CloudLibraryScreen's.
+                const SizedBox(width: 48),
               ],
             ),
           ),
@@ -280,12 +300,19 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
                           children: [
                             Expanded(
                               flex: 5,
-                              child: Text(
-                                _capitalizeFirst(comp.title),
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
+                              child: Padding(
+                                // Matches the header's own 12px
+                                // indent on Title exactly, per
+                                // request — same treatment as
+                                // CloudLibraryScreen's.
+                                padding: const EdgeInsets.only(left: 12),
+                                child: Text(
+                                  _capitalizeFirst(comp.title),
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
@@ -321,26 +348,29 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
                                 style: const TextStyle(fontSize: 22, color: Colors.black),
                               ),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.edit, size: 20),
-                              tooltip: 'Edit info',
-                              onPressed: () {
-                                showDialog(
-                                  context: context,
-                                  builder: (context) => EditCompositionDialog(
-                                    composition: comp,
-                                    onSaved: (updated) async {
-                                      await _service.saveComposition(updated);
-                                    },
-                                    onDelete: () async {
-                                      if (comp.id != null) {
-                                        await _service.deleteComposition(comp.id!);
-                                      }
-                                    },
-                                    allowDelete: true,
-                                  ),
-                                );
-                              },
+                            SizedBox(
+                              width: 48,
+                              child: IconButton(
+                                icon: const Icon(Icons.edit, size: 20),
+                                tooltip: 'Edit info',
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => EditCompositionDialog(
+                                      composition: comp,
+                                      onSaved: (updated) async {
+                                        await _service.saveComposition(updated);
+                                      },
+                                      onDelete: () async {
+                                        if (comp.id != null) {
+                                          await _service.deleteComposition(comp.id!);
+                                        }
+                                      },
+                                      allowDelete: true,
+                                    ),
+                                  );
+                                },
+                              ),
                             ),
                           ],
                         ),

@@ -2935,10 +2935,10 @@ class CompositionController extends ChangeNotifier {
   /// so the person knows which toggle to turn off.
   String get editingBlockedMessage {
     if (showCompensatedNotation) {
-      return 'Turn off Compensated Notation to edit notes';
+      return 'Turn off Easy Read Mode to edit notes';
     }
     if (inputLocked) {
-      return 'Turn off Scroll Lock to edit notes';
+      return 'Turn off Lock Mode to edit notes';
     }
     return 'Editing is currently disabled';
   }

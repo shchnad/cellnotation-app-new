@@ -45,6 +45,25 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       body: Stack(
         children: [
+          // BACKGROUND IMAGE — the piano photo, full-bleed behind
+          // everything else on this screen, per request. Positioned
+          // first in the Stack so it paints BEHIND the button column
+          // and the Exit link. Positioned.fill + BoxFit.cover fills
+          // the whole screen regardless of aspect ratio, cropping
+          // rather than stretching/leaving gaps. A semi-transparent
+          // dark scrim sits on top of the image (below the buttons)
+          // so the white button text/icons stay legible against
+          // whatever part of the photo shows through.
+          Positioned.fill(
+            child: Image.asset(
+              'assets/cellnotation_background.jpg',
+              fit: BoxFit.cover,
+            ),
+          ),
+          Positioned.fill(
+            child: Container(color: Colors.black.withOpacity(0.35)),
+          ),
+
           Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -54,8 +73,8 @@ class HomeScreen extends StatelessWidget {
                     return _HomeMenuButton(
                       icon: Icons.library_add,
                       label: 'Create Composition',
-                      color: Colors.black,
-                      textColor: Colors.white,
+                      color: Colors.grey.shade300,
+                      textColor: Colors.black,
                       onPressed: () => _handleCreateComposition(buttonContext),
                     );
                   },
@@ -173,8 +192,8 @@ class _HomeMenuButton extends StatelessWidget {
     // a shorter one (e.g. "Profile") unless every button is
     // explicitly constrained to the SAME width like this.
     return SizedBox(
-        width: 300,
-        height: 100,
+      width: 300,
+      height: 100,
       child: ElevatedButton.icon(
         style: ElevatedButton.styleFrom(
           backgroundColor: color,

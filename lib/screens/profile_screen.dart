@@ -93,165 +93,182 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          user == null
-              ? Column(
-            children: [
-              const Center(
-                  child: Text(
-                      'Not signed in',
-                      style: TextStyle(fontSize: 22))),
-            ],
-          )
-              : ListView(
-            padding: const EdgeInsets.all(24),
-            children: [
-              Center(
-                child: SizedBox(
-                  width: (MediaQuery.of(context).size.width - 48).clamp(0, 500),
-                  child: Column(
-                    children: [
-                      CircleAvatar(
-                        radius: 60,
-                        backgroundColor: Colors.blue.shade100,
-                        backgroundImage: user.photoURL != null
-                            ? NetworkImage(user.photoURL!)
-                            : null,
-                        child: user.photoURL == null
-                            ? const Icon(Icons.person, size: 48, color: Colors.black)
-                            : null,
-                      ),
+          // The main content is now genuinely centered VERTICALLY as
+          // well as horizontally, per request — not just horizontally
+          // (via the existing Center+width-clamped SizedBox below).
+          // LayoutBuilder + a min-height ConstrainedBox is the
+          // standard way to center content that's SHORTER than the
+          // viewport while still allowing it to scroll normally if it
+          // ever overflows a short screen — a plain ListView/Column
+          // alone only ever top-aligns content, leaving blank space
+          // below it on a tall screen instead of centering.
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Center(
+                    child: user == null
+                        ? const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                          'Not signed in',
+                          style: TextStyle(fontSize: 22)),
+                    )
+                        : Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: (MediaQuery.of(context).size.width - 48).clamp(0, 500),
+                            child: Column(
+                              children: [
+                                CircleAvatar(
+                                  radius: 60,
+                                  backgroundColor: Colors.blue.shade100,
+                                  backgroundImage: user.photoURL != null
+                                      ? NetworkImage(user.photoURL!)
+                                      : null,
+                                  child: user.photoURL == null
+                                      ? const Icon(Icons.person, size: 48, color: Colors.black)
+                                      : null,
+                                ),
 
-                      const SizedBox(height: 20),
+                                const SizedBox(height: 20),
 
-                      Text(
-                        user.email ?? '',
-                        style: const TextStyle(
-                          fontSize: 22,
-                          color: Colors.black,
-                        ),
-                      ),
+                                Text(
+                                  user.email ?? '',
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    color: Colors.black,
+                                  ),
+                                ),
 
-                      const SizedBox(height: 30),
+                                const SizedBox(height: 30),
 
-                      TextField(
-                        controller: _nameController,
-                        textInputAction: TextInputAction.done,
-                        onSubmitted: (_) => _saveName(),
-                        style: const TextStyle(
-                          fontSize: 22,
-                          color: Colors.blue,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        decoration: InputDecoration(
-                          labelText: 'Edit user name',
-                          labelStyle: const TextStyle(
-                            color: Colors.black,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          border: const OutlineInputBorder(),
-                          suffixIcon: IconButton(
-                            icon: const Icon(Icons.clear),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            visualDensity: VisualDensity.compact,
-                            onPressed: () {
-                              setState(() {
-                                _nameController.clear();
-                              });
-                            },
-                          ),
-                        ),
-                      ),
+                                TextField(
+                                  controller: _nameController,
+                                  textInputAction: TextInputAction.done,
+                                  onSubmitted: (_) => _saveName(),
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    color: Colors.blue,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  decoration: InputDecoration(
+                                    labelText: 'Edit user name',
+                                    labelStyle: const TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    border: const OutlineInputBorder(),
+                                    suffixIcon: IconButton(
+                                      icon: const Icon(Icons.clear),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      visualDensity: VisualDensity.compact,
+                                      onPressed: () {
+                                        setState(() {
+                                          _nameController.clear();
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                ),
 
-                      const SizedBox(height: 10),
+                                const SizedBox(height: 10),
 
-                      SizedBox(
-                        width: 300,
-                        height: 100,
-                        child: ElevatedButton(
-                          onPressed: _saving
-                              ? null
-                              : _saveName,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.grey.shade300,
-                            // foregroundColor: Colors.black,
-                            minimumSize: const Size(300, 100),
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(4),
+                                SizedBox(
+                                  width: 300,
+                                  height: 100,
+                                  child: ElevatedButton(
+                                    onPressed: _saving
+                                        ? null
+                                        : _saveName,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.grey.shade300,
+                                      // foregroundColor: Colors.black,
+                                      minimumSize: const Size(300, 100),
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                    ),
+                                    // Kept as a plain ElevatedButton (rather than
+                                    // ElevatedButton.icon) since it also needs to
+                                    // swap to a loading spinner while saving —
+                                    // building the icon+label Row manually gives
+                                    // the same visual result as .icon while still
+                                    // allowing that conditional.
+                                    child: _saving
+                                        ? const SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    )
+                                        : const Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        SizedBox(
+                                            child: Icon(
+                                              Icons.save,
+                                              color: Colors.black,
+                                              size: 22,
+                                            )
+                                        ),
+                                        SizedBox(width: 8),
+                                        SizedBox(
+                                          child: Text('Save',
+                                              style: TextStyle(
+                                                fontSize: 22,
+                                                color: Colors.black,
+                                              )),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+
+                                const SizedBox(height: 10),
+
+                              ],
                             ),
                           ),
-                          // Kept as a plain ElevatedButton (rather than
-                          // ElevatedButton.icon) since it also needs to
-                          // swap to a loading spinner while saving —
-                          // building the icon+label Row manually gives
-                          // the same visual result as .icon while still
-                          // allowing that conditional.
-                          child: _saving
-                              ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                              : const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              SizedBox(
-                                  child: Icon(
-                                    Icons.save,
-                                    color: Colors.black,
-                                    size: 22,
-                                  )
-                              ),
-                              SizedBox(width: 8),
-                              SizedBox(
-                                child: Text('Save',
-                                    style: TextStyle(
-                                      fontSize: 22,
-                                      color: Colors.black,
-                                    )),
-                              ),
-                            ],
+
+                          const SizedBox(height: 60),
+
+                          SizedBox(
+                            width: (MediaQuery.of(context).size.width - 48).clamp(0, 500),
+                            child: StreamBuilder<List<Composition>>(
+                              stream: _compositionService.getUserCompositions(),
+                              builder: (context, snapshot) {
+                                final compositions = snapshot.data ?? [];
+                                final publicCount = compositions.where((c) => c.isPublic).length;
+                                final totalLikes = compositions.fold<int>(
+                                  0,
+                                      (sum, c) => sum + c.likeCount,
+                                );
+
+                                return Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                    _StatTile(label: 'Compositions', value: '${compositions.length}'),
+                                    _StatTile(label: 'Public', value: '$publicCount'),
+                                    _StatTile(label: 'Likes received', value: '$totalLikes'),
+                                  ],
+                                );
+                              },
+                            ),
                           ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 10),
-
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 60),
-
-              Center(
-                child: SizedBox(
-                  width: (MediaQuery.of(context).size.width - 48).clamp(0, 500),
-                  child: StreamBuilder<List<Composition>>(
-                    stream: _compositionService.getUserCompositions(),
-                    builder: (context, snapshot) {
-                      final compositions = snapshot.data ?? [];
-                      final publicCount = compositions.where((c) => c.isPublic).length;
-                      final totalLikes = compositions.fold<int>(
-                        0,
-                            (sum, c) => sum + c.likeCount,
-                      );
-
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _StatTile(label: 'Compositions', value: '${compositions.length}'),
-                          _StatTile(label: 'Public', value: '$publicCount'),
-                          _StatTile(label: 'Likes received', value: '$totalLikes'),
                         ],
-                      );
-                    },
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              );
+            },
           ),
 
           // HOME — top-left corner, clickable text + icon (not a

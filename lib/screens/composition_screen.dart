@@ -95,44 +95,48 @@ class _CompositionScreenState extends State<CompositionScreen>
   // measure's speed rather than snapping or feeling arbitrary.
   static const int _ghostLeadInBeats = 4;
 
-  // A SMALL, fixed leading gap that stays present in EVERY mode, per
-  // request — even outside Scroll Lock, there should always be a bit
-  // of breathing room between the toolbar/pitch column and the
-  // grid's own content, rather than the grid's content starting
-  // flush against them. Independent of zoom/tempo (unlike
-  // _leadingPadding below): a constant number of pixels, not ticks.
-  static const double _minimumLeadingPadding = 20.0;
+  // A NARROW, fixed leading gap — the SAME width regardless of which
+  // composition is open (independent of its own tempo/time
+  // signature/zoom) — shown by default (Scroll Lock off), including
+  // right when a composition is first opened. This is the "resting"
+  // width the grid always returns to once Scroll Lock is turned back
+  // off, per request.
+  static const double _narrowLeadingPadding = 20.0;
 
-  // Blank scrollable space before tick 0, sized to EXACTLY match
-  // _ghostLeadInBeats worth of ticks in pixels (not a fixed screen
-  // fraction) — see GridWidget's own leadingPadding doc. Updated
-  // every build(), since it depends on pixelsPerTick (zoom-
+  // The WIDE "runway" leading space, sized to EXACTLY match
+  // _ghostLeadInBeats worth of ticks in pixels — see GridWidget's own
+  // leadingPadding doc. Deliberately varies from one composition to
+  // another (a fixed BEAT count, not a fixed pixel width) — a fast
+  // tempo, a different time signature, or a different zoom level all
+  // naturally give this a different on-screen width, which is
+  // expected: it needs to represent a consistent amount of musical
+  // TIME to lead in with, not a consistent number of pixels. Only
+  // applied while Scroll Lock is ON — see _effectiveLeadingPadding.
+  // Updated every build(), since it depends on pixelsPerTick (zoom-
   // dependent) and the first measure's own ticksPerBeat.
   double _leadingPadding = 0;
 
-  /// The leading padding actually applied right now. The FULL
-  /// [_leadingPadding] "runway" only applies while Scroll Lock is on;
-  /// outside that, per request, a small constant
-  /// [_minimumLeadingPadding] still applies instead of dropping to
-  /// exactly 0 — so there's always at least a little breathing room
-  /// between the toolbar/pitch column and the grid's own content,
-  /// in every mode, not just during Scroll Lock. Every place that
-  /// used to read [_leadingPadding] directly (scroll math,
-  /// GridWidget's own prop) now reads this instead, so the whole
-  /// screen stays internally consistent about how much leading space
-  /// currently exists.
+  /// The leading padding actually applied right now — [_leadingPadding]
+  /// (the wide, composition-dependent runway) while Scroll Lock is
+  /// on, or [_narrowLeadingPadding] (the same narrow width for every
+  /// composition) otherwise, including on first opening a
+  /// composition — per request. Every place that reads a leading-
+  /// padding value (scroll math, GridWidget's own prop) reads this,
+  /// not [_leadingPadding] directly, so the whole screen stays
+  /// internally consistent about how much leading space currently
+  /// exists.
   double get _effectiveLeadingPadding =>
-      controller.inputLocked ? _leadingPadding : _minimumLeadingPadding;
+      controller.inputLocked ? _leadingPadding : _narrowLeadingPadding;
 
   // Tracks controller.inputLocked (Scroll Lock) across rebuilds so
   // build() can detect when it CHANGES (from any of the several
   // places that toggle it — the Scroll Lock button itself, Easy
   // Read, Help Mode, Rotate Pitch Text, or starting playback) and
   // re-anchor the scroll position afterward, since
-  // _effectiveLeadingPadding's own gap appears/disappears exactly
-  // when this flips. Null until the very first build so that build
-  // doesn't try to "correct" anything before there's a previous
-  // value to compare against.
+  // _effectiveLeadingPadding's own width changes (narrow <-> runway)
+  // exactly when this flips. Null until the very first build so that
+  // build doesn't try to "correct" anything before there's a
+  // previous value to compare against.
   bool? _lastKnownInputLocked;
 
   void _togglePlayback() {
@@ -149,11 +153,12 @@ class _CompositionScreenState extends State<CompositionScreen>
     }
 
     // Captured BEFORE toggling Scroll Lock below — the leading
-    // padding gap tracks Scroll Lock (see _effectiveLeadingPadding),
-    // and the grid widget tree hasn't rebuilt with any new lock
-    // state yet at this point, so the CURRENT scroll offset still
-    // means whatever it meant under the OLD lock state.
-    final hadLeadingPaddingBefore = controller.inputLocked;
+    // padding's WIDTH tracks Scroll Lock (see
+    // _effectiveLeadingPadding), and the grid widget tree hasn't
+    // rebuilt with any new lock state yet at this point, so the
+    // CURRENT scroll offset still means whatever it meant under the
+    // OLD (pre-toggle) lock state.
+    final hadWideLeadingPaddingBefore = controller.inputLocked;
 
     // Starting playback ("hitting the scroll icon") automatically
     // turns on Scroll Lock and Easy Read (Compensated Notation) if
@@ -175,13 +180,14 @@ class _CompositionScreenState extends State<CompositionScreen>
     _playbackTicker?.dispose();
     _playbackTicker = null;
 
-    // Uses the OLD lock state captured above, NOT
-    // _effectiveLeadingPadding's current value — inputLocked may have
-    // just flipped true above, but the actual on-screen scroll offset
-    // still reflects whatever padding was in effect the LAST time
-    // this screen actually rebuilt.
-    final oldEffectivePadding =
-    hadLeadingPaddingBefore ? _leadingPadding : 0.0;
+    // Uses the OLD (pre-toggle) padding captured above, NOT
+    // _effectiveLeadingPadding's current value — inputLocked may
+    // have just flipped true above, but the actual on-screen scroll
+    // offset still reflects whatever padding was in effect the LAST
+    // time this screen actually rebuilt.
+    final oldEffectivePadding = hadWideLeadingPaddingBefore
+        ? _leadingPadding
+        : _narrowLeadingPadding;
     final tickFromScroll = _gridHorizontalController.hasClients
         ? (_gridHorizontalController.offset - oldEffectivePadding) /
         controller.pixelsPerTick
@@ -214,13 +220,13 @@ class _CompositionScreenState extends State<CompositionScreen>
     _playbackTicker?.dispose();
     _playbackTicker = null;
     _activeNoteRows.value = {};
-    // No scroll re-anchoring needed here — the leading padding gap
-    // tracks Scroll Lock (see _effectiveLeadingPadding), not playback
-    // state, and Scroll Lock deliberately stays ON across a pause
-    // (see the comment in _startPlayback), so pausing doesn't change
-    // whether the gap exists at all. The generic re-anchor logic in
-    // build() (see _lastKnownInputLocked) handles it if/when Scroll
-    // Lock itself is later toggled off via its own button.
+    // No scroll re-anchoring needed here — the leading padding's
+    // width tracks Scroll Lock (see _effectiveLeadingPadding), not
+    // playback state itself, and Scroll Lock deliberately stays ON
+    // across a pause (see the comment in _startPlayback), so pausing
+    // alone doesn't change the padding at all. The generic re-anchor
+    // logic in build() (see _lastKnownInputLocked) handles it if/when
+    // Scroll Lock itself is later toggled off via its own button.
     if (mounted) {
       setState(() => _isPlaying = false);
     }
@@ -309,12 +315,11 @@ class _CompositionScreenState extends State<CompositionScreen>
 
   Future<void> _scrollToStart() async {
     if (!_gridHorizontalController.hasClients) return;
-    // Targets 0 (not _effectiveLeadingPadding) — per request, the
-    // grey leading space must stay VISIBLE after scrolling to the
-    // start, rather than being scrolled past so tick 0 sits flush
-    // against the pitch column. At offset 0 the viewport shows the
-    // full leading gap followed by the start of the grid's own
-    // content.
+    // Targets 0 (not _leadingPadding) — per request, the grey leading
+    // space must stay VISIBLE after scrolling to the start, rather
+    // than being scrolled past so tick 0 sits flush against the
+    // pitch column. At offset 0 the viewport shows the full leading
+    // gap followed by the start of the grid's own content.
     await _gridHorizontalController.animateTo(
       0,
       duration: const Duration(milliseconds: 300),
@@ -621,18 +626,20 @@ class _CompositionScreenState extends State<CompositionScreen>
           // since the last build, from ANY of the several places that
           // toggle it (the Scroll Lock button itself, Easy Read, Help
           // Mode, Rotate Pitch Text, or _startPlayback) — since the
-          // leading padding gap tracks it directly (see
-          // _effectiveLeadingPadding), a change here means the gap
-          // just appeared or disappeared. Re-anchors the scroll
-          // position, once the grid has actually rebuilt with the new
-          // padding (next frame), to whatever tick the OLD padding
-          // value said was on screen — so the visible content doesn't
-          // visually jump purely because the gap's size changed.
+          // leading padding's WIDTH tracks it directly (see
+          // _effectiveLeadingPadding: narrow when off, the wide
+          // runway when on), a change here means that width just
+          // changed. Re-anchors the scroll position, once the grid
+          // has actually rebuilt with the new padding (next frame),
+          // to whatever tick the OLD padding value said was on
+          // screen — so the visible content doesn't visually jump
+          // purely because the gap's width changed.
           final currentInputLocked = controller.inputLocked;
           if (_lastKnownInputLocked != null &&
               _lastKnownInputLocked != currentInputLocked) {
-            final oldEffectivePadding =
-            _lastKnownInputLocked! ? _leadingPadding : 0.0;
+            final oldEffectivePadding = _lastKnownInputLocked!
+                ? _leadingPadding
+                : _narrowLeadingPadding;
             final tickBeforeChange = _gridHorizontalController.hasClients
                 ? (_gridHorizontalController.offset - oldEffectivePadding) /
                 controller.pixelsPerTick
@@ -682,7 +689,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                             ),
                             tooltip: 'Home',
                             onPressed: _withHelp(
-                                'Home: \nSaves and exits the composition returning to the main menu.',
+                                'Exit: \nSaves and exits the composition returning to the main menu.',
                                     () {
                                   saveExitDialog(
                                     context,
@@ -708,7 +715,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                                 ? 'Grid Dark Mode: On'
                                 : 'Grid Dark Mode: Off',
                             onPressed: _withHelp(
-                                'Dark or Light Mode: \nToggles a background color.',
+                                'Theme Mode: \nToggles a background color.',
                                     () {
                                   controller.toggleDarkMode();
                                   ScaffoldMessenger.of(context).showSnackBar(
@@ -766,7 +773,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                                 ? 'title is hidden'
                                 : 'title is shown',
                             onPressed: _withHelp(
-                                'Title: \nShows/Hides the title and composer.',
+                                'Show Title Mode: \nShows or hides the title of the composition.',
                                     () {
                                   _showTitle();
                                 }),
@@ -793,7 +800,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                                 ? 'Hide Finger Numbers: On'
                                 : 'Hide Finger Numbers: Off',
                             onPressed: _withHelp(
-                                'Finger Numbers: \nHides/Shows the fingering numbers on notes.',
+                                'Fingers Mode: \nShows or hides fingering numbers.',
                                     () {
                                   controller.toggleHideFingerNumbers();
                                   ScaffoldMessenger.of(context).showSnackBar(
@@ -823,7 +830,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                                 ? 'Highlight Accidental Notes: On'
                                 : 'Highlight Accidental Notes: Off',
                             onPressed: _withHelp(
-                                'Accidental Notes: \nHighlights notes outside the current scale.',
+                                'Show Accidentals Mode: \nHighlights notes outside the current scale.',
                                     () {
                                   controller.toggleHighlightAccidentalNotes();
                                   ScaffoldMessenger.of(context).showSnackBar(
@@ -847,7 +854,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                             ),
                             tooltip: 'Raise scales',
                             onPressed: _withHelp(
-                                'Raise scales: \nRaises the whole composition up a semitone.',
+                                'Transposing Up: \nRaises the whole composition up a semitone.',
                                     () {
                                   controller.raiseAllScales();
                                   ScaffoldMessenger.of(context).showSnackBar(
@@ -872,7 +879,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                             ),
                             tooltip: 'Reset scales',
                             onPressed: _withHelp(
-                                'Reset scales: \nReverts the composition back to its original starting scale.',
+                                'Reset Transposing: \nReverts the composition back to its original starting scale.',
                                     () {
                                   controller.resetAllScales();
                                   ScaffoldMessenger.of(context).showSnackBar(
@@ -897,7 +904,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                             ),
                             tooltip: 'Lower scales',
                             onPressed: _withHelp(
-                                'Lower scales: \nLowers the whole composition down a semitone.',
+                                'Transposing Down: \nLowers the whole composition down a semitone.',
                                     () {
                                   controller.lowerAllScales();
                                   ScaffoldMessenger.of(context).showSnackBar(
@@ -933,7 +940,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                                 ? 'Rotate Pitch Text: On'
                                 : 'Rotate Pitch Text: Off',
                             onPressed: _withHelp(
-                                'Rotate: \nRotates labels for reading with the device turned sideways.',
+                                'Rotate Mode: \nRotates labels for reading with the device turned sideways.',
                                     () {
                                   controller.toggleRotatePitchText();
                                   _setOrientationLocked(
@@ -957,7 +964,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                                 ? 'Compensated Notation: On'
                                 : 'Compensated Notation: Off',
                             onPressed: _withHelp(
-                                'Easy Read: \nShows a simplified notation and prevents from editing.',
+                                'Easy Read Mode: \nShows a simplified notation.',
                                     () {
                                   controller.toggleCompensatedNotation();
                                   // Keep Scroll Lock in sync with Easy Read

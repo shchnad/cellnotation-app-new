@@ -11,7 +11,7 @@ enum Tempo {
   alegretto(92, 'Alegretto'),
   animato(100, 'Animato'),
   di_marcia(112, 'Di Marcia'),
-  allegto(120, 'Allegto'),
+  allegro(120, 'Allegro'),
   vivo(160, 'Vivo'),
   vivace(176, 'Vivace'),
   presto(184, 'Presto'),
