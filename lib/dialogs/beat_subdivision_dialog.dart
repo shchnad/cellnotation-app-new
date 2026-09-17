@@ -37,7 +37,7 @@ void beatSubdivisionDialog({
           warnings.join('\n'),
           style: const TextStyle(fontSize: 20),
         ),
-        duration: const Duration(seconds: 5),
+        duration: const Duration(seconds: 2),
       ),
     );
   }

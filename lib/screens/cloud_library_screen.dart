@@ -85,13 +85,15 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
+          duration: const Duration(seconds: 2),
           content: Text('Copied to My Compositions', style: TextStyle(fontSize: 20)),
         ),
       );
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Copy failed: $e', style: const TextStyle(fontSize: 20))),
+        SnackBar(duration: const Duration(seconds: 2),
+            content: Text('Copy failed: $e', style: const TextStyle(fontSize: 20))),
       );
     }
   }
@@ -480,7 +482,8 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
                                       } catch (e) {
                                         if (!context.mounted) return;
                                         ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Failed: $e', style: const TextStyle(fontSize: 18))),
+                                          SnackBar(duration: const Duration(seconds: 2),
+                                              content: Text('Failed: $e', style: const TextStyle(fontSize: 18))),
                                         );
                                       }
                                     },

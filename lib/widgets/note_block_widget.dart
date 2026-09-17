@@ -158,6 +158,7 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
     if (!widget.controller.editingBlocked) return false;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
+        duration: const Duration(seconds: 2),
         content: Text(
           widget.controller.editingBlockedMessage,
           style: const TextStyle(fontSize: 22),
@@ -375,7 +376,7 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
         // accidental display is computed differently.
         color: (controller.highlightAccidentalNotes &&
             interactionNote.accidental != null)
-            ? Colors.green
+            ? Colors.red
             : _handColor(note.hand),
         borderRadius: BorderRadius.circular(4),
         border: _combinedBorder(),
@@ -502,6 +503,7 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
                 if (blockedReason != null) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
+                      duration: const Duration(seconds: 2),
                       content: Text(
                         blockedReason,
                         style: const TextStyle(fontSize: 22),
@@ -576,6 +578,7 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
                 controller.enterPasteMode();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
+                    duration: const Duration(seconds: 2),
                     content: Text(
                         'Note ${controller.noteNumber(interactionNote)} is copied',
                         style: const TextStyle(fontSize: 22)

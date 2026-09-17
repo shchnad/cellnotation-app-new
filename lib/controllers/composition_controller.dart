@@ -1257,6 +1257,25 @@ class CompositionController extends ChangeNotifier {
   double zoomX = defaultCellWidth;
   double zoomY = defaultZoomY;
 
+  /// Whether the grid is currently zoomed IN beyond its default level
+  /// — used to color the Zoom In toolbar icon blue, per request.
+  /// [zoomX] and [zoomY] always move together (both the Zoom In/Out
+  /// buttons and [setZoom]/[resetZoom] change them in lockstep), so
+  /// checking [zoomX] alone against its own default is sufficient.
+  bool get isZoomedIn => zoomX > defaultCellWidth;
+
+  /// Same as [isZoomedIn] but for the ZOOMED-OUT direction — used to
+  /// color the Zoom Out toolbar icon blue.
+  bool get isZoomedOut => zoomX < defaultCellWidth;
+
+  /// Whether the grid's cell width currently differs from its default
+  /// (in either direction) — used to color the Cell Width toolbar
+  /// icon blue, per request. Equivalent to [isZoomedIn] ||
+  /// [isZoomedOut], but named for what THIS icon specifically
+  /// represents — cleared the moment [resetCellWidth]/[resetZoom]
+  /// restores [zoomX] to [defaultCellWidth].
+  bool get isCellWidthChanged => zoomX != defaultCellWidth;
+
   double get pixelsPerTick => zoomX;
 
   int get totalRows => composition.numberOfOctaves * 7;
@@ -1301,7 +1320,14 @@ class CompositionController extends ChangeNotifier {
       double x,
       double y,
       ){
-    zoomX = x.clamp(20, 500);
+    // Clamp range fixed to (2, 50) — matches changeCellWidth's own
+    // range and, critically, actually INCLUDES defaultCellWidth (10).
+    // The previous (20, 500) range excluded the default entirely, so
+    // the very first Zoom In OR Zoom Out tap (10+1=11, or 10-1=9)
+    // both got clamped UP to the same floor (20) regardless of
+    // direction — silently turning "Zoom Out" into a zoom-in on the
+    // very first tap and confusing which toolbar icon should light up.
+    zoomX = x.clamp(2, 50);
     zoomY = y.clamp(0.5, 3);
     notifyListeners();
   }
@@ -2935,10 +2961,10 @@ class CompositionController extends ChangeNotifier {
   /// so the person knows which toggle to turn off.
   String get editingBlockedMessage {
     if (showCompensatedNotation) {
-      return 'Turn off Easy Read Mode to edit notes';
+      return 'Turn off Compensated Notation to edit notes';
     }
     if (inputLocked) {
-      return 'Turn off Lock Mode to edit notes';
+      return 'Turn off Scroll Lock to edit notes';
     }
     return 'Editing is currently disabled';
   }
@@ -3527,6 +3553,31 @@ class CompositionController extends ChangeNotifier {
       measures[index].originalScaleName,
       measures[index].scaleName,
     );
+  }
+
+  /// Whether ANY measure's current scale sits ABOVE (raised from) its
+  /// own original scale — used to color the Raise Scale toolbar icon
+  /// blue, per request. Checks every measure's own
+  /// [semitoneDeltaForMeasure] rather than just the first, since
+  /// [raiseAllScales]/[lowerAllScales] apply uniformly to every
+  /// measure together, but an individual measure's own scale picker
+  /// ([updateMeasureScale]) can independently reset just THAT
+  /// measure's drift back to zero, leaving the rest of the
+  /// composition still raised/lowered.
+  bool get isScaleRaised {
+    for (int i = 0; i < measures.length; i++) {
+      if (semitoneDeltaForMeasure(i) > 0) return true;
+    }
+    return false;
+  }
+
+  /// Same as [isScaleRaised] but for the LOWERED direction — used to
+  /// color the Lower Scale toolbar icon blue.
+  bool get isScaleLowered {
+    for (int i = 0; i < measures.length; i++) {
+      if (semitoneDeltaForMeasure(i) < 0) return true;
+    }
+    return false;
   }
 
   /// Accepts every measure's current (possibly raised/lowered) scale as

@@ -51,6 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
+          duration: const Duration(seconds: 2),
           content: Text(e.toString(), style: TextStyle(fontSize: 22),),
         ),
       );
@@ -71,307 +72,347 @@ class _LoginScreenState extends State<LoginScreen> {
       //   title: const Text('Login'),
       // ),
 
-      body: Center(
-        child: SizedBox(
-          width: 500,
-          child: Padding(
-            padding: const EdgeInsets.all(20),
+      // BACKGROUND — same cellnotation_background.jpg + dark scrim
+      // treatment as home_screen.dart, per request, so the whole
+      // pre-login flow shares one consistent look. Field/title text
+      // that used to be plain black is now white below — black text
+      // would be unreadable against this dark background.
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              'assets/cellnotation_background.jpg',
+              fit: BoxFit.cover,
+            ),
+          ),
+          Positioned.fill(
+            child: Container(color: Colors.black.withOpacity(0.35)),
+          ),
 
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.start,
+          Center(
+            child: SizedBox(
+              width: 500,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
 
-              children: [
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.start,
 
-                const SizedBox(height: 100),
+                  children: [
 
-                Text('Cellnotation',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                    const SizedBox(height: 100),
 
-                const SizedBox(height: 20),
-
-                SizedBox(
-                  height: 50,
-                  child: TextField(
-                    controller: emailController,
-                    obscureText: false,
-                    style: const TextStyle(
-                      color: Colors.blue,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    decoration: InputDecoration(
-                      labelText: 'Email',
-                      labelStyle: const TextStyle(
-                        color: Colors.black,
+                    Text('Cellnotation',
+                      style: TextStyle(
+                        color: Colors.white,
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                       ),
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.clear),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        visualDensity: VisualDensity.compact,
-                        onPressed: () {
-                          setState(() {
-                            emailController.clear();
-                          });
-                        },
-                      ),
                     ),
-                  ),
-                ),
 
-                const SizedBox(height: 20),
+                    const SizedBox(height: 20),
 
-                SizedBox(
-                  height: 50,
-                  child: TextField(
-                    controller: passwordController,
-                    obscureText: _obscurePassword,
-                    style: const TextStyle(
-                      color: Colors.blue,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      labelStyle: const TextStyle(
-                        color: Colors.black,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      border: const OutlineInputBorder(),
-                      suffixIcon: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const SizedBox(width: 8),
-                          IconButton(
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility
-                                  : Icons.visibility_off,
-                            ),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            visualDensity: VisualDensity.compact,
-                            onPressed: () {
-                              setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              });
-                            },
+                    SizedBox(
+                      height: 50,
+                      child: TextField(
+                        controller: emailController,
+                        obscureText: false,
+                        style: const TextStyle(
+                          color: Colors.blue,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Colors.white,
+                          labelText: 'Email',
+                          labelStyle: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
                           ),
-                          const SizedBox(width: 8),
-                          IconButton(
+                          border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
                             icon: const Icon(Icons.clear),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
                             visualDensity: VisualDensity.compact,
                             onPressed: () {
                               setState(() {
-                                passwordController.clear();
+                                emailController.clear();
                               });
                             },
                           ),
-                          const SizedBox(width: 8),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
-                ),
 
-                const SizedBox(height: 20),
+                    const SizedBox(height: 20),
 
-                SizedBox(
-                  // width: double.infinity,
-                  width: 250,
-                  height: 100,
-                  child: ElevatedButton(
-                    onPressed: loading ? null : login,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(double.infinity, 50),
-                      elevation: 0,
-                      // Same note-block shape as the home screen's
-                      // buttons — matches NoteBlockWidget's own
-                      // BorderRadius.circular(4).
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                    child: loading
-                        ? const CircularProgressIndicator(
-                      color: Colors.white,
-                    )
-                        : const Text(
-                      'Login',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                SizedBox(
-                  // width: double.infinity,
-                  width: 250,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      if (emailController.text.isEmpty) {
-                        ScaffoldMessenger.of(context)
-                            .showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              "Enter your email first",
-                              style: TextStyle(fontSize: 22),
-                            ),
+                    SizedBox(
+                      height: 50,
+                      child: TextField(
+                        controller: passwordController,
+                        obscureText: _obscurePassword,
+                        style: const TextStyle(
+                          color: Colors.blue,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Colors.white,
+                          labelText: 'Password',
+                          labelStyle: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
                           ),
-                        );
-                        return;
-                      }
-                      await _authService.resetPassword(
-                        emailController.text.trim(),
-                      );
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            "Password reset email sent",
-                            style: TextStyle(fontSize: 22),
+                          border: const OutlineInputBorder(),
+                          suffixIcon: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility
+                                      : Icons.visibility_off,
+                                ),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () {
+                                  setState(() {
+                                    _obscurePassword = !_obscurePassword;
+                                  });
+                                },
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: const Icon(Icons.clear),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () {
+                                  setState(() {
+                                    passwordController.clear();
+                                  });
+                                },
+                              ),
+                              const SizedBox(width: 8),
+                            ],
                           ),
                         ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      // backgroundColor: Colors.grey.shade300,
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(double.infinity, 50),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4),
                       ),
                     ),
-                    child: loading
-                        ? const CircularProgressIndicator(
-                      color: Colors.white,
-                    )
-                        : const Text(
-                      'Forgot password?',
-                      style: TextStyle(
-                        color: Colors.red,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
+
+                    const SizedBox(height: 20),
+
+                    SizedBox(
+                      // width: double.infinity,
+                      width: 250,
+                      height: 100,
+                      child: ElevatedButton(
+                        onPressed: loading ? null : login,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.black,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 50),
+                          elevation: 0,
+                          // Same note-block shape as the home screen's
+                          // buttons — matches NoteBlockWidget's own
+                          // BorderRadius.circular(4).
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        child: loading
+                            ? const CircularProgressIndicator(
+                          color: Colors.white,
+                        )
+                            : const Text(
+                          'Login',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
 
-                const SizedBox(height: 30),
+                    const SizedBox(height: 20),
 
-                SizedBox(
-                  width: 250,
-                  child: InkWell(
-                    onTap: () async {
-                      try {
-                        await _authService.signInWithGoogle();
-                        // Same safety net as email/password login
-                        // above — see that comment for why this
-                        // matters.
-                        if (mounted) {
-                          Navigator.of(context)
-                              .popUntil((route) => route.isFirst);
-                        }
-                      } catch (e) {
-                        ScaffoldMessenger.of(context)
-                            .showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              e.toString(),
-                              style: TextStyle(fontSize: 22),
+                    SizedBox(
+                      // width: double.infinity,
+                      width: 250,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          if (emailController.text.isEmpty) {
+                            ScaffoldMessenger.of(context)
+                                .showSnackBar(
+                              const SnackBar(
+                                duration: const Duration(seconds: 2),
+                                content: Text(
+                                  "Enter your email first",
+                                  style: TextStyle(fontSize: 22),
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+                          await _authService.resetPassword(
+                            emailController.text.trim(),
+                          );
+                          ScaffoldMessenger.of(context)
+                              .showSnackBar(
+                            const SnackBar(
+                              duration: const Duration(seconds: 2),
+                              content: Text(
+                                "Password reset email sent",
+                                style: TextStyle(fontSize: 22),
+                              ),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          // backgroundColor: Colors.grey.shade300,
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 50),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        child: loading
+                            ? const CircularProgressIndicator(
+                          color: Colors.white,
+                        )
+                            : const Text(
+                          'Forgot password?',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 30),
+
+                    SizedBox(
+                      width: 250,
+                      child: InkWell(
+                        onTap: () async {
+                          try {
+                            await _authService.signInWithGoogle();
+                            // Same safety net as email/password login
+                            // above — see that comment for why this
+                            // matters.
+                            if (mounted) {
+                              Navigator.of(context)
+                                  .popUntil((route) => route.isFirst);
+                            }
+                          } catch (e) {
+                            ScaffoldMessenger.of(context)
+                                .showSnackBar(
+                              SnackBar(
+                                duration: const Duration(seconds: 2),
+                                content: Text(
+                                  e.toString(),
+                                  style: TextStyle(fontSize: 22),
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        // Stretched to the SAME width as the Login/Create
+                        // Account buttons above/below it, for matching
+                        // visual weight (see Google's own "should be
+                        // approximately the same size" guideline). Height
+                        // is NOT set explicitly — BoxFit.fitWidth scales it
+                        // proportionally from whatever the source image's
+                        // own aspect ratio actually is, so it can never be
+                        // stretched/distorted regardless of the asset's
+                        // real dimensions.
+                        //
+                        // Assumes assets/google.png is registered in
+                        // pubspec.yaml's flutter/assets section — adjust
+                        // the path here if it lives somewhere else (e.g.
+                        // assets/images/google.png).
+                        //
+                        // Wrapped in a white Container now — this
+                        // button's own asset has a transparent
+                        // background, which used to just show the
+                        // page's plain white Scaffold through it;
+                        // against the new dark background image it
+                        // would otherwise look like a floating cutout.
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: Image.asset(
+                              'assets/google.png',
+                              fit: BoxFit.fitWidth,
                             ),
                           ),
-                        );
-                      }
-                    },
-                    // Stretched to the SAME width as the Login/Create
-                    // Account buttons above/below it, for matching
-                    // visual weight (see Google's own "should be
-                    // approximately the same size" guideline). Height
-                    // is NOT set explicitly — BoxFit.fitWidth scales it
-                    // proportionally from whatever the source image's
-                    // own aspect ratio actually is, so it can never be
-                    // stretched/distorted regardless of the asset's
-                    // real dimensions.
-                    //
-                    // Assumes assets/google.png is registered in
-                    // pubspec.yaml's flutter/assets section — adjust
-                    // the path here if it lives somewhere else (e.g.
-                    // assets/images/google.png).
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: Image.asset(
-                        'assets/google.png',
-                        fit: BoxFit.fitWidth,
-                      ),
-                    ),
-                  ),
-                ),
-
-
-                const SizedBox(height: 20),
-
-                SizedBox(
-                  // width: double.infinity,
-                  width: 250,
-                  height: 100,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const RegisterScreen(),
                         ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(double.infinity, 50),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4),
                       ),
                     ),
-                    child: loading
-                        ? const CircularProgressIndicator(
-                      color: Colors.white,
-                    )
-                        : const Text(
-                      'Create Account',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
 
-              ],
+
+                    const SizedBox(height: 20),
+
+                    SizedBox(
+                      // width: double.infinity,
+                      width: 250,
+                      height: 100,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const RegisterScreen(),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 50),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        child: loading
+                            ? const CircularProgressIndicator(
+                          color: Colors.white,
+                        )
+                            : const Text(
+                          'Create Account',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

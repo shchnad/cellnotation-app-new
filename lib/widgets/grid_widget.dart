@@ -794,6 +794,7 @@ class GridWidget extends StatelessWidget {
                                 if (!helpMode && controller.editingBlocked) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
+                                      duration: const Duration(seconds: 2),
                                       content: Text(
                                         controller.editingBlockedMessage,
                                         style: const TextStyle(fontSize: 22),
@@ -822,6 +823,7 @@ class GridWidget extends StatelessWidget {
                                   if (errorMessage != null) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
+                                        duration: const Duration(seconds: 2),
                                         content: Text(
                                           errorMessage,
                                           style: const TextStyle(fontSize: 22),
@@ -856,6 +858,7 @@ class GridWidget extends StatelessWidget {
                                   if (errorMessage != null) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
+                                        duration: const Duration(seconds: 2),
                                         content: Text(
                                           errorMessage,
                                           style: const TextStyle(fontSize: 22),
@@ -1043,6 +1046,7 @@ class GridWidget extends StatelessWidget {
                                 if (!helpMode && controller.editingBlocked) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
+                                      duration: const Duration(seconds: 2),
                                       content: Text(
                                         controller.editingBlockedMessage,
                                         style: const TextStyle(fontSize: 22),
@@ -1148,7 +1152,7 @@ class GridWidget extends StatelessWidget {
                                 // below it).
                                 bottom: gridHeight - hit.rect.top + 2,
                                 child: _helpCallout(
-                                  'Tap Tempo name to edit',
+                                  'to edit tempo or \ntime signature tap its label',
                                 ),
                               ),
                             ),
@@ -1161,7 +1165,7 @@ class GridWidget extends StatelessWidget {
                                 left: hit.rect.left,
                                 top: hit.rect.bottom + 2,
                                 child: _helpCallout(
-                                  'Tap scale name to edit',
+                                  'to edit scale tap its label',
                                 ),
                               ),
                             ),
@@ -1188,16 +1192,16 @@ class GridWidget extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          _helpCallout('Single tap note to edit'),
+                          _helpCallout('quick-tap note to edit it'),
                           const SizedBox(height: 8),
-                          _helpCallout('Drag note to move it'),
+                          _helpCallout('drag note to move it'),
                           const SizedBox(height: 8),
                           _helpCallout(
-                            "Long tap note to copy it, paste it, to stop pasting tap icon 'Paste mode'",
+                            "long-tap note to copy it, \nthen paste it as many times as you wish, \nto stop pasting tap icon 'Paste Mode'",
                             maxWidth: 260,
                           ),
                           const SizedBox(height: 8),
-                          _helpCallout('Double tap beat to edit'),
+                          _helpCallout('double-tap beat or measure to edit it'),
                         ],
                       ),
                     ),
@@ -1215,9 +1219,9 @@ class GridWidget extends StatelessWidget {
                 if (helpMode)
                   Positioned.fill(
                     child: Align(
-                      alignment: const Alignment(-1, -0.5),
+                      alignment: const Alignment(-1, -0.72),
                       child: _speechBubble(
-                        'Tap icon to\nknow what it does',
+                        'tap icons to\nknow what they do',
                         pointerSide: _BubblePointerSide.left,
                       ),
                     ),
@@ -1236,9 +1240,9 @@ class GridWidget extends StatelessWidget {
                     child: Align(
                       alignment: const Alignment(0, -0.3),
                       child: _helpCallout(
-                        "To start set hand by tapping icon 'Hand change', set note "
-                            "duration by tapping icon 'Note duration', then tap "
-                            "grid to create note.",
+                        "To start choose first hand tapping icon 'Hand Set',\n"
+                            "then choose note duration tapping icon 'Note Duration',\n"
+                            "then tap grid to create note.",
                         maxWidth: 320,
                         fontSize: 22,
                       ),

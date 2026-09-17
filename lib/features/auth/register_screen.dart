@@ -33,6 +33,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
+            duration: const Duration(seconds: 2),
             content: Text(
               'Verification email sent — check your inbox.',
               style: TextStyle(fontSize: 22),
@@ -56,6 +57,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ScaffoldMessenger.of(context)
           .showSnackBar(
         SnackBar(
+          duration: const Duration(seconds: 2),
           content: Text(
             e.toString(),
             style: TextStyle(fontSize: 22),
@@ -82,6 +84,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
       // ),
       body: Stack(
         children: [
+          // BACKGROUND — same cellnotation_background.jpg + dark
+          // scrim treatment as home_screen.dart / LoginScreen, per
+          // request, so the whole pre-login flow shares one
+          // consistent look. Placed FIRST so it paints behind
+          // everything else in this Stack.
+          Positioned.fill(
+            child: Image.asset(
+              'assets/cellnotation_background.jpg',
+              fit: BoxFit.cover,
+            ),
+          ),
+          Positioned.fill(
+            child: Container(color: Colors.black.withOpacity(0.35)),
+          ),
+
           Center(
             child: SizedBox(
               width: 500,
@@ -95,7 +112,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                     Text('Cellnotation',
                       style: TextStyle(
-                        color: Colors.black,
+                        color: Colors.white,
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                       ),
@@ -114,6 +131,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                         decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Colors.white,
                           labelText: 'Email',
                           labelStyle: const TextStyle(
                             color: Colors.black,
@@ -149,6 +168,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                         decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Colors.white,
                           labelText: 'Password',
                           labelStyle: const TextStyle(
                             color: Colors.black,

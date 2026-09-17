@@ -51,9 +51,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final newName = _nameController.text.trim();
     if (newName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(
-            'Name cannot be empty',
-            style: TextStyle(fontSize: 22))),
+        const SnackBar(duration: const Duration(seconds: 2),
+            content: Text(
+                'Name cannot be empty',
+                style: TextStyle(fontSize: 22))),
       );
       return;
     }
@@ -64,17 +65,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await _user?.reload();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(
-            'Name updated',
-            style: TextStyle(fontSize: 22))),
+        const SnackBar(duration: const Duration(seconds: 2),
+            content: Text(
+                'Name updated',
+                style: TextStyle(fontSize: 22))),
       );
       setState(() {}); // refresh displayed name
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(
-            'Failed to update name: $e',
-            style: const TextStyle(fontSize: 22))),
+        SnackBar(duration: const Duration(seconds: 2),
+            content: Text(
+                'Failed to update name: $e',
+                style: const TextStyle(fontSize: 22))),
       );
     } finally {
       if (mounted) setState(() => _saving = false);

@@ -34,19 +34,8 @@ class DefaultValues {
   static const double gridFontSizeLarge = 22.0;
 
 
-  // NOTE COPYING
-  static const String titleOfMessageForCopying = 'Note copying';
-  static const String messageForCopying =
-      'Long-tap the note to copy it.\n\n'
-      'The button gets blue showing Paste Mode is enable.\n\n'
-      'You can clone this note than where ever you wish as many times as you wish.\n\n'
-      'To disable Paste Mode toggle the button.';
-  static const snackBarMessageForCopying = 'Paste Mode is disable';
-// Message of copied note is in note_block_widget LongTap action.
-
-
 // SIMPLIFY MODE
   static const String messageForSimplifyMode =
-      'Turn off the Read Easy mode first!';
+      'Turn off the Read Easy Mode first!';
 
 }

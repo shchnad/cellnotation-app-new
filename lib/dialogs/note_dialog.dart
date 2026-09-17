@@ -417,6 +417,7 @@ class NoteDialog extends StatelessWidget {
                           editedNote.graceOriginalDurationTicks != null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
+                            duration: const Duration(seconds: 2),
                             content: Text(
                               "Grace note durations are set automatically "
                                   "and can't be edited directly here.",
@@ -711,6 +712,7 @@ class NoteDialog extends StatelessWidget {
                           controller.startGlissandoPick(editedNote, direction);
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
+                              duration: const Duration(seconds: 2),
                               content: Text(
                                 'Tap the grid to set the glissando end row',
                                 style: TextStyle(fontSize: 22),
@@ -799,6 +801,7 @@ class NoteDialog extends StatelessWidget {
                           controller.startAddingGraceNotes(editedNote, type);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
+                              duration: const Duration(seconds: 2),
                               content: Text(
                                 maxForType == 0
                                     ? 'This note is too short for ${type.label}'
@@ -857,6 +860,7 @@ class NoteDialog extends StatelessWidget {
                     controller.enterPasteMode();
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
+                        duration: const Duration(seconds: 2),
                         content: Text('Note ${controller.noteNumber(editedNote)} is copied'),
                       ),
                     );
