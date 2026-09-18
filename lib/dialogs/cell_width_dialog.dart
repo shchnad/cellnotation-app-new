@@ -106,7 +106,7 @@ void cellWidthDialog(
                     child: const Text(
                       "Reset",
                       style: TextStyle(
-                        color: Colors.black,
+                        color: Colors.blue,
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                       ),

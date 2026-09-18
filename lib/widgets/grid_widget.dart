@@ -534,16 +534,16 @@ Widget _helpCallout(String text, {double? maxWidth, double fontSize = 22}) {
 // used by the sample-note help illustration below, where one bubble
 // points DOWN at the note (pointer on its own bottom edge) and the
 // other points UP at it (pointer on its own top edge).
-enum _BubblePointerSide { top, bottom, left, right }
+enum BubblePointerSide { top, bottom, left, right }
 
 /// Draws a rounded speech-bubble shape with a small triangular
 /// pointer on one side, per request — a round callout that visibly
 /// points at its target, rather than a plain rectangular label.
-class _SpeechBubblePainter extends CustomPainter {
-  final _BubblePointerSide pointerSide;
+class SpeechBubblePainter extends CustomPainter {
+  final BubblePointerSide pointerSide;
   final Color color;
 
-  _SpeechBubblePainter({required this.pointerSide, required this.color});
+  SpeechBubblePainter({required this.pointerSide, required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -551,15 +551,15 @@ class _SpeechBubblePainter extends CustomPainter {
     const pointerWidth = 16.0;
     const radius = 12.0;
 
-    final bodyTop = pointerSide == _BubblePointerSide.top ? pointerHeight : 0.0;
-    final bodyBottom = pointerSide == _BubblePointerSide.bottom
+    final bodyTop = pointerSide == BubblePointerSide.top ? pointerHeight : 0.0;
+    final bodyBottom = pointerSide == BubblePointerSide.bottom
         ? size.height - pointerHeight
         : size.height;
     // Only the `left`/`right` cases actually inset the body's
     // corresponding edge — top/bottom cases keep the body spanning
     // the full width, same as before.
-    final bodyLeft = pointerSide == _BubblePointerSide.left ? pointerHeight : 0.0;
-    final bodyRight = pointerSide == _BubblePointerSide.right
+    final bodyLeft = pointerSide == BubblePointerSide.left ? pointerHeight : 0.0;
+    final bodyRight = pointerSide == BubblePointerSide.right
         ? size.width - pointerHeight
         : size.width;
 
@@ -577,25 +577,25 @@ class _SpeechBubblePainter extends CustomPainter {
     final centerX = size.width / 2;
     final centerY = size.height / 2;
     switch (pointerSide) {
-      case _BubblePointerSide.top:
+      case BubblePointerSide.top:
         path.moveTo(centerX - pointerWidth / 2, bodyTop);
         path.lineTo(centerX, 0);
         path.lineTo(centerX + pointerWidth / 2, bodyTop);
         path.close();
         break;
-      case _BubblePointerSide.bottom:
+      case BubblePointerSide.bottom:
         path.moveTo(centerX - pointerWidth / 2, bodyBottom);
         path.lineTo(centerX, size.height);
         path.lineTo(centerX + pointerWidth / 2, bodyBottom);
         path.close();
         break;
-      case _BubblePointerSide.left:
+      case BubblePointerSide.left:
         path.moveTo(bodyLeft, centerY - pointerWidth / 2);
         path.lineTo(0, centerY);
         path.lineTo(bodyLeft, centerY + pointerWidth / 2);
         path.close();
         break;
-      case _BubblePointerSide.right:
+      case BubblePointerSide.right:
         path.moveTo(bodyRight, centerY - pointerWidth / 2);
         path.lineTo(size.width, centerY);
         path.lineTo(bodyRight, centerY + pointerWidth / 2);
@@ -614,7 +614,7 @@ class _SpeechBubblePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _SpeechBubblePainter oldDelegate) {
+  bool shouldRepaint(covariant SpeechBubblePainter oldDelegate) {
     return oldDelegate.pointerSide != pointerSide || oldDelegate.color != color;
   }
 }
@@ -626,9 +626,9 @@ class _SpeechBubblePainter extends CustomPainter {
 /// top edge (so it sits below something and points up at it); `left`
 /// puts it on the left edge (so it sits to the right of something and
 /// points left at it).
-Widget _speechBubble(
+Widget speechBubble(
     String text, {
-      required _BubblePointerSide pointerSide,
+      required BubblePointerSide pointerSide,
       double? maxWidth,
     }) {
   final textWidget = Text(
@@ -641,16 +641,16 @@ Widget _speechBubble(
     ),
   );
   return CustomPaint(
-    painter: _SpeechBubblePainter(
+    painter: SpeechBubblePainter(
       pointerSide: pointerSide,
       color: Colors.blue.shade100,
     ),
     child: Padding(
       padding: EdgeInsets.fromLTRB(
-        pointerSide == _BubblePointerSide.left ? 18 : 12,
-        pointerSide == _BubblePointerSide.top ? 18 : 8,
-        pointerSide == _BubblePointerSide.right ? 18 : 12,
-        pointerSide == _BubblePointerSide.bottom ? 18 : 8,
+        pointerSide == BubblePointerSide.left ? 18 : 12,
+        pointerSide == BubblePointerSide.top ? 18 : 8,
+        pointerSide == BubblePointerSide.right ? 18 : 12,
+        pointerSide == BubblePointerSide.bottom ? 18 : 8,
       ),
       child: maxWidth != null
           ? SizedBox(width: maxWidth, child: textWidget)
@@ -1137,7 +1137,10 @@ class GridWidget extends StatelessWidget {
                           ),
 
                           // HELP MODE — tempo callouts, positioned just
-                          // below each tempo label's own rect.
+                          // below each tempo label's own rect. Points
+                          // DOWN (per request) since the bubble sits
+                          // ABOVE the tempo/time-signature label it's
+                          // pointing at.
                           if (helpMode)
                             ...labelHits.where((h) => h.isTempo).map(
                                   (hit) => Positioned(
@@ -1151,21 +1154,25 @@ class GridWidget extends StatelessWidget {
                                 // the tempo name, per request (previously
                                 // below it).
                                 bottom: gridHeight - hit.rect.top + 2,
-                                child: _helpCallout(
-                                  'to edit tempo or \ntime signature tap its label',
+                                child: speechBubble(
+                                  'to edit tempo or\ntime signature\n tap its label',
+                                  pointerSide: BubblePointerSide.bottom,
                                 ),
                               ),
                             ),
 
                           // HELP MODE — scale callouts, positioned just
                           // below each scale name label's own rect.
+                          // Points UP (per request) since the bubble
+                          // sits BELOW the scale label it's pointing at.
                           if (helpMode)
                             ...scaleLabelHits.map(
                                   (hit) => Positioned(
                                 left: hit.rect.left,
                                 top: hit.rect.bottom + 2,
-                                child: _helpCallout(
-                                  'to edit scale tap its label',
+                                child: speechBubble(
+                                  'to edit scale\ntap its label',
+                                  pointerSide: BubblePointerSide.top,
                                 ),
                               ),
                             ),
@@ -1184,25 +1191,28 @@ class GridWidget extends StatelessWidget {
                 // illustrative one) — so these use the plain, pointer-
                 // less _helpCallout style instead of speech bubbles
                 // pointing at a note that no longer exists.
+                //
+                // Combined into ONE banner, per request — previously
+                // this was 4 separate stacked callouts in the center
+                // plus a 5th one lower down explaining hand/duration
+                // setup; all 5 are now one single _helpCallout so
+                // there's just one box to read instead of several.
                 if (helpMode)
                   Positioned.fill(
                     child: Align(
-                      alignment: const Alignment(0, 0.5),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          _helpCallout('quick-tap note to edit it'),
-                          const SizedBox(height: 8),
-                          _helpCallout('drag note to move it'),
-                          const SizedBox(height: 8),
-                          _helpCallout(
-                            "long-tap note to copy it, \nthen paste it as many times as you wish, \nto stop pasting tap icon 'Paste Mode'",
-                            maxWidth: 260,
-                          ),
-                          const SizedBox(height: 8),
-                          _helpCallout('double-tap beat or measure to edit it'),
-                        ],
+                      alignment: const Alignment(0.8, -0.2),
+                      child: _helpCallout(
+                        "To set a hand for notes tap icon 'Hand Set'.\n\n"
+                            "To set a duration of notes tap icon 'Note Duration'.\n\n"
+                            "To input a note quick-single-tap grid on a correct row (pitch) and beat (column).\n\n"
+                            "To edit a note quick-single-tap it.\n\n"
+                            "To change position of a note drug it.\n\n"
+                            "To copy a note long-single tap it, then paste its copy on the grid while 'Paste Mode' icon is highlighted.\n\n"
+                            "To add grace notes to a note quick-single-tap it, choose type of grace note, then while 'Grace Notes' icon is highlighted quick-single-tap grid on correct rows (pitches) and beats (columns).\n\n"
+                            "To edit beat or measure double-tap it.\n\n"
+                            "To input or edit dynamic or pedal double-tap grid on a correct column (beat).\n\n"
+                            "To change scale, tempo, time signature tap its label.",
+                        maxWidth: 400,
                       ),
                     ),
                   ),
@@ -1219,32 +1229,10 @@ class GridWidget extends StatelessWidget {
                 if (helpMode)
                   Positioned.fill(
                     child: Align(
-                      alignment: const Alignment(-1, -0.72),
-                      child: _speechBubble(
-                        'tap icons to\nknow what they do',
-                        pointerSide: _BubblePointerSide.left,
-                      ),
-                    ),
-                  ),
-
-                // HELP MODE — a plain, pointer-less banner (per request —
-                // this one doesn't point at any specific spot on the grid,
-                // so it uses the same square _helpCallout style as the
-                // tempo/scale callouts rather than a speech bubble),
-                // explaining hand/duration setup before tapping the grid.
-                // Positioned at the BOTTOM of the viewport, well clear of
-                // the upper-left icon bubble and the centered sample-note
-                // group, so none of the three banners cover each other.
-                if (helpMode)
-                  Positioned.fill(
-                    child: Align(
-                      alignment: const Alignment(0, -0.3),
-                      child: _helpCallout(
-                        "To start choose first hand tapping icon 'Hand Set',\n"
-                            "then choose note duration tapping icon 'Note Duration',\n"
-                            "then tap grid to create note.",
-                        maxWidth: 320,
-                        fontSize: 22,
+                      alignment: const Alignment(-1.1, -0.60),
+                      child: speechBubble(
+                        'tap icons to know\n what they do',
+                        pointerSide: BubblePointerSide.left,
                       ),
                     ),
                   ),

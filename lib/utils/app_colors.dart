@@ -100,7 +100,15 @@ class AppColors {
   /// the earlier design), so its own inner text needs to flip to
   /// black there too — see [noteText].
   static Color noteHandLeft(bool isDarkMode) =>
-      isDarkMode ? Colors.orangeAccent.shade100 : Colors.blue;
+      isDarkMode ? Colors.blue.shade200 : Colors.blue;
+
+  /// A third-hand ("additional hand") note's fill color — plain
+  /// Colors.green in light mode; a lighter green in dark mode (per
+  /// request) since the same saturated green reads too dark/muddy
+  /// against a black grid background, the same reasoning behind
+  /// [noteHandLeft]'s own light-blue swap.
+  static Color noteHandAdditional(bool isDarkMode) =>
+      isDarkMode ? Colors.green.shade200 : Colors.green;
 
   /// Text drawn INSIDE a note block (pitch/accidental) — was always
   /// plain Colors.white, since both fills (black right-hand, blue

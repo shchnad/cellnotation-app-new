@@ -1257,23 +1257,25 @@ class CompositionController extends ChangeNotifier {
   double zoomX = defaultCellWidth;
   double zoomY = defaultZoomY;
 
-  /// Whether the grid is currently zoomed IN beyond its default level
-  /// — used to color the Zoom In toolbar icon blue, per request.
-  /// [zoomX] and [zoomY] always move together (both the Zoom In/Out
-  /// buttons and [setZoom]/[resetZoom] change them in lockstep), so
-  /// checking [zoomX] alone against its own default is sufficient.
-  bool get isZoomedIn => zoomX > defaultCellWidth;
+  /// Whether the grid's cell HEIGHT is currently BIGGER than its
+  /// default — used to color the Zoom In toolbar icon blue, per
+  /// request.
+  bool get isZoomedIn => zoomY > defaultZoomY;
 
-  /// Same as [isZoomedIn] but for the ZOOMED-OUT direction — used to
-  /// color the Zoom Out toolbar icon blue.
-  bool get isZoomedOut => zoomX < defaultCellWidth;
+  /// Same as [isZoomedIn] but for the ZOOMED-OUT direction — lights
+  /// up the Zoom Out toolbar icon when the cell HEIGHT is currently
+  /// SMALLER than its default.
+  bool get isZoomedOut => zoomY < defaultZoomY;
 
   /// Whether the grid's cell width currently differs from its default
   /// (in either direction) — used to color the Cell Width toolbar
-  /// icon blue, per request. Equivalent to [isZoomedIn] ||
-  /// [isZoomedOut], but named for what THIS icon specifically
-  /// represents — cleared the moment [resetCellWidth]/[resetZoom]
-  /// restores [zoomX] to [defaultCellWidth].
+  /// icon blue, per request. Checks [zoomX] (cell WIDTH) only —
+  /// deliberately independent of [isZoomedIn]/[isZoomedOut] (which
+  /// check [zoomY], cell HEIGHT), so the Zoom In/Out buttons never
+  /// light this icon up; only actually changing the width (via the
+  /// Cell Width dialog) does. Cleared the moment
+  /// [resetCellWidth]/[resetZoom] restores [zoomX] to
+  /// [defaultCellWidth].
   bool get isCellWidthChanged => zoomX != defaultCellWidth;
 
   double get pixelsPerTick => zoomX;

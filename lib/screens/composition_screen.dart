@@ -70,6 +70,7 @@ class _CompositionScreenState extends State<CompositionScreen>
   final LayerLink _handIconLink = LayerLink();
   final LayerLink _durationIconLink = LayerLink();
   final LayerLink _pasteIconLink = LayerLink();
+  final LayerLink _graceNotesIconLink = LayerLink();
 
   // When on, tapping any toolbar icon shows a help dialog explaining
   // that button instead of performing its normal action. Toggled by
@@ -396,21 +397,13 @@ class _CompositionScreenState extends State<CompositionScreen>
     return CompositedTransformFollower(
       link: link,
       offset: const Offset(46, 0),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-        decoration: BoxDecoration(
-          color: Colors.blue.shade100,
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: Colors.black, width: 1),
-        ),
-        child: Text(
-          text,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
-        ),
+      // Reuses GridWidget's own speechBubble/BubblePointerSide (now
+      // public — see that file), per request, pointing LEFT since
+      // this label sits to the RIGHT of its own toolbar icon and
+      // points back at it.
+      child: speechBubble(
+        text,
+        pointerSide: BubblePointerSide.left,
       ),
     );
   }
@@ -584,7 +577,7 @@ class _CompositionScreenState extends State<CompositionScreen>
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          duration: Duration(seconds: 2),
+          duration: Duration(seconds: 1),
           content: Text('Composition saved', style: TextStyle(fontSize: 22)),
         ),
       );
@@ -592,7 +585,7 @@ class _CompositionScreenState extends State<CompositionScreen>
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          duration: const Duration(seconds: 2),
+          duration: const Duration(seconds: 1),
           content: Text('Save failed: $e', style: const TextStyle(fontSize: 22)),
         ),
       );
@@ -690,7 +683,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                                 color: Colors.black,
                               ),
                             ),
-                            tooltip: 'Home',
+                            tooltip: 'Exit',
                             onPressed: _withHelp(
                                 'Exit: \nSaves and exits the composition returning to the main menu.',
                                     () {
@@ -705,31 +698,28 @@ class _CompositionScreenState extends State<CompositionScreen>
                           IconButton(
                             icon: Transform.rotate(
                               angle: controller.rotatePitchText ? -pi / 2 : 0,
-                              child: Icon(
-                                controller.isDarkMode
-                                    ? Icons.dark_mode
-                                    : Icons.light_mode,
+                              child: Icon(Icons.dark_mode,
                                 color: controller.isDarkMode
                                     ? Colors.blue
                                     : Colors.black,
                               ),
                             ),
                             tooltip: controller.isDarkMode
-                                ? 'Grid Dark Mode: On'
-                                : 'Grid Dark Mode: Off',
+                                ? 'Dark Mode on'
+                                : 'Dark Mode off',
                             onPressed: _withHelp(
-                                'Theme Mode: \nToggles a background color.',
+                                'Dark Mode: \nToggles a background color.',
                                     () {
                                   controller.toggleDarkMode();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      duration: const Duration(seconds: 2),
-                                      content: Text(
-                                        controller.isDarkMode ? 'Dark mode on.' : 'Dark mode off.',
-                                        style: const TextStyle(fontSize: 22),
-                                      ),
-                                    ),
-                                  );
+                                  // ScaffoldMessenger.of(context).showSnackBar(
+                                  //   SnackBar(
+                                  //     duration: const Duration(seconds: 1),
+                                  //     content: Text(
+                                  //       controller.isDarkMode ? 'Dark Mode on.' : 'Dark Mode off.',
+                                  //       style: const TextStyle(fontSize: 22),
+                                  //     ),
+                                  //   ),
+                                  // );
                                 }),
                           ),
 
@@ -739,12 +729,12 @@ class _CompositionScreenState extends State<CompositionScreen>
                               angle: controller.rotatePitchText ? -pi / 2 : 0,
                               child: Icon(
                                 Icons.help_outline,
-                                color: _helpMode ? Colors.blue : Colors.black,
+                                color: _helpMode ? Colors.red: Colors.black,
                               ),
                             ),
                             tooltip: _helpMode
-                                ? 'Help Mode: On'
-                                : 'Help Mode: Off',
+                                ? 'Help Mode on'
+                                : 'Help Mode off',
                             onPressed: () {
                               setState(() {
                                 _helpMode = !_helpMode;
@@ -774,10 +764,10 @@ class _CompositionScreenState extends State<CompositionScreen>
                               ),
                             ),
                             tooltip: _toShowTitle
-                                ? 'title is hidden'
-                                : 'title is shown',
+                                ? 'Title is hidden'
+                                : 'Title is shown',
                             onPressed: _withHelp(
-                                'Show Title Mode: \nShows or hides the title of the composition.',
+                                'Title Mode: \nShows or hides the title of the composition.',
                                     () {
                                   _showTitle();
                                 }),
@@ -796,20 +786,20 @@ class _CompositionScreenState extends State<CompositionScreen>
                               child: Icon(
                                 Icons.touch_app,
                                 color: controller.hideFingerNumbers
-                                    ? Colors.blue
+                                    ? Colors.red
                                     : Colors.black,
                               ),
                             ),
                             tooltip: controller.hideFingerNumbers
-                                ? 'Hide Finger Numbers: On'
-                                : 'Hide Finger Numbers: Off',
+                                ? 'Finger Numbers off'
+                                : 'Finger Numbers on',
                             onPressed: _withHelp(
-                                'Fingers Hide Mode: \nHides fingering numbers.',
+                                'Fingers Mode: \nHides fingering numbers.',
                                     () {
                                   controller.toggleHideFingerNumbers();
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      duration: const Duration(seconds: 2),
+                                      duration: const Duration(seconds: 1),
                                       content: Text(
                                         controller.hideFingerNumbers ? 'Fingers hidden.' : 'Fingers visible.',
                                         style: const TextStyle(fontSize: 22),
@@ -827,22 +817,24 @@ class _CompositionScreenState extends State<CompositionScreen>
                               child: Icon(
                                 Icons.open_in_full_sharp,
                                 color: controller.highlightAccidentalNotes
-                                    ? Colors.blue
+                                    ? Colors.red
                                     : Colors.black,
                               ),
                             ),
                             tooltip: controller.highlightAccidentalNotes
-                                ? 'Highlight Accidental Notes: On'
-                                : 'Highlight Accidental Notes: Off',
+                                ? 'Accidentals on'
+                                : 'Accidentals off',
                             onPressed: _withHelp(
-                                'Show Accidentals Mode: \nHighlights notes outside the current scale.',
+                                'Accidentals Mode: \nHighlights notes outside the current scale.',
                                     () {
                                   controller.toggleHighlightAccidentalNotes();
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      duration: const Duration(seconds: 2),
+                                      duration: const Duration(seconds: 1),
                                       content: Text(
-                                        controller.highlightAccidentalNotes ? 'Show Accidentals Mode on.' : 'Show Accidentals Mode off.',
+                                        controller.highlightAccidentalNotes
+                                            ? 'Notes with accidentals are highlighted.'
+                                            : 'Notes with accidentals are back to normal.',
                                         style: const TextStyle(fontSize: 22),
                                       ),
                                     ),
@@ -860,16 +852,26 @@ class _CompositionScreenState extends State<CompositionScreen>
                                     : Colors.black,
                               ),
                             ),
-                            tooltip: 'Raise scales',
+                            tooltip: 'Scale up',
                             onPressed: _withHelp(
-                                'Transposing Up: \nRaises the whole composition up a semitone.',
+                                'Scale up: \nRaises composition up a semitone.',
                                     () {
                                   controller.raiseAllScales();
+                                  // Raising the scale forces Lock Mode
+                                  // on, per request — it stays locked
+                                  // until Reset Scale brings the
+                                  // composition back to its original
+                                  // scale (see the Reset Scale button
+                                  // and the Lock Mode button's own
+                                  // guard against turning off early).
+                                  if (!controller.inputLocked) {
+                                    controller.toggleInputLocked();
+                                  }
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
                                       duration: Duration(seconds: 2),
                                       content: Text(
-                                        'Raised a semitone.',
+                                        'Scale of composition is a semitone higher.',
                                         style: TextStyle(fontSize: 22),
                                       ),
                                     ),
@@ -886,17 +888,38 @@ class _CompositionScreenState extends State<CompositionScreen>
                                 color: Colors.black,
                               ),
                             ),
-                            tooltip: 'Reset scales',
+                            tooltip: 'Reset scale',
                             onPressed: _withHelp(
-                                'Reset Transposing: \nReverts the composition back to its original starting scale.',
+                                'Reset scale: \nReset scale of composition to original.',
                                     () {
+                                  // Captured BEFORE resetAllScales()
+                                  // runs — once that call completes,
+                                  // isScaleRaised/isScaleLowered are
+                                  // both always false, so this is the
+                                  // only way to tell whether there was
+                                  // actually anything to reset.
+                                  final wasAlreadyOriginal =
+                                      !controller.isScaleRaised &&
+                                          !controller.isScaleLowered;
                                   controller.resetAllScales();
+                                  // Resetting the scale back to
+                                  // original is the ONLY way to
+                                  // release the Lock Mode that raising
+                                  // or lowering the scale forces on —
+                                  // see the RAISE/LOWER SCALE buttons
+                                  // and the Lock Mode button's own
+                                  // guard.
+                                  if (controller.inputLocked) {
+                                    controller.toggleInputLocked();
+                                  }
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      duration: Duration(seconds: 2),
+                                    SnackBar(
+                                      duration: const Duration(seconds: 2),
                                       content: Text(
-                                        'Scale reset.',
-                                        style: TextStyle(fontSize: 22),
+                                        wasAlreadyOriginal
+                                            ? 'Scale of composition is already original.'
+                                            : 'Scale of composition is reset to original.',
+                                        style: const TextStyle(fontSize: 22),
                                       ),
                                     ),
                                   );
@@ -914,16 +937,25 @@ class _CompositionScreenState extends State<CompositionScreen>
                                     : Colors.black,
                               ),
                             ),
-                            tooltip: 'Lower scales',
+                            tooltip: 'Scale Down',
                             onPressed: _withHelp(
-                                'Transposing Down: \nLowers the whole composition down a semitone.',
+                                'Scale Down: \nLow composition down a semitone.',
                                     () {
                                   controller.lowerAllScales();
+                                  // Lowering the scale forces Lock
+                                  // Mode on, per request — same as
+                                  // raising it (see RAISE SCALE above)
+                                  // — it stays locked until Reset
+                                  // Scale brings the composition back
+                                  // to its original scale.
+                                  if (!controller.inputLocked) {
+                                    controller.toggleInputLocked();
+                                  }
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
                                       duration: Duration(seconds: 2),
                                       content: Text(
-                                        'Lowered a semitone.',
+                                        'Scale of composition is a semitone lower.',
                                         style: TextStyle(fontSize: 22),
                                       ),
                                     ),
@@ -950,8 +982,8 @@ class _CompositionScreenState extends State<CompositionScreen>
                               ),
                             ),
                             tooltip: controller.rotatePitchText
-                                ? 'Rotate Pitch Text: On'
-                                : 'Rotate Pitch Text: Off',
+                                ? 'Rotate on'
+                                : 'Rotate off',
                             onPressed: _withHelp(
                                 'Rotate Mode: \nRotates labels for reading with the device turned sideways.',
                                     () {
@@ -974,8 +1006,8 @@ class _CompositionScreenState extends State<CompositionScreen>
                               ),
                             ),
                             tooltip: controller.showCompensatedNotation
-                                ? 'Compensated Notation: On'
-                                : 'Compensated Notation: Off',
+                                ? 'Easy Read Mode on'
+                                : 'Easy Read Mode off',
                             onPressed: _withHelp(
                                 'Easy Read Mode: \nShows a simplified notation.',
                                     () {
@@ -990,9 +1022,11 @@ class _CompositionScreenState extends State<CompositionScreen>
                                   }
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      duration: const Duration(seconds: 2),
+                                      duration: const Duration(seconds: 1),
                                       content: Text(
-                                        controller.showCompensatedNotation ? 'Easy Read Mode on.' : 'Easy Read Mode off.',
+                                        controller.showCompensatedNotation
+                                            ? 'Easy Read Mode on.'
+                                            : 'Easy Read Mode off.',
                                         style: const TextStyle(fontSize: 22),
                                       ),
                                     ),
@@ -1014,17 +1048,60 @@ class _CompositionScreenState extends State<CompositionScreen>
                               ),
                             ),
                             tooltip: controller.inputLocked
-                                ? 'Scroll Lock: On'
-                                : 'Scroll Lock: Off',
+                                ? 'Lock Mode on'
+                                : 'Lock Mode off',
                             onPressed: _withHelp(
                                 'Lock Mode: \nPrevents from editing.',
                                     () {
+                                  // Lock Mode can't be turned OFF while
+                                  // Easy Read Mode is on, per request —
+                                  // Easy Read Mode requires Lock Mode
+                                  // to stay on (see the Easy Read
+                                  // button's own toggle, which turns
+                                  // Lock Mode on together with it).
+                                  // Only the OFF direction is blocked;
+                                  // turning Lock Mode ON while Easy
+                                  // Read is off still works normally.
+                                  if (controller.inputLocked &&
+                                      controller.showCompensatedNotation) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        duration: Duration(seconds: 1),
+                                        content: Text(
+                                          'Turn off Easy Read Mode first.',
+                                          style: TextStyle(fontSize: 22),
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  // Same guard for a raised/lowered
+                                  // scale, per request — the ONLY way
+                                  // to release the lock in this case is
+                                  // Reset Scale (see that button's own
+                                  // handler above).
+                                  if (controller.inputLocked &&
+                                      (controller.isScaleRaised ||
+                                          controller.isScaleLowered)) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        duration: Duration(seconds: 3),
+                                        content: Text(
+                                          'To disable Lock Mode reset the scale of the composition to original.',
+                                          style: TextStyle(fontSize: 22),
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
                                   controller.toggleInputLocked();
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      duration: const Duration(seconds: 2),
+                                      duration: const Duration(seconds: 1),
                                       content: Text(
-                                        controller.inputLocked ? 'Lock on.' : 'Lock off.',
+                                        controller.inputLocked
+                                            ? 'Lock Mode on.'
+                                            : 'Lock Mode off.',
                                         style: const TextStyle(fontSize: 22),
                                       ),
                                     ),
@@ -1053,8 +1130,15 @@ class _CompositionScreenState extends State<CompositionScreen>
                             onPressed: _withHelp(
                                 'Zoom In: \nEnlarges the grid.',
                                     () {
+                                  // Only zoomY (cell HEIGHT) changes
+                                  // here, per request — zoomX (cell
+                                  // WIDTH) is passed through
+                                  // unchanged, so Zoom In no longer
+                                  // touches width at all, keeping
+                                  // isCellWidthChanged's own icon
+                                  // independent of this button.
                                   controller.setZoom(
-                                    controller.zoomX + 1,
+                                    controller.zoomX,
                                     controller.zoomY + 0.1,
                                   );
                                 }),
@@ -1075,8 +1159,15 @@ class _CompositionScreenState extends State<CompositionScreen>
                             onPressed: _withHelp(
                                 'Zoom Out: \nShrinks the grid.',
                                     () {
+                                  // Only zoomY (cell HEIGHT) changes
+                                  // here, per request — zoomX (cell
+                                  // WIDTH) is passed through
+                                  // unchanged, so Zoom Out no longer
+                                  // touches width at all, keeping
+                                  // isCellWidthChanged's own icon
+                                  // independent of this button.
                                   controller.setZoom(
-                                    controller.zoomX - 1,
+                                    controller.zoomX,
                                     controller.zoomY - 0.1,
                                   );
                                 }),
@@ -1093,7 +1184,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                             ),
                             tooltip: 'Reset Zoom',
                             onPressed: _withHelp(
-                              'Reset Zoom: \nReturns the grid to its default zoom level.',
+                              'Reset Zoom: \nReturns the grid to default zoom level.',
                               controller.resetZoom,
                             ),
                           ),
@@ -1135,7 +1226,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                             ),
                             tooltip: 'Save Composition',
                             onPressed: _withHelp(
-                                'Save: \nSaves the current composition.',
+                                'Save Composition: \nSaves the current composition.',
                                     () {
                                   _saveComposition(context);
                                 }),
@@ -1187,20 +1278,20 @@ class _CompositionScreenState extends State<CompositionScreen>
                             ),
                             tooltip: controller.gridFontSize ==
                                 DefaultValues.gridFontSizeLarge
-                                ? 'Grid Font Size: Large'
-                                : 'Grid Font Size: Normal',
+                                ? 'Large Labels Mode on'
+                                : 'Large Labels Mode off',
                             onPressed: _withHelp(
                                 'Large Labels Mode: \nToggles size of labels on the grid.',
                                     () {
                                   controller.toggleGridFontSize();
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      duration: const Duration(seconds: 2),
+                                      duration: const Duration(seconds: 1),
                                       content: Text(
                                         controller.gridFontSize ==
                                             DefaultValues.gridFontSizeLarge
-                                            ? 'Labels larger.'
-                                            : 'Labels normal.',
+                                            ? 'Large Labels Mode on.'
+                                            : 'Large Labels Mode off.',
                                         style: const TextStyle(fontSize: 22),
                                       ),
                                     ),
@@ -1230,11 +1321,9 @@ class _CompositionScreenState extends State<CompositionScreen>
                                       : Colors.green,
                                 ),
                               ),
-                              tooltip: 'Hand',
+                              tooltip: 'Hand Set',
                               onPressed: _withHelp(
-                                  'Hand Set: \nOpens a picker for Left, '
-                                      'Right, or Additional hand for newly '
-                                      'entered notes.',
+                                  'Hand Set: \nOpens a menu to set hand for newly entered notes.',
                                       () {
                                     // Always opens the 3-way picker now —
                                     // the separate "Additional Hand Mode"
@@ -1269,7 +1358,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                               ),
                               tooltip: 'Note Duration',
                               onPressed: _withHelp(
-                                  'Note Duration: \nSets the duration used for newly entered notes.',
+                                  'Note Duration: \nOpens a menu to set duration for newly entered notes.',
                                       () {
                                     globalDurationDialog(
                                       context,
@@ -1280,34 +1369,37 @@ class _CompositionScreenState extends State<CompositionScreen>
                           ),
 
                           // GRACE NOTES
-                          IconButton(
-                            icon: Transform.rotate(
-                              angle: controller.rotatePitchText ? -pi / 2 : 0,
-                              child: Icon(
-                                Icons.grain,
-                                color: controller.isAddingGraceNotes
-                                    ? Colors.red
-                                    : Colors.black,
+                          CompositedTransformTarget(
+                            link: _graceNotesIconLink,
+                            child: IconButton(
+                              icon: Transform.rotate(
+                                angle: controller.rotatePitchText ? -pi / 2 : 0,
+                                child: Icon(
+                                  Icons.grain,
+                                  color: controller.isAddingGraceNotes
+                                      ? Colors.red
+                                      : Colors.black,
+                                ),
                               ),
-                            ),
-                            tooltip: controller.isAddingGraceNotes
-                                ? 'Add grace note: On'
-                                : 'Add grace note: Off',
-                            onPressed: _withHelp(
-                                'Grace Note: \nStops adding grace notes.',
-                                    () {
-                                  final wasOn = controller.isAddingGraceNotes;
-                                  controller.stopAddingGraceNotes();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      duration: const Duration(seconds: 2),
-                                      content: Text(
-                                        wasOn ? 'Adding grace notes is off.' : 'Add grace notes via note edit menu.',
-                                        style: const TextStyle(fontSize: 22),
+                              tooltip: controller.isAddingGraceNotes
+                                  ? 'Grace Notes Mode on'
+                                  : 'Grace Notes Mode off',
+                              onPressed: _withHelp(
+                                  'Grace Notes Mode: \nStops adding grace notes.',
+                                      () {
+                                    final wasOn = controller.isAddingGraceNotes;
+                                    controller.stopAddingGraceNotes();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        duration: const Duration(seconds: 1),
+                                        content: Text(
+                                          'Grace Notes Mode is disable.',
+                                          style: const TextStyle(fontSize: 22),
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                }),
+                                    );
+                                  }),
+                            ),
                           ),
 
                           // LEGATO
@@ -1322,15 +1414,15 @@ class _CompositionScreenState extends State<CompositionScreen>
                               ),
                             ),
                             tooltip: controller.legatoMode
-                                ? 'Legato Mode: On'
-                                : 'Legato Mode: Off',
+                                ? 'Legato Mode on'
+                                : 'Legato Mode off',
                             onPressed: _withHelp(
                                 'Legato Mode: \nSets legato on each tapped note.',
                                     () {
                                   controller.toggleLegatoMode();
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      duration: const Duration(seconds: 2),
+                                      duration: const Duration(seconds: 1),
                                       content: Text(
                                         controller.legatoMode ? 'Legato Mode on.' : 'Legato Mode off.',
                                         style: const TextStyle(fontSize: 22),
@@ -1354,7 +1446,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                                       : Colors.black,
                                 ),
                               ),
-                              tooltip: 'Paste',
+                              tooltip: 'Paste Mode',
                               onPressed: _withHelp(
                                   'Paste Mode: \nStops pasting previously copied note.',
                                       () {
@@ -1362,21 +1454,22 @@ class _CompositionScreenState extends State<CompositionScreen>
                                       controller.exitPasteMode();
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(
-                                          duration: const Duration(seconds: 2),
+                                          duration: const Duration(seconds: 1),
                                           content: Text(
-                                            'Paste Mode is disable',
+                                            'Paste Mode is disable.',
                                             style: const TextStyle(fontSize: 22),
                                           ),
                                         ),
                                       );
                                     } else {
-                                      simpleMessageDialog(
-                                          context,
-                                          'Note copying',
-                                          'Long-tap the note to copy it.\n\n'
-                                              'The button gets blue showing Paste Mode is enable.\n\n'
-                                              'You can clone this note than where ever you wish as many times as you wish.\n\n'
-                                              'To disable Paste Mode toggle the button.'
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          duration: const Duration(seconds: 1),
+                                          content: Text(
+                                            'Paste Mode is disable',
+                                            style: const TextStyle(fontSize: 22),
+                                          ),
+                                        ),
                                       );
                                     }
 
@@ -1406,7 +1499,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                             ),
                             tooltip: _isPlaying ? 'Pause' : 'Play',
                             onPressed: _withHelp(
-                              'Play/Pause: \nStarts/Pauses playback of the composition.',
+                              'Play/Pause: \nStarts or Pauses playback of the composition.',
                               hasMeasures ? _togglePlayback : null,
                             ),
                           ),
@@ -1451,7 +1544,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                                   controller.toggleSound();
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      duration: const Duration(seconds: 2),
+                                      duration: const Duration(seconds: 1),
                                       content: Text(
                                         controller.soundEnabled ? 'Sound on.' : 'Sound off.',
                                         style: const TextStyle(fontSize: 22),
@@ -1493,7 +1586,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                                 color: Colors.black,
                               ),
                             ),
-                            tooltip: 'Export Measures as Text',
+                            tooltip: 'Export',
                             onPressed: _withHelp(
                                 'Export: \nExports a range of measures as plain text.',
                                     () {
@@ -1567,7 +1660,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                                 color: Colors.black,
                               ),
                             ),
-                            tooltip: 'Import Transcription',
+                            tooltip: 'Import',
                             onPressed: _withHelp(
                                 'Import: \nImports a batch of transcribed measures.',
                                     () {
@@ -1869,6 +1962,7 @@ class _CompositionScreenState extends State<CompositionScreen>
               if (_helpMode) _toolbarLabel(_handIconLink, 'Hand Set'),
               if (_helpMode) _toolbarLabel(_durationIconLink, 'Note Duration'),
               if (_helpMode) _toolbarLabel(_pasteIconLink, 'Paste Mode'),
+              if (_helpMode) _toolbarLabel(_graceNotesIconLink, 'Grace Notes'),
             ],
           );
 

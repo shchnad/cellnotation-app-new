@@ -33,9 +33,4 @@ class DefaultValues {
   static const double gridFontSize = 16.0;
   static const double gridFontSizeLarge = 22.0;
 
-
-// SIMPLIFY MODE
-  static const String messageForSimplifyMode =
-      'Turn off the Read Easy Mode first!';
-
 }

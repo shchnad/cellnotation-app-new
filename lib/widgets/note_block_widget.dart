@@ -629,10 +629,10 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
     );
   }
 
-  /// Right/Left colors come from AppColors (which already flip
-  /// slightly for dark mode) — Additional is a straight, fixed green
-  /// regardless of dark mode, per request ("3rd hand with color
-  /// green"), rather than needing its own AppColors dark-mode pair.
+  /// All three hand colors come from AppColors, each with its own
+  /// light/dark-mode pair — right, left, and (per request) additional
+  /// too, which flips from plain green to a lighter green in dark
+  /// mode, the same reasoning as left hand's own light-blue swap.
   Color _handColor(Hand hand) {
     final isDarkMode = widget.controller.isDarkMode;
     switch (hand) {
@@ -641,7 +641,7 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
       case Hand.left:
         return AppColors.noteHandLeft(isDarkMode);
       case Hand.additional:
-        return Colors.green;
+        return AppColors.noteHandAdditional(isDarkMode);
     }
   }
 }

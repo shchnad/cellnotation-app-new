@@ -57,7 +57,7 @@ void beatSubdivisionDialog({
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         title: const Text(
-          'Change Time Subdivision',
+          'Change Time Signature',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 22,
@@ -75,7 +75,7 @@ void beatSubdivisionDialog({
               const Divider(),
 
               const Text(
-                'Make beat twice shorter',
+                'Split each beat to halves',
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
               // const Text(
@@ -123,7 +123,7 @@ void beatSubdivisionDialog({
               const Divider(),
 
               const Text(
-                'Make beat twice longer',
+                'Unite every two beats to one',
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
               // const Text(
