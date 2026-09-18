@@ -94,8 +94,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     // — still reserves its own height, which was pushing the body
     // (and the Home text inside it) down from that same position.
     return Scaffold(
+      // BACKGROUND — same cellnotation_background.jpg + dark scrim
+      // treatment as home_screen.dart/login_screen.dart/
+      // register_screen.dart, per request, so the profile screen
+      // shares the same consistent look. Text that used to be plain
+      // black is now white below — black text would be unreadable
+      // against this dark background.
       body: Stack(
         children: [
+          Positioned.fill(
+            child: Image.asset(
+              'assets/cellnotation_background.jpg',
+              fit: BoxFit.cover,
+            ),
+          ),
+          Positioned.fill(
+            child: Container(color: Colors.black.withOpacity(0.35)),
+          ),
+
           // The main content is now genuinely centered VERTICALLY as
           // well as horizontally, per request — not just horizontally
           // (via the existing Center+width-clamped SizedBox below).
@@ -112,14 +128,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   constraints: BoxConstraints(minHeight: constraints.maxHeight),
                   child: Center(
                     child: user == null
-                        ? const Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Text(
-                          'Not signed in',
-                          style: TextStyle(fontSize: 22)),
-                    )
-                        : Padding(
+                        ? Container(
+                      margin: const EdgeInsets.all(24),
                       padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                          'Not signed in',
+                          style: TextStyle(fontSize: 22, color: Colors.black)),
+                    )
+                        : Container(
+                      margin: const EdgeInsets.all(24),
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -160,13 +186,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     fontWeight: FontWeight.bold,
                                   ),
                                   decoration: InputDecoration(
+                                    filled: true,
+                                    fillColor: Colors.white,
                                     labelText: 'Edit user name',
                                     labelStyle: const TextStyle(
                                       color: Colors.black,
                                       fontSize: 22,
                                       fontWeight: FontWeight.bold,
                                     ),
-                                    border: const OutlineInputBorder(),
+                                    border: OutlineInputBorder(
+                                      borderSide: BorderSide(color: Colors.grey.shade400),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderSide: BorderSide(color: Colors.grey.shade400),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderSide: BorderSide(color: Colors.grey.shade400),
+                                    ),
                                     suffixIcon: IconButton(
                                       icon: const Icon(Icons.clear),
                                       padding: EdgeInsets.zero,
@@ -191,7 +227,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         ? null
                                         : _saveName,
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.grey.shade300,
+                                      backgroundColor: Colors.blue,
                                       // foregroundColor: Colors.black,
                                       minimumSize: const Size(300, 100),
                                       elevation: 0,
@@ -217,7 +253,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         SizedBox(
                                             child: Icon(
                                               Icons.save,
-                                              color: Colors.black,
+                                              color: Colors.white,
                                               size: 22,
                                             )
                                         ),
@@ -226,7 +262,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           child: Text('Save',
                                               style: TextStyle(
                                                 fontSize: 22,
-                                                color: Colors.black,
+                                                color: Colors.white,
                                               )),
                                         ),
                                       ],
