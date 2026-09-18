@@ -6,6 +6,7 @@ enum MusicStyle {
   country('country'),
   disco('disco'),
   folk('folk'),
+  kids('kids'),
   gregorian('gregorian'),
   hiphop('hip-hop'),
   jazz('jazz'),

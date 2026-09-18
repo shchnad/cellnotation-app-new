@@ -78,7 +78,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
 
     return Scaffold(
-      resizeToAvoidBottomInset : false,
+      // true (the default) now, per request — with false, the body
+      // never shrinks for the keyboard, so Flutter never realizes it
+      // needs to scroll a focused field (e.g. Password, in landscape)
+      // up above the keyboard, leaving it hidden underneath it.
+      resizeToAvoidBottomInset : true,
       // appBar: AppBar(
       //   title: const Text('Register'),
       // ),
@@ -99,208 +103,217 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: Container(color: Colors.black.withOpacity(0.35)),
           ),
 
-          Center(
-            child: SizedBox(
-              width: 500,
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
+          // LayoutBuilder + a min-height ConstrainedBox centers the
+          // content when it's SHORTER than the viewport, while still
+          // allowing it to scroll normally if it ever overflows a
+          // short (e.g. landscape, or landscape + keyboard) screen —
+          // same pattern as login_screen.dart/profile_screen.dart. A
+          // plain Center() alone can't tell a ScrollView how tall the
+          // viewport actually is, so it wouldn't center short content
+          // this way on its own.
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Center(
+                    child: SizedBox(
+                      width: 500,
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
 
-                    const SizedBox(height: 100),
+                            const SizedBox(height: 100),
 
-                    Text('Cellnotation',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                            // Text('cellnotation',
+                            //   style: TextStyle(
+                            //     color: Colors.white,
+                            //     fontSize: 80,
+                            //     fontWeight: FontWeight.bold,
+                            //   ),
+                            // ),
+                            //
+                            // const SizedBox(height: 20),
 
-                    const SizedBox(height: 20),
-
-                    SizedBox(
-                      height: 50,
-                      child: TextField(
-                        controller: emailController,
-                        obscureText: false,
-                        style: const TextStyle(
-                          color: Colors.blue,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: Colors.white,
-                          labelText: 'Email',
-                          labelStyle: const TextStyle(
-                            color: Colors.black,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          border: const OutlineInputBorder(),
-                          suffixIcon: IconButton(
-                            icon: const Icon(Icons.clear),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            visualDensity: VisualDensity.compact,
-                            onPressed: () {
-                              setState(() {
-                                emailController.clear();
-                              });
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    SizedBox(
-                      height: 50,
-                      child: TextField(
-                        controller: passwordController,
-                        obscureText: _obscurePassword,
-                        style: const TextStyle(
-                          color: Colors.blue,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: Colors.white,
-                          labelText: 'Password',
-                          labelStyle: const TextStyle(
-                            color: Colors.black,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          border: const OutlineInputBorder(),
-                          suffixIcon: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const SizedBox(width: 8),
-                              IconButton(
-                                icon: Icon(
-                                  _obscurePassword
-                                      ? Icons.visibility
-                                      : Icons.visibility_off,
+                            SizedBox(
+                              height: 50,
+                              child: TextField(
+                                controller: emailController,
+                                obscureText: false,
+                                style: const TextStyle(
+                                  color: Colors.green,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                                visualDensity: VisualDensity.compact,
-                                onPressed: () {
-                                  setState(() {
-                                    _obscurePassword = !_obscurePassword;
-                                  });
-                                },
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  labelText: 'Email',
+                                  labelStyle: const TextStyle(
+                                    color: Colors.green,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  border: const OutlineInputBorder(),
+                                  suffixIcon: IconButton(
+                                    icon: const Icon(Icons.clear),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () {
+                                      setState(() {
+                                        emailController.clear();
+                                      });
+                                    },
+                                  ),
+                                ),
                               ),
-                              const SizedBox(width: 8),
-                              IconButton(
-                                icon: const Icon(Icons.clear),
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                                visualDensity: VisualDensity.compact,
-                                onPressed: () {
-                                  setState(() {
-                                    passwordController.clear();
-                                  });
-                                },
+                            ),
+
+                            const SizedBox(height: 20),
+
+                            SizedBox(
+                              height: 50,
+                              child: TextField(
+                                controller: passwordController,
+                                obscureText: _obscurePassword,
+                                style: const TextStyle(
+                                  color: Colors.green,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  labelText: 'Password',
+                                  labelStyle: const TextStyle(
+                                    color: Colors.green,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  border: const OutlineInputBorder(),
+                                  suffixIcon: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const SizedBox(width: 8),
+                                      IconButton(
+                                        icon: Icon(
+                                          _obscurePassword
+                                              ? Icons.visibility
+                                              : Icons.visibility_off,
+                                        ),
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                        visualDensity: VisualDensity.compact,
+                                        onPressed: () {
+                                          setState(() {
+                                            _obscurePassword = !_obscurePassword;
+                                          });
+                                        },
+                                      ),
+                                      const SizedBox(width: 8),
+                                      IconButton(
+                                        icon: const Icon(Icons.clear),
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                        visualDensity: VisualDensity.compact,
+                                        onPressed: () {
+                                          setState(() {
+                                            passwordController.clear();
+                                          });
+                                        },
+                                      ),
+                                      const SizedBox(width: 8),
+                                    ],
+                                  ),
+                                ),
                               ),
-                              const SizedBox(width: 8),
-                            ],
-                          ),
+                            ),
+
+                            const SizedBox(height:20),
+
+                            SizedBox(
+                              // width: double.infinity,
+                              width: 250,
+                              height: 100,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  foregroundColor: Colors.white,
+                                  // Matches the outer SizedBox exactly now — a
+                                  // mismatched minimumSize (this was double.
+                                  // infinity x 50 while the SizedBox constrained
+                                  // to 250x100) is a likely cause of buttons not
+                                  // sizing as expected elsewhere in this app too.
+                                  minimumSize: const Size(250, 100),
+                                  elevation: 0,
+                                  // Same note-block shape as the home screen's
+                                  // buttons — matches NoteBlockWidget's own
+                                  // BorderRadius.circular(4).
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                                onPressed: loading ? null : register,
+                                child: loading
+                                    ? const CircularProgressIndicator()
+                                    : const Text(
+                                  'Register',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 8),
+
+                            // BACK TO LOGIN — now a plain text button placed
+                            // directly under Register, per request (was
+                            // previously a top-left corner icon+text link,
+                            // now removed).
+                            TextButton(
+                              onPressed: () {
+                                // Navigator.pop, not push — RegisterScreen was
+                                // reached BY pushing from LoginScreen (via
+                                // "Create Account"), so "Back to Login" should
+                                // return to that SAME instance. Pushing a new
+                                // LoginScreen here instead stacks a duplicate
+                                // route on top of AuthGate — if a successful
+                                // sign-in later happens on THAT pushed copy,
+                                // AuthGate's own StreamBuilder switches to
+                                // HomeScreen underneath it, but the pushed
+                                // LoginScreen stays visible on top, making a
+                                // successful login look like it silently
+                                // failed.
+                                Navigator.pop(context);
+                              },
+                              child: const Text(
+                                'Back to Login',
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+
+                          ],
+
                         ),
+
                       ),
                     ),
-
-                    const SizedBox(height:20),
-
-                    SizedBox(
-                      // width: double.infinity,
-                      width: 250,
-                      height: 100,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          foregroundColor: Colors.white,
-                          // Matches the outer SizedBox exactly now — a
-                          // mismatched minimumSize (this was double.
-                          // infinity x 50 while the SizedBox constrained
-                          // to 250x100) is a likely cause of buttons not
-                          // sizing as expected elsewhere in this app too.
-                          minimumSize: const Size(250, 100),
-                          elevation: 0,
-                          // Same note-block shape as the home screen's
-                          // buttons — matches NoteBlockWidget's own
-                          // BorderRadius.circular(4).
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                        onPressed: loading ? null : register,
-                        child: loading
-                            ? const CircularProgressIndicator()
-                            : const Text(
-                          'Register',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                  ],
-
+                  ),
                 ),
-
-              ),
-            ),
+              );
+            },
           ),
 
-          // BACK TO LOGIN — top-left corner, clickable text + icon
-          // (not a full note-block button), matching HomeScreen's own
-          // Exit treatment exactly (same red color, same arrow-back
-          // icon as ProfileScreen's Home), just with different text.
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: InkWell(
-                onTap: () {
-                  // Navigator.pop, not push — RegisterScreen was
-                  // reached BY pushing from LoginScreen (via
-                  // "Create Account"), so "Back to Login" should
-                  // return to that SAME instance. Pushing a new
-                  // LoginScreen here instead stacks a duplicate route
-                  // on top of AuthGate — if a successful sign-in
-                  // later happens on THAT pushed copy, AuthGate's own
-                  // StreamBuilder switches to HomeScreen underneath
-                  // it, but the pushed LoginScreen stays visible on
-                  // top, making a successful login look like it
-                  // silently failed.
-                  Navigator.pop(context);
-                },
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.arrow_back, color: Colors.red),
-                    SizedBox(width: 6),
-                    Text(
-                      'Back to Login',
-                      style: TextStyle(
-                        color: Colors.red,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
         ],
       ),
 

@@ -67,7 +67,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(duration: const Duration(seconds: 2),
             content: Text(
-                'Name updated',
+                'user name updated',
                 style: TextStyle(fontSize: 22))),
       );
       setState(() {}); // refresh displayed name
@@ -227,7 +227,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         ? null
                                         : _saveName,
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.blue,
+                                      backgroundColor: Colors.black,
                                       // foregroundColor: Colors.black,
                                       minimumSize: const Size(300, 100),
                                       elevation: 0,
