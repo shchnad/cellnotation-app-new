@@ -118,19 +118,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   constraints: BoxConstraints(minHeight: constraints.maxHeight),
                   child: Center(
                     child: SizedBox(
-                      width: 500,
+                      // Widened from 500 to 660, per request — matches
+                      // login_screen.dart's own treatment, keeping
+                      // both auth screens visually consistent, even
+                      // though a single 300px button (see below) would
+                      // already fit comfortably within the old 500.
+                      width: 660,
                       child: Padding(
                         padding: const EdgeInsets.all(20),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
 
-                            const SizedBox(height: 100),
+                            // const SizedBox(height: 100),
 
                             // Text('cellnotation',
                             //   style: TextStyle(
                             //     color: Colors.white,
-                            //     fontSize: 80,
+                            //     fontSize: 110,
                             //     fontWeight: FontWeight.bold,
                             //   ),
                             // ),
@@ -236,7 +241,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                             SizedBox(
                               // width: double.infinity,
-                              width: 250,
+                              width: 300,
                               height: 100,
                               child: ElevatedButton(
                                 style: ElevatedButton.styleFrom(
@@ -245,9 +250,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   // Matches the outer SizedBox exactly now — a
                                   // mismatched minimumSize (this was double.
                                   // infinity x 50 while the SizedBox constrained
-                                  // to 250x100) is a likely cause of buttons not
+                                  // to 300x100) is a likely cause of buttons not
                                   // sizing as expected elsewhere in this app too.
-                                  minimumSize: const Size(250, 100),
+                                  minimumSize: const Size(300, 100),
                                   elevation: 0,
                                   // Same note-block shape as the home screen's
                                   // buttons — matches NoteBlockWidget's own
@@ -270,7 +275,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ),
                             ),
 
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 30),
 
                             // BACK TO LOGIN — now a plain text button placed
                             // directly under Register, per request (was

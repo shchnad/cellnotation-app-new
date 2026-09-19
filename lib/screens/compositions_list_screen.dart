@@ -57,6 +57,7 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
           labelText: label,
           labelStyle: const TextStyle(
             fontSize: 22,
+            fontWeight: FontWeight.bold,
             color: Colors.green,
           ),
           isDense: true,

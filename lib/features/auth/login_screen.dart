@@ -108,7 +108,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   constraints: BoxConstraints(minHeight: constraints.maxHeight),
                   child: Center(
                     child: SizedBox(
-                      width: 500,
+                      // Widened from 500 to 660, per request — each
+                      // button row now holds two FIXED 300px-wide
+                      // buttons (see below) plus a 12px gap between
+                      // them and this Padding's own 20px on each
+                      // side: 300 + 300 + 12 + 40 = 652, so 660 keeps
+                      // a little breathing room.
+                      width: 660,
                       child: Padding(
                         padding: const EdgeInsets.all(20),
 
@@ -117,12 +123,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           children: [
 
-                            const SizedBox(height: 100),
+                            // const SizedBox(height: 100),
 
                             // Text('cellnotation',
                             //   style: TextStyle(
                             //     color: Colors.white,
-                            //     fontSize: 80,
+                            //     fontSize: 110,
                             //     fontWeight: FontWeight.bold,
                             //   ),
                             // ),
@@ -230,71 +236,69 @@ class _LoginScreenState extends State<LoginScreen> {
                             // per request.
                             Row(
                               children: [
-                                Expanded(
-                                  child: SizedBox(
-                                    height: 100,
-                                    child: ElevatedButton(
-                                      onPressed: loading ? null : login,
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.blue,
-                                        foregroundColor: Colors.white,
-                                        minimumSize: const Size(double.infinity, 50),
-                                        elevation: 0,
-                                        // Same note-block shape as the home screen's
-                                        // buttons — matches NoteBlockWidget's own
-                                        // BorderRadius.circular(4).
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
+                                SizedBox(
+                                  width: 300,
+                                  height: 100,
+                                  child: ElevatedButton(
+                                    onPressed: loading ? null : login,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.blue,
+                                      foregroundColor: Colors.white,
+                                      minimumSize: const Size(double.infinity, 50),
+                                      elevation: 0,
+                                      // Same note-block shape as the home screen's
+                                      // buttons — matches NoteBlockWidget's own
+                                      // BorderRadius.circular(4).
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(4),
                                       ),
-                                      child: loading
-                                          ? const CircularProgressIndicator(
+                                    ),
+                                    child: loading
+                                        ? const CircularProgressIndicator(
+                                      color: Colors.white,
+                                    )
+                                        : const Text(
+                                      'Login',
+                                      style: TextStyle(
                                         color: Colors.white,
-                                      )
-                                          : const Text(
-                                        'Login',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 22,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                Expanded(
-                                  child: SizedBox(
-                                    height: 100,
-                                    child: ElevatedButton(
-                                      onPressed: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => const RegisterScreen(),
-                                          ),
-                                        );
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.green,
-                                        foregroundColor: Colors.white,
-                                        minimumSize: const Size(double.infinity, 50),
-                                        elevation: 0,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(4),
+                                SizedBox(
+                                  width: 300,
+                                  height: 100,
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const RegisterScreen(),
                                         ),
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green,
+                                      foregroundColor: Colors.white,
+                                      minimumSize: const Size(double.infinity, 50),
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(4),
                                       ),
-                                      child: loading
-                                          ? const CircularProgressIndicator(
+                                    ),
+                                    child: loading
+                                        ? const CircularProgressIndicator(
+                                      color: Colors.white,
+                                    )
+                                        : const Text(
+                                      'Create Account',
+                                      style: TextStyle(
                                         color: Colors.white,
-                                      )
-                                          : const Text(
-                                        'Create Account',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 22,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   ),
@@ -309,7 +313,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                Expanded(
+                                SizedBox(
+                                  width: 300,
                                   child: TextButton(
                                     onPressed: () async {
                                       if (emailController.text.isEmpty) {
@@ -354,7 +359,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                Expanded(
+                                SizedBox(
+                                  width: 300,
                                   child: InkWell(
                                     onTap: () async {
                                       try {

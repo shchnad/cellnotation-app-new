@@ -60,8 +60,9 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
           fillColor: Colors.white,
           labelText: label,
           labelStyle: const TextStyle(
-            color: Colors.blue,
+            fontSize: 22,
             fontWeight: FontWeight.bold,
+            color: Colors.blue,
           ),
           isDense: true,
           border: const OutlineInputBorder(),
