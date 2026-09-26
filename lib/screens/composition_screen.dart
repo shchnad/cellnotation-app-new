@@ -8,7 +8,6 @@ import 'package:music_composer/utils/default_values.dart';
 
 import '../controllers/composition_controller.dart';
 
-import '../models/import_batches.dart';
 import '../models/note_import.dart';
 
 import '../dialogs/measure_range_dialog.dart';
@@ -21,6 +20,7 @@ import '../dialogs/hand_dialog.dart';
 import '../dialogs/simple_message_dialog.dart';
 import '../dialogs/edit_composition_dialog.dart';
 import '../dialogs/scale_change_warning_dialog.dart';
+import '../dialogs/sheet_music_transcription_dialog.dart';
 import '../enums/hand.dart';
 
 import '../services/composition_service.dart';
@@ -1662,174 +1662,19 @@ class _CompositionScreenState extends State<CompositionScreen>
                             ),
                             tooltip: 'Import',
                             onPressed: _withHelp(
-                                'Import: \nImports a batch of transcribed measures.',
+                                'Import: \nImports a transcription pasted in the line-position notation.',
                                     () {
-                                  showDialog(
+                                  // The old fixed-batch list (and its
+                                  // whole intermediate picker dialog)
+                                  // has been removed, per request —
+                                  // this button now opens the paste-
+                                  // your-own dialog directly, since
+                                  // that dialog is the app's only
+                                  // remaining way to import a
+                                  // transcription.
+                                  sheetMusicTranscriptionDialog(
                                     context: context,
-                                    builder: (dialogContext) {
-                                      return StatefulBuilder(
-                                        builder: (dialogContext, setDialogState) {
-                                          return AlertDialog(
-                                            backgroundColor: Colors.white,
-                                            surfaceTintColor: Colors.white,
-                                            title: const Text(
-                                              'Import Transcription',
-                                              style: TextStyle(
-                                                fontSize: 22,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            content: SizedBox(
-                                              width: 400,
-                                              child: Column(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  for (final batch
-                                                  in availableImportBatches)
-                                                    Builder(
-                                                      builder: (_) {
-                                                        final done = controller
-                                                            .importedBatchLabels
-                                                            .contains(
-                                                            batch.label);
-                                                        return ListTile(
-                                                          title: Text(
-                                                            batch.label,
-                                                            style: TextStyle(
-                                                              fontSize: 22,
-                                                              fontWeight:
-                                                              FontWeight.bold,
-                                                              color: done
-                                                                  ? Colors.grey
-                                                                  : Colors.black,
-                                                            ),
-                                                          ),
-                                                          trailing: Icon(
-                                                            done
-                                                                ? Icons
-                                                                .check_circle
-                                                                : Icons
-                                                                .file_download,
-                                                            color: done
-                                                                ? Colors.green
-                                                                : Colors.black,
-                                                          ),
-                                                          onLongPress: done
-                                                              ? () {
-                                                            controller
-                                                                .resetImportedBatch(
-                                                                batch.label);
-                                                            setDialogState(
-                                                                    () {});
-                                                            ScaffoldMessenger.of(
-                                                                context)
-                                                                .showSnackBar(
-                                                              SnackBar(
-                                                                duration: const Duration(seconds: 2),
-                                                                content: Text(
-                                                                  'Can re-import.',
-                                                                  style: const TextStyle(
-                                                                      fontSize: 22),
-                                                                ),
-                                                              ),
-                                                            );
-                                                          }
-                                                              : null,
-                                                          onTap: done
-                                                              ? null
-                                                              : () {
-                                                            final warnings =
-                                                            controller
-                                                                .importBatch(
-                                                                batch);
-                                                            setDialogState(
-                                                                    () {});
-                                                            showDialog(
-                                                              context:
-                                                              dialogContext,
-                                                              builder:
-                                                                  (resultContext) =>
-                                                                  AlertDialog(
-                                                                    backgroundColor:
-                                                                    Colors.white,
-                                                                    surfaceTintColor:
-                                                                    Colors.white,
-                                                                    title: Text(
-                                                                      warnings
-                                                                          .isEmpty
-                                                                          ? 'Import Complete'
-                                                                          : 'Import Complete — '
-                                                                          '${warnings.length} warning'
-                                                                          '${warnings.length == 1 ? '' : 's'}',
-                                                                      style: const TextStyle(
-                                                                        fontSize: 22,
-                                                                        fontWeight: FontWeight.bold,
-                                                                      ),
-                                                                    ),
-                                                                    content: SizedBox(
-                                                                      width: 400,
-                                                                      child: warnings.isEmpty
-                                                                          ? Text(
-                                                                        'All notes from ${batch.label} were created successfully.',
-                                                                        style: const TextStyle(fontSize: 22),
-                                                                      )
-                                                                          : SingleChildScrollView(
-                                                                        child: Column(
-                                                                          mainAxisSize: MainAxisSize.min,
-                                                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                                                          children: [
-                                                                            for (final w in warnings)
-                                                                              Padding(
-                                                                                padding: const EdgeInsets.only(bottom: 8),
-                                                                                child: Text(
-                                                                                  w.toString(),
-                                                                                  style: const TextStyle(fontSize: 18, color: Colors.red),
-                                                                                ),
-                                                                              ),
-                                                                          ],
-                                                                        ),
-                                                                      ),
-                                                                    ),
-                                                                    actions: [
-                                                                      TextButton(
-                                                                        onPressed: () => Navigator.pop(resultContext),
-                                                                        child: const Text(
-                                                                          'Close',
-                                                                          style: TextStyle(
-                                                                            fontSize: 22,
-                                                                            fontWeight: FontWeight.bold,
-                                                                            color: Colors.black,
-                                                                          ),
-                                                                        ),
-                                                                      ),
-                                                                    ],
-                                                                  ),
-                                                            );
-                                                          },
-                                                        );
-                                                      },
-                                                    ),
-                                                ],
-                                              ),
-                                            ),
-                                            actions: [
-                                              TextButton(
-                                                onPressed: () =>
-                                                    Navigator.pop(dialogContext),
-                                                child: const Text(
-                                                  'Close',
-                                                  style: TextStyle(
-                                                    fontSize: 22,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Colors.black,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          );
-                                        },
-                                      );
-                                    },
+                                    controller: controller,
                                   );
                                 }),
                           ),

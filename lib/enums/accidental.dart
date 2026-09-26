@@ -1,15 +1,9 @@
 enum Accidental {
   sharp('sharp', '+'),
   flat('flat','-'),
+  natural('natural', 'x'),
   doubleSharp('double sharp', '++'),
-  doubleFlat('double flat', '--'),
-  // Explicitly cancels any alteration in effect for this note — either
-  // the scale's own inherent +/- for this degree, or an earlier
-  // accidental still persisting through the measure. Used by
-  // CompositionController.compensateAccidentals() to mark a note as
-  // deliberately natural once its own accidental and the scale's
-  // inherent sign have been reconciled.
-  natural('natural', 'x');
+  doubleFlat('double flat', '--');
 
   final String label;
   final String sign;

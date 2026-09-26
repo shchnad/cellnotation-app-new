@@ -6,6 +6,7 @@ import '../enums/accidental.dart';
 import '../enums/finger.dart';
 import '../enums/glissando_direction.dart';
 import '../enums/grace_note_type.dart';
+import '../enums/note_duration.dart';
 import '../enums/ornament.dart';
 import '../enums/playing_technique.dart';
 import '../models/note.dart';
@@ -65,6 +66,70 @@ class NoteDialog extends StatelessWidget {
   /// Octave/Degree) — matches DefaultValues.widthBetweenWidgets.
   double get _rowGap => DefaultValues.widthBetweenWidgets;
 
+  /// Renders [note] in the same line-position transcription notation
+  /// cellnotation_transcription_parser.dart parses on the way IN —
+  /// the exact inverse of that file's own row -> (degree, octave)
+  /// conversion, solved back to a staff line position: `row - 28`
+  /// even means the note sits ON line `(row-28)/2`; odd means it
+  /// sits BETWEEN lines `(row-29)/2` and that line + 1 (see that
+  /// file's own top-level doc comment for the full derivation this
+  /// mirrors). Accidental and duration are read directly off [note]
+  /// itself — [Accidental.sign] already matches the parser's own
+  /// +/++/-/--/x signs exactly, and each duration part becomes one
+  /// "d<n>" code, concatenated for a dotted/tied note (e.g. "d4d8").
+  /// Prefixed with "m<measure> b<beat>" (matching the parser's own
+  /// `m`/`b` markers), so the whole string can be read back directly
+  /// against the original transcription text, not just the isolated
+  /// note token.
+  String _transcriptionFor(Note note) {
+    final offset = note.row - 28;
+    final String position;
+    if (offset % 2 == 0) {
+      position = (offset ~/ 2).toString();
+    } else {
+      // Dart's `%` can return a negative remainder for a negative
+      // dividend (e.g. -1 % 2 == -1, not 1) — floor-dividing instead
+      // of truncating keeps the "between lines" case correct for
+      // notes below line 0 too.
+      final lower = ((offset - 1) / 2).floor();
+      position = '$lower/${lower + 1}';
+    }
+
+    final accidentalSign = note.accidental?.sign ?? '';
+
+    final durationParts = decomposeDurationTicks(note.durationTicks);
+    final durationCode = durationParts.map((d) {
+      final denominator = NoteDuration.whole.ticks ~/ d.ticks;
+      return 'd$denominator';
+    }).join();
+
+    final measureNumber = controller.getMeasureNumber(note);
+    // getBeatNumber truncates to a whole beat, losing any fractional
+    // offset a note starting mid-beat actually has — computed
+    // directly here instead, in the parser's own decimal notation
+    // (b1.25/b1.5/b1.75 for a quarter/eighth-note-and/three-quarter
+    // offset within the beat).
+    final measure = controller.getMeasureAtTick(note.startTick);
+    final tickInsideMeasure = note.startTick - measure.startTick;
+    final ticksPerBeat = measure.timeSignature.ticksPerBeat;
+    final wholeBeatIndex = tickInsideMeasure ~/ ticksPerBeat;
+    final remainderTicks = tickInsideMeasure - wholeBeatIndex * ticksPerBeat;
+    final fraction = remainderTicks / ticksPerBeat;
+    final beatNumber = wholeBeatIndex + 1;
+    // Only the three quarter-beat fractions the parser itself
+    // recognizes are ever shown — anything else (a note that doesn't
+    // land on a quarter-beat boundary at all) is rounded to the
+    // nearest of those rather than showing an unparseable decimal.
+    final beatSuffix = switch ((fraction * 4).round() % 4) {
+      1 => '.25',
+      2 => '.5',
+      3 => '.75',
+      _ => '',
+    };
+
+    return 'm$measureNumber b$beatNumber$beatSuffix $position$accidentalSign$durationCode';
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -122,6 +187,7 @@ class NoteDialog extends StatelessWidget {
           ) +
               _rowGap +
               _textWidth('Degree: ${controller.getDegree(editedNote)}'),
+          _textWidth('Transcription: ${_transcriptionFor(editedNote)}'),
           _textWidth('Accidental: ${editedNote.accidental?.label ?? 'none'}') +
               _listTileChrome,
           _textWidth(
@@ -310,6 +376,31 @@ class NoteDialog extends StatelessWidget {
                     ],
                   ),
 
+
+                  Row(
+                    children: [
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            const TextSpan(
+                              text: 'Transcription: ',
+                              style: TextStyle(
+                                fontSize: 22,
+                                color: Colors.black,
+                              ),
+                            ),
+                            TextSpan(
+                              text: _transcriptionFor(editedNote),
+                              style: const TextStyle(
+                                fontSize: 22,
+                                color: Colors.blue,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
 
                   const Divider(thickness: 1.0),
 

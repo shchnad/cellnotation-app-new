@@ -339,8 +339,8 @@ class CompositionController extends ChangeNotifier {
   /// an ordinary beat this column actually is (so its beat line and
   /// "fz" label are drawn in the right place — see grid_widget.dart)
   /// and lets [deleteFermata] revert it back to a normal-width beat
-  /// exactly. Session-scoped only, like [importedBatchLabels] — not
-  /// persisted with the composition itself.
+  /// exactly. Session-scoped only — not persisted with the
+  /// composition itself.
   final Map<String, int> fermataMultipliers = {};
 
   String _fermataKey(int measureIndex, int beatIndex) =>
@@ -1425,54 +1425,16 @@ class CompositionController extends ChangeNotifier {
   /// — every skip is collected into the returned warning list instead,
   /// so the caller can report exactly what didn't make it in and why.
 
-  /// Labels of every ImportBatch (see import_batches.dart) already
-  /// imported into THIS composition — checked by [importBatch] to
-  /// avoid silently re-importing the same batch twice (which would
-  /// otherwise just produce a wall of "overlaps an existing note"
-  /// warnings from importTranscribedMeasures instead of a clean "already
-  /// done"). Not persisted with the composition itself — this only
-  /// tracks what's happened in the current session.
-  final Set<String> importedBatchLabels = {};
-
-  /// Imports [batch] via [importTranscribedMeasures], but only if its
-  /// label hasn't already been imported into this composition — see
-  /// [importedBatchLabels]. Returns a single batch-level ImportWarning
-  /// (measureIndex/beat both null) instead of importing again if it
-  /// has.
+  /// Imports [batch] via [importTranscribedMeasures] — a thin
+  /// pass-through that exists so callers can hand over an
+  /// [ImportBatch] (label + measures) directly, e.g.
+  /// sheet_music_transcription_dialog.dart's own paste-and-import
+  /// flow. The label itself carries no special meaning here anymore
+  /// — the old named-batch registry (import_batches.dart) and its
+  /// one-time-import-per-label dedupe tracking have been removed, per
+  /// request, along with the fixed-batch picker UI that used them.
   List<ImportWarning> importBatch(ImportBatch batch) {
-    if (importedBatchLabels.contains(batch.label)) {
-      return [
-        ImportWarning(
-          message: '"${batch.label}" was already imported into this '
-              'composition — skipped to avoid duplicating notes.',
-        ),
-      ];
-    }
-    final warnings = importTranscribedMeasures(batch.measures);
-    // Only mark as done if it actually fully succeeded — a batch
-    // that hit warnings (e.g. because the composition didn't have
-    // enough measures yet) is NOT locked out from being retried once
-    // the underlying problem is fixed (e.g. after adding the missing
-    // measures). Without this check, a batch that failed almost
-    // entirely on its first attempt would get marked "done" anyway
-    // and become permanently unimportable through the UI.
-    if (warnings.isEmpty) {
-      importedBatchLabels.add(batch.label);
-    }
-    return warnings;
-  }
-
-  /// Manually clears [label] from [importedBatchLabels], letting a
-  /// batch be re-imported even if it previously succeeded — an
-  /// explicit escape hatch for cases importBatch's own automatic
-  /// "only mark done on full success" logic doesn't cover (e.g.
-  /// deliberately wanting to try again after undoing/deleting some of
-  /// what a successful import created). Does NOT undo or remove any
-  /// notes that import already created — only resets the tracking
-  /// flag itself.
-  void resetImportedBatch(String label) {
-    importedBatchLabels.remove(label);
-    notifyListeners();
+    return importTranscribedMeasures(batch.measures);
   }
 
   /// The inverse of [importTranscribedMeasures] — reads the ACTUAL
