@@ -587,3 +587,157 @@ TranscriptionParseResult parseCellnotationTranscription(
     measuresNeeded: measuresNeeded,
   );
 }
+
+// =====================================================================
+// EXPORT — the inverse of everything above: converting ImportMeasures
+// (see CompositionController.exportMeasureRange) back into this same
+// notation text, so a range can be exported, edited by hand, and
+// pasted straight back into sheetMusicTranscriptionDialog for a clean
+// round trip.
+// =====================================================================
+
+/// The exact inverse of [_rowForPosition] — converts a row back into
+/// its line-position string ("6", "-5/-4", ...). See this file's own
+/// top-level doc comment for the row <-> line-position relationship
+/// this mirrors. Public (not `_positionForRow`) so
+/// transcription_column_widget.dart can reuse the exact same
+/// conversion, rather than duplicating it.
+String positionForRow(int row) {
+  final offset = row - 28;
+  if (offset % 2 == 0) {
+    return (offset ~/ 2).toString();
+  }
+  // Dart's `%` can return a negative remainder for a negative
+  // dividend (e.g. -1 % 2 == -1, not 1) — floor-dividing instead of
+  // truncating keeps the "between lines" case correct for rows below
+  // line 0 too.
+  final lower = ((offset - 1) / 2).floor();
+  return '$lower/${lower + 1}';
+}
+
+/// The exact inverse of [_parseDurationParts] — converts a list of
+/// [NoteDuration] parts back into its "d<n>" code(s), concatenated
+/// for a dotted/tied note (e.g. [half, quarter] -> "d2d4").
+String _durationCodeFor(List<NoteDuration> parts) {
+  return parts.map((d) {
+    final denominator = NoteDuration.whole.ticks ~/ d.ticks;
+    return 'd$denominator';
+  }).join();
+}
+
+/// The exact inverse of [_accidentalBySign] — [Accidental.sign]
+/// already matches this notation's own signs exactly, so this is
+/// just a direct passthrough kept here for symmetry with the parsing
+/// side.
+String _accidentalCodeFor(Accidental? accidental) => accidental?.sign ?? '';
+
+/// One pitch's position+accidental (no duration — see
+/// [ImportEvent]/[ImportNoteSpec]'s own doc for why a chord's shared
+/// duration is written once, separately, rather than per note).
+String _pitchCodeFor(ImportNoteSpec pitch) =>
+    '${positionForRow(pitch.row)}${_accidentalCodeFor(pitch.accidental)}';
+
+/// One event's full token — a rest ("rd4"), a single note
+/// ("6+d4"), or a chord ("(-5/-4, -1, 0)d4") — exactly matching
+/// whichever of the three forms [parseCellnotationTranscription]
+/// itself would read back into the same [ImportEvent].
+String _eventTokenFor(ImportEvent event) {
+  final durationCode = _durationCodeFor(event.durationParts);
+  if (event.pitches.isEmpty) {
+    return 'r$durationCode';
+  }
+  if (event.pitches.length == 1) {
+    return '${_pitchCodeFor(event.pitches.first)}$durationCode';
+  }
+  final inner = event.pitches.map(_pitchCodeFor).join(', ');
+  return '($inner)$durationCode';
+}
+
+/// The beat marker for [beat] — "b3", "b1.25", "b1.5", "b1.75" — the
+/// exact inverse of [_beatValueFromMatch]. A [beat] that doesn't land
+/// on a whole quarter-beat at all (shouldn't normally happen, since
+/// nothing on the import side can produce one) rounds to the nearest
+/// quarter-beat rather than emitting a fraction this notation can't
+/// actually represent.
+String _beatMarkerFor(double beat) {
+  final whole = beat.floor();
+  final fraction = beat - whole;
+  final quarterSteps = (fraction * 4).round() % 4;
+  final suffix = switch (quarterSteps) {
+    1 => '.25',
+    2 => '.5',
+    3 => '.75',
+    _ => '',
+  };
+  return 'b$whole$suffix';
+}
+
+/// Converts [measures] (see CompositionController.exportMeasureRange)
+/// back into the line-position notation text
+/// [parseCellnotationTranscription] reads — a clean round trip: export
+/// a range, edit it by hand if needed, and paste it straight back into
+/// sheetMusicTranscriptionDialog.
+///
+/// [scaleName]/[timeSignatureBeats]/[timeSignatureDenominator], when
+/// all three are provided, are written as the leading "<scale>" and
+/// "t<beats>/<denominator>" lines — omitted entirely if any is null,
+/// since a range spanning measures with different scales/time
+/// signatures has no single correct header line to write (the person
+/// exporting can add per-measure headers by hand if that's ever
+/// needed — this notation doesn't have a way to declare a MID-range
+/// scale/time-signature change).
+///
+/// Within each measure, events are grouped by hand (right, then
+/// left, then additional — skipping any hand with no events in this
+/// measure at all) and sorted by beat within each group, matching
+/// the order every hand-section appears in throughout this file's
+/// own examples.
+///
+/// A rest ([ImportEvent.pitches] empty) carries no hand of its own to
+/// group it by, so it's silently skipped here — this is never
+/// actually a problem in practice, since
+/// CompositionController.exportMeasureRange (the normal source of
+/// [measures]) only ever builds an event from a real Note, and a
+/// rest is simply the ABSENCE of one — it's never represented as its
+/// own [ImportEvent] on the way out, only ever on the way IN (typed
+/// by hand, to mark a silence while transcribing).
+String formatMeasuresAsCellnotationText(
+    List<ImportMeasure> measures, {
+      String? scaleName,
+      int? timeSignatureBeats,
+      int? timeSignatureDenominator,
+    }) {
+  final buffer = StringBuffer();
+
+  if (scaleName != null &&
+      timeSignatureBeats != null &&
+      timeSignatureDenominator != null) {
+    buffer.writeln(scaleName);
+    buffer.writeln('t$timeSignatureBeats/$timeSignatureDenominator');
+  }
+
+  for (final measure in measures) {
+    buffer.writeln('m${measure.measureIndex + 1}');
+
+    for (final hand in [Hand.right, Hand.left, Hand.additional]) {
+      final handEvents = measure.events
+          .where((e) => e.pitches.isNotEmpty && e.pitches.first.hand == hand)
+          .toList()
+        ..sort((a, b) => a.beat.compareTo(b.beat));
+      if (handEvents.isEmpty) continue;
+
+      final handMarker = switch (hand) {
+        Hand.right => 'hr',
+        Hand.left => 'hl',
+        Hand.additional => 'ha',
+      };
+
+      final tokens = handEvents
+          .map((e) => '${_beatMarkerFor(e.beat)} ${_eventTokenFor(e)}')
+          .join(' ');
+      buffer.writeln('$handMarker $tokens');
+    }
+  }
+
+  return buffer.toString().trimRight();
+}

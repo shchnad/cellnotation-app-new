@@ -130,6 +130,24 @@ class NoteDialog extends StatelessWidget {
     return 'm$measureNumber b$beatNumber$beatSuffix $position$accidentalSign$durationCode';
   }
 
+  /// The note's plain solfège name + octave — e.g. "Mi5", "Do4" —
+  /// shown alongside the scale-based Pitch value for a quick,
+  /// unambiguous read of which actual note this is, independent of
+  /// the composition's current scale/accidental. Degree (1-7) and
+  /// octave both come from [controller], the same way every other
+  /// field in this dialog already reads them. When the note carries
+  /// an accidental, its word label (flat/sharp/double flat/double
+  /// sharp/natural — see Accidental.label) is appended directly with
+  /// no space, per request — e.g. "Mi5flat", "Do4natural",
+  /// "Sol3sharp".
+  String _noteNameFor(Note note) {
+    const names = {1: 'Do', 2: 'Re', 3: 'Mi', 4: 'Fa', 5: 'Sol', 6: 'La', 7: 'Si'};
+    final degree = controller.getDegree(note);
+    final octave = controller.getOctave(note);
+    final accidentalWord = note.accidental?.label ?? '';
+    return '${names[degree] ?? '?'}$octave$accidentalWord';
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -171,7 +189,7 @@ class NoteDialog extends StatelessWidget {
 
         final rowWidths = <double>[
           _textWidth(
-            'Pitch: ${controller.getNotePitchName(editedNote)}${editedNote.accidental?.sign ?? ''}',
+            'Pitch: ${controller.getNotePitchName(editedNote)}${editedNote.accidental?.sign ?? ''} (${_noteNameFor(editedNote)})',
           ),
           _textWidth('Measure: ${controller.getMeasureNumber(editedNote)}') +
               _rowGap +
@@ -272,31 +290,6 @@ class NoteDialog extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            const TextSpan(
-                              text: 'Pitch: ',
-                              style: TextStyle(
-                                fontSize: 22,
-                                color: Colors.black,
-                              ),
-                            ),
-                            TextSpan(
-                              text: '${controller.getNotePitchName(editedNote)}${editedNote.accidental?.sign ?? ''}',
-                              style: const TextStyle(
-                                fontSize: 22,
-                                color: Colors.blue,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  Row(
-                    children: [
                       _infoRow(
                         'Measure:',
                         controller.getMeasureNumber(editedNote).toString(),
@@ -376,6 +369,38 @@ class NoteDialog extends StatelessWidget {
                     ],
                   ),
 
+
+                  Row(
+                    children: [
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            const TextSpan(
+                              text: 'Pitch: ',
+                              style: TextStyle(
+                                fontSize: 22,
+                                color: Colors.black,
+                              ),
+                            ),
+                            TextSpan(
+                              text: '${controller.getNotePitchName(editedNote)}${editedNote.accidental?.sign ?? ''}',
+                              style: const TextStyle(
+                                fontSize: 22,
+                                color: Colors.blue,
+                              ),
+                            ),
+                            TextSpan(
+                              text: ' (${_noteNameFor(editedNote)})',
+                              style: const TextStyle(
+                                fontSize: 22,
+                                color: Colors.blue,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
 
                   Row(
                     children: [

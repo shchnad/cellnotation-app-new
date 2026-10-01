@@ -11,6 +11,7 @@ import '../controllers/composition_controller.dart';
 import '../models/note_import.dart';
 
 import '../dialogs/measure_range_dialog.dart';
+import '../dialogs/go_to_measure_dialog.dart';
 import '../dialogs/cell_width_dialog.dart';
 import '../dialogs/new_composition_dialog.dart';
 import '../dialogs/global_duration_dialog.dart';
@@ -22,10 +23,14 @@ import '../dialogs/edit_composition_dialog.dart';
 import '../dialogs/scale_change_warning_dialog.dart';
 import '../dialogs/sheet_music_transcription_dialog.dart';
 import '../enums/hand.dart';
+import '../enums/note_duration.dart';
+import '../utils/cellnotation_transcription_parser.dart';
 
 import '../services/composition_service.dart';
 import '../widgets/grid_widget.dart';
+import '../widgets/letter_name_column_widget.dart';
 import '../widgets/pitch_column_widget.dart';
+import '../widgets/transcription_column_widget.dart';
 
 
 class CompositionScreen extends StatefulWidget {
@@ -49,6 +54,8 @@ class _CompositionScreenState extends State<CompositionScreen>
 
   final ScrollController _gridVerticalController = ScrollController();
   final ScrollController _pitchVerticalController = ScrollController();
+  final ScrollController _transcriptionVerticalController = ScrollController();
+  final ScrollController _letterNameVerticalController = ScrollController();
 
   final ScrollController _gridHorizontalController = ScrollController();
 
@@ -57,6 +64,11 @@ class _CompositionScreenState extends State<CompositionScreen>
   double _playbackTick = 0;
   bool _isPlaying = false;
   bool _toShowTitle = false;
+  // Independent from _toShowTitle now, per request — previously the
+  // letter-name and transcription columns appeared/disappeared
+  // together with the title; a separate toggle (its own toolbar
+  // icon, right under "Show Title") now controls them instead.
+  bool _toShowReferenceColumns = false;
 
   // Anchors for the Hand/Note-Duration help labels — see
   // _toolbarLabel's doc. CompositedTransformTarget (wrapping each
@@ -334,6 +346,26 @@ class _CompositionScreenState extends State<CompositionScreen>
     if (mounted) setState(() {});
   }
 
+  /// Scrolls the grid to the start of [measureIndex] (0-based) — used
+  /// by the "Go to Measure" button, right under Scroll to Start.
+  /// Animated (matching _scrollToStart's own feel) rather than an
+  /// instant jump, and re-checks _isAtBeginning afterward the same
+  /// way _scrollToStart does, since scrollTo doesn't otherwise
+  /// trigger the Play/Pause icon's color to refresh on its own.
+  Future<void> _scrollToMeasure(int measureIndex) async {
+    if (!_gridHorizontalController.hasClients) return;
+    if (measureIndex < 0 || measureIndex >= controller.measures.length) return;
+    final tick = controller.measures[measureIndex].startTick;
+    final offset = _effectiveLeadingPadding + tick * controller.pixelsPerTick;
+    final maxScroll = _gridHorizontalController.position.maxScrollExtent;
+    await _gridHorizontalController.animateTo(
+      offset.clamp(0.0, maxScroll),
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
+    if (mounted) setState(() {});
+  }
+
 
   /// Wraps a button's normal [action] so that, while help mode is on,
   /// tapping the button shows [helpText] in a dialog instead of
@@ -447,6 +479,12 @@ class _CompositionScreenState extends State<CompositionScreen>
     if (_pitchVerticalController.hasClients) {
       _pitchVerticalController.jumpTo(_gridVerticalController.offset);
     }
+    if (_transcriptionVerticalController.hasClients) {
+      _transcriptionVerticalController.jumpTo(_gridVerticalController.offset);
+    }
+    if (_letterNameVerticalController.hasClients) {
+      _letterNameVerticalController.jumpTo(_gridVerticalController.offset);
+    }
   }
 
   @override
@@ -454,6 +492,8 @@ class _CompositionScreenState extends State<CompositionScreen>
     _gridVerticalController.removeListener(_syncPitchColumn);
     _gridVerticalController.dispose();
     _pitchVerticalController.dispose();
+    _transcriptionVerticalController.dispose();
+    _letterNameVerticalController.dispose();
     _gridHorizontalController.dispose();
     _playbackTicker?.dispose();
     _activeNoteRows.dispose();
@@ -757,7 +797,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                             icon: Transform.rotate(
                               angle: controller.rotatePitchText ? -pi / 2 : 0,
                               child: Icon(
-                                Icons.info_outline,
+                                Icons.face_6_rounded,
                                 color: _toShowTitle
                                     ? Colors.blue
                                     : Colors.black,
@@ -857,15 +897,21 @@ class _CompositionScreenState extends State<CompositionScreen>
                                 'Scale up: \nRaises composition up a semitone.',
                                     () {
                                   controller.raiseAllScales();
-                                  // Raising the scale forces Lock Mode
-                                  // on, per request — it stays locked
-                                  // until Reset Scale brings the
-                                  // composition back to its original
-                                  // scale (see the Reset Scale button
-                                  // and the Lock Mode button's own
-                                  // guard against turning off early).
+                                  // Raising the scale forces BOTH Lock
+                                  // Mode and Easy Read Mode on now, per
+                                  // request — while the scale is
+                                  // raised/lowered, editing must not be
+                                  // possible at all, and the notation
+                                  // must be shown compensated. Both
+                                  // stay forced on until Reset Scale
+                                  // brings the composition back to its
+                                  // original scale (see the Reset
+                                  // Scale button, which releases both).
                                   if (!controller.inputLocked) {
                                     controller.toggleInputLocked();
+                                  }
+                                  if (!controller.showCompensatedNotation) {
+                                    controller.toggleCompensatedNotation();
                                   }
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
@@ -903,14 +949,18 @@ class _CompositionScreenState extends State<CompositionScreen>
                                           !controller.isScaleLowered;
                                   controller.resetAllScales();
                                   // Resetting the scale back to
-                                  // original is the ONLY way to
-                                  // release the Lock Mode that raising
-                                  // or lowering the scale forces on —
-                                  // see the RAISE/LOWER SCALE buttons
-                                  // and the Lock Mode button's own
-                                  // guard.
+                                  // original releases BOTH Lock Mode
+                                  // and Easy Read Mode now, per request
+                                  // — once the scale is back to
+                                  // original, there's no longer any
+                                  // reason to force either on (see the
+                                  // RAISE/LOWER SCALE buttons, which
+                                  // force both on).
                                   if (controller.inputLocked) {
                                     controller.toggleInputLocked();
+                                  }
+                                  if (controller.showCompensatedNotation) {
+                                    controller.toggleCompensatedNotation();
                                   }
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
@@ -942,14 +992,18 @@ class _CompositionScreenState extends State<CompositionScreen>
                                 'Scale Down: \nLow composition down a semitone.',
                                     () {
                                   controller.lowerAllScales();
-                                  // Lowering the scale forces Lock
-                                  // Mode on, per request — same as
-                                  // raising it (see RAISE SCALE above)
-                                  // — it stays locked until Reset
-                                  // Scale brings the composition back
-                                  // to its original scale.
+                                  // Lowering the scale forces BOTH Lock
+                                  // Mode and Easy Read Mode on, per
+                                  // request — same as raising it (see
+                                  // RAISE SCALE above) — both stay
+                                  // forced on until Reset Scale brings
+                                  // the composition back to its
+                                  // original scale.
                                   if (!controller.inputLocked) {
                                     controller.toggleInputLocked();
+                                  }
+                                  if (!controller.showCompensatedNotation) {
+                                    controller.toggleCompensatedNotation();
                                   }
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
@@ -966,6 +1020,178 @@ class _CompositionScreenState extends State<CompositionScreen>
 
                           SizedBox(
                             height: 30,
+                          ),
+
+                          // SCROLL LOCK
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: Icon(
+                                controller.inputLocked
+                                    ? Icons.lock
+                                    : Icons.lock_open,
+                                color: controller.inputLocked
+                                    ? Colors.red
+                                    : Colors.black,
+                              ),
+                            ),
+                            tooltip: controller.inputLocked
+                                ? 'Lock Mode on'
+                                : 'Lock Mode off',
+                            onPressed: _withHelp(
+                                'Lock Mode: \nPrevents from editing.',
+                                    () {
+                                  if (!controller.inputLocked) {
+                                    // Locking never breaks anything —
+                                    // no guard needed for this
+                                    // direction.
+                                    controller.toggleInputLocked();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        duration: Duration(seconds: 1),
+                                        content: Text(
+                                          'Lock Mode on.',
+                                          style: TextStyle(fontSize: 22),
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  // Trying to UNLOCK from here on.
+                                  // Blocked during playback, per
+                                  // request — Lock Mode is what makes
+                                  // grid taps pause/resume playback
+                                  // instead of editing (see
+                                  // isPlaying: controller.inputLocked
+                                  // passed to GridWidget below), so
+                                  // unlocking mid-playback would break
+                                  // that.
+                                  if (_isPlaying) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        duration: Duration(seconds: 2),
+                                        content: Text(
+                                          'Pause playback first.',
+                                          style: TextStyle(fontSize: 22),
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  // Same guard for a raised/lowered
+                                  // scale, per request — the ONLY way
+                                  // to release the lock in this case is
+                                  // Reset Scale (see that button's own
+                                  // handler above).
+                                  if (controller.isScaleRaised ||
+                                      controller.isScaleLowered) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        duration: Duration(seconds: 3),
+                                        content: Text(
+                                          'To disable Lock Mode reset the scale of the composition to original.',
+                                          style: TextStyle(fontSize: 22),
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  // Unlocking also turns Easy Read Mode
+                                  // off at the same time, per request
+                                  // — tapping Unlock is now the ONLY
+                                  // way out of Easy Read Mode, rather
+                                  // than requiring Easy Read to be
+                                  // turned off first as a separate
+                                  // step.
+                                  controller.toggleInputLocked();
+                                  if (controller.showCompensatedNotation) {
+                                    controller.toggleCompensatedNotation();
+                                  }
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      duration: Duration(seconds: 1),
+                                      content: Text(
+                                        'Lock Mode off.',
+                                        style: TextStyle(fontSize: 22),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                          ),
+
+                          // EASY READ MODE
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: Icon(Icons.auto_fix_high,
+                                color: controller.showCompensatedNotation
+                                    ? Colors.red
+                                    : Colors.black,
+                              ),
+                            ),
+                            tooltip: controller.showCompensatedNotation
+                                ? 'Easy Read Mode on'
+                                : 'Easy Read Mode off',
+                            onPressed: _withHelp(
+                                'Easy Read Mode: \nShows a simplified notation.',
+                                    () {
+                                  // Easy Read Mode can't be changed
+                                  // during playback, per request — it's
+                                  // already forced on by _startPlayback
+                                  // and must stay that way until the
+                                  // piece is paused.
+                                  if (_isPlaying) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        duration: Duration(seconds: 2),
+                                        content: Text(
+                                          'Pause playback first.',
+                                          style: TextStyle(fontSize: 22),
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  // Same guard while the scale is
+                                  // raised/lowered, per request — it's
+                                  // already forced on by the RAISE/
+                                  // LOWER SCALE buttons, and the ONLY
+                                  // way to release it in this case is
+                                  // Reset Scale.
+                                  if (controller.isScaleRaised ||
+                                      controller.isScaleLowered) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        duration: Duration(seconds: 3),
+                                        content: Text(
+                                          'To disable Easy Read Mode reset the scale of the composition to original.',
+                                          style: TextStyle(fontSize: 22),
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  controller.toggleCompensatedNotation();
+                                  // Keep Scroll Lock in sync with Easy Read
+                                  // Mode, per request — turning Easy Read on
+                                  // turns Scroll Lock on too, and turning Easy
+                                  // Read off turns Scroll Lock off too.
+                                  if (controller.showCompensatedNotation !=
+                                      controller.inputLocked) {
+                                    controller.toggleInputLocked();
+                                  }
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      duration: const Duration(seconds: 1),
+                                      content: Text(
+                                        controller.showCompensatedNotation
+                                            ? 'Easy Read Mode on.'
+                                            : 'Easy Read Mode off.',
+                                        style: const TextStyle(fontSize: 22),
+                                      ),
+                                    ),
+                                  );
+                                }),
                           ),
 
                           // ROTATE
@@ -995,117 +1221,27 @@ class _CompositionScreenState extends State<CompositionScreen>
                                 }),
                           ),
 
-                          // MAGIC MODE
-                          IconButton(
-                            icon: Transform.rotate(
-                              angle: controller.rotatePitchText ? -pi / 2 : 0,
-                              child: Icon(Icons.auto_fix_high,
-                                color: controller.showCompensatedNotation
-                                    ? Colors.red
-                                    : Colors.black,
-                              ),
-                            ),
-                            tooltip: controller.showCompensatedNotation
-                                ? 'Easy Read Mode on'
-                                : 'Easy Read Mode off',
-                            onPressed: _withHelp(
-                                'Easy Read Mode: \nShows a simplified notation.',
-                                    () {
-                                  controller.toggleCompensatedNotation();
-                                  // Keep Scroll Lock in sync with Easy Read
-                                  // Mode, per request — turning Easy Read on
-                                  // turns Scroll Lock on too, and turning Easy
-                                  // Read off turns Scroll Lock off too.
-                                  if (controller.showCompensatedNotation !=
-                                      controller.inputLocked) {
-                                    controller.toggleInputLocked();
-                                  }
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      duration: const Duration(seconds: 1),
-                                      content: Text(
-                                        controller.showCompensatedNotation
-                                            ? 'Easy Read Mode on.'
-                                            : 'Easy Read Mode off.',
-                                        style: const TextStyle(fontSize: 22),
-                                      ),
-                                    ),
-                                  );
-                                }),
-                          ),
-
-                          // SCROLL LOCK
+                          // SHOW REFERENCE COLUMNS
                           IconButton(
                             icon: Transform.rotate(
                               angle: controller.rotatePitchText ? -pi / 2 : 0,
                               child: Icon(
-                                controller.inputLocked
-                                    ? Icons.lock
-                                    : Icons.lock_open,
-                                color: controller.inputLocked
-                                    ? Colors.red
+                                Icons.assist_walker_sharp ,
+                                color: _toShowReferenceColumns
+                                    ? Colors.blue
                                     : Colors.black,
                               ),
                             ),
-                            tooltip: controller.inputLocked
-                                ? 'Lock Mode on'
-                                : 'Lock Mode off',
+                            tooltip: _toShowReferenceColumns
+                                ? 'Reference Columns shown'
+                                : 'Reference Columns hidden',
                             onPressed: _withHelp(
-                                'Lock Mode: \nPrevents from editing.',
+                                'Reference Columns: \nShows or hides the letter name and line-position transcription columns.',
                                     () {
-                                  // Lock Mode can't be turned OFF while
-                                  // Easy Read Mode is on, per request —
-                                  // Easy Read Mode requires Lock Mode
-                                  // to stay on (see the Easy Read
-                                  // button's own toggle, which turns
-                                  // Lock Mode on together with it).
-                                  // Only the OFF direction is blocked;
-                                  // turning Lock Mode ON while Easy
-                                  // Read is off still works normally.
-                                  if (controller.inputLocked &&
-                                      controller.showCompensatedNotation) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        duration: Duration(seconds: 1),
-                                        content: Text(
-                                          'Turn off Easy Read Mode first.',
-                                          style: TextStyle(fontSize: 22),
-                                        ),
-                                      ),
-                                    );
-                                    return;
-                                  }
-                                  // Same guard for a raised/lowered
-                                  // scale, per request — the ONLY way
-                                  // to release the lock in this case is
-                                  // Reset Scale (see that button's own
-                                  // handler above).
-                                  if (controller.inputLocked &&
-                                      (controller.isScaleRaised ||
-                                          controller.isScaleLowered)) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        duration: Duration(seconds: 3),
-                                        content: Text(
-                                          'To disable Lock Mode reset the scale of the composition to original.',
-                                          style: TextStyle(fontSize: 22),
-                                        ),
-                                      ),
-                                    );
-                                    return;
-                                  }
-                                  controller.toggleInputLocked();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      duration: const Duration(seconds: 1),
-                                      content: Text(
-                                        controller.inputLocked
-                                            ? 'Lock Mode on.'
-                                            : 'Lock Mode off.',
-                                        style: const TextStyle(fontSize: 22),
-                                      ),
-                                    ),
-                                  );
+                                  setState(() {
+                                    _toShowReferenceColumns =
+                                    !_toShowReferenceColumns;
+                                  });
                                 }),
                           ),
 
@@ -1524,6 +1660,32 @@ class _CompositionScreenState extends State<CompositionScreen>
                             ),
                           ),
 
+                          // GO TO MEASURE
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: const Icon(
+                                Icons.numbers,
+                                color: Colors.black,
+                              ),
+                            ),
+                            tooltip: 'Go to Measure',
+                            onPressed: _withHelp(
+                              'Go to Measure: \nOpens a dialog to enter a measure number, then jumps the grid to it.',
+                              hasMeasures
+                                  ? () {
+                                goToMeasureDialog(
+                                  context: context,
+                                  controller: controller,
+                                  onConfirm: (measureIndex) {
+                                    _scrollToMeasure(measureIndex);
+                                  },
+                                );
+                              }
+                                  : null,
+                            ),
+                          ),
+
                           // SOUND
                           IconButton(
                             icon: Transform.rotate(
@@ -1595,16 +1757,36 @@ class _CompositionScreenState extends State<CompositionScreen>
                                     controller: controller,
                                     title: 'Export Measures',
                                     actionLabel: 'Export',
-                                    actionColor: Colors.black,
+                                    actionColor: Colors.blue,
                                     onConfirm: (from, to) {
-                                      final exported =
-                                      controller.exportMeasureRange(from, to);
-                                      final dynamicsText = controller
-                                          .exportDynamicsAndHairpinsText(from, to);
-                                      final text =
-                                          formatImportMeasuresAsText(exported) +
-                                              '\nDynamics / Dynamic Changes\n' +
-                                              dynamicsText;
+                                      final exported = controller.exportMeasureRange(from, to);
+                                      // Round-trippable notation text —
+                                      // the SAME line-position format
+                                      // sheetMusicTranscriptionDialog
+                                      // reads — the only thing shown
+                                      // here now, per request (the
+                                      // separate readable-summary
+                                      // section was removed), so this
+                                      // whole export can be copied
+                                      // straight back into that
+                                      // dialog. The scale/time-
+                                      // signature header line is
+                                      // taken from the FIRST measure in
+                                      // the range (this notation has no
+                                      // way to declare a mid-range
+                                      // change, matching the parser's
+                                      // own limitation).
+                                      final firstMeasure = controller.measures[from];
+                                      final denominator = NoteDuration.whole.ticks ~/
+                                          firstMeasure.timeSignature.beatDuration.ticks;
+                                      final transcriptionText =
+                                      formatMeasuresAsCellnotationText(
+                                        exported,
+                                        scaleName: firstMeasure.scaleName,
+                                        timeSignatureBeats:
+                                        firstMeasure.timeSignature.beats,
+                                        timeSignatureDenominator: denominator,
+                                      );
                                       Future.delayed(Duration.zero, () {
                                         showDialog(
                                           context: context,
@@ -1623,13 +1805,41 @@ class _CompositionScreenState extends State<CompositionScreen>
                                               height: 400,
                                               child: SingleChildScrollView(
                                                 child: SelectableText(
-                                                  text,
+                                                  transcriptionText,
                                                   style: const TextStyle(
-                                                      fontSize: 18),
+                                                    fontSize: 18,
+                                                    fontFamily: 'monospace',
+                                                  ),
                                                 ),
                                               ),
                                             ),
                                             actions: [
+                                              TextButton(
+                                                onPressed: () async {
+                                                  await Clipboard.setData(
+                                                    ClipboardData(text: transcriptionText),
+                                                  );
+                                                  if (!resultContext.mounted) return;
+                                                  ScaffoldMessenger.of(resultContext)
+                                                      .showSnackBar(
+                                                    const SnackBar(
+                                                      duration: Duration(seconds: 2),
+                                                      content: Text(
+                                                        'transcription is copied to clipboard',
+                                                        style: TextStyle(fontSize: 22),
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
+                                                child: const Text(
+                                                  'Copy',
+                                                  style: TextStyle(
+                                                    fontSize: 22,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.blue,
+                                                  ),
+                                                ),
+                                              ),
                                               TextButton(
                                                 onPressed: () =>
                                                     Navigator.pop(resultContext),
@@ -1690,7 +1900,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                   _toShowTitle
                       ? Container(
                     width: 46,
-                    color: Colors.black,
+                    color: Colors.white,
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () => _showEditDialog(context),
@@ -1701,7 +1911,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                             '${controller.composition.composer} - ${controller.composition.title}',
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: Colors.black,
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                             ),
@@ -1711,6 +1921,31 @@ class _CompositionScreenState extends State<CompositionScreen>
                     ),
                   )
                       : SizedBox(),
+
+                  // Controlled by their own separate toggle now, per
+                  // request — no longer tied to _toShowTitle. Both
+                  // reference columns (letter name and line-position
+                  // transcription) sit right after the title info
+                  // block and before the existing pitch column,
+                  // appearing/disappearing with
+                  // _toShowReferenceColumns instead.
+                  if (_toShowReferenceColumns)
+                    SafeArea(
+                      child: LetterNameColumnWidget(
+                        controller: controller,
+                        cellHeight: cellHeight,
+                        scrollController: _letterNameVerticalController,
+                      ),
+                    ),
+
+                  if (_toShowReferenceColumns)
+                    SafeArea(
+                      child: TranscriptionColumnWidget(
+                        controller: controller,
+                        cellHeight: cellHeight,
+                        scrollController: _transcriptionVerticalController,
+                      ),
+                    ),
 
                   SafeArea(
                     child: PitchColumnWidget(

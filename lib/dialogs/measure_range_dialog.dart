@@ -43,7 +43,7 @@ void measureRangeDialog({
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'composition has in total $totalMeasures '
+              'Composition has in total $totalMeasures '
                   'measure${totalMeasures == 1 ? '' : 's'}.',
               style: const TextStyle(
                 fontSize: 22,
@@ -52,44 +52,77 @@ void measureRangeDialog({
             ),
             const SizedBox(height: 16),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: TextField(
-                    controller: fromController,
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      color: Colors.blue,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    decoration: const InputDecoration(
-                      labelText: 'From Measure',
-                      labelStyle: TextStyle(
-                        fontSize: 22,
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // A plain Text label above a BARE TextField
+                      // (no labelText at all), per request — a
+                      // Material labelText's rendered size doesn't
+                      // reliably stay at labelStyle's own fontSize
+                      // once it's floating (which these fields start
+                      // in immediately, since fromController/
+                      // toController are pre-filled with text, not
+                      // empty) — floatingLabelStyle alone didn't fix
+                      // it, so the floating-label mechanism itself is
+                      // sidestepped entirely here instead.
+                      const Text(
+                        'From Measure',
+                        style: TextStyle(
+                          fontSize: 22,
+                          color: Colors.black,
+                          // fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 4),
+                      TextField(
+                        controller: fromController,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          color: Colors.blue,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: TextField(
-                    controller: toController,
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(
-                        fontSize: 22,
-                        color: Colors.blue,
-                        fontWeight: FontWeight.bold,
-                    ),
-                    decoration: const InputDecoration(
-                      labelText: 'To Measure',
-                      labelStyle: TextStyle(
-                        fontSize: 22,
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'To Measure',
+                        style: TextStyle(
+                          fontSize: 22,
+                          color: Colors.black,
+                          // fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 4),
+                      TextField(
+                        controller: toController,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          color: Colors.blue,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

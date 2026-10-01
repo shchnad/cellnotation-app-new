@@ -1155,7 +1155,7 @@ class GridWidget extends StatelessWidget {
                                 // below it).
                                 bottom: gridHeight - hit.rect.top + 2,
                                 child: speechBubble(
-                                  'to edit tempo or\ntime signature\n tap its label',
+                                  'To edit tempo or\ntime signature,\ntap its label.',
                                   pointerSide: BubblePointerSide.bottom,
                                 ),
                               ),
@@ -1171,7 +1171,7 @@ class GridWidget extends StatelessWidget {
                                 left: hit.rect.left,
                                 top: hit.rect.bottom + 2,
                                 child: speechBubble(
-                                  'to edit scale\ntap its label',
+                                  'To edit the scale,\ntap its label.',
                                   pointerSide: BubblePointerSide.top,
                                 ),
                               ),
@@ -1202,16 +1202,16 @@ class GridWidget extends StatelessWidget {
                     child: Align(
                       alignment: const Alignment(0.8, -0.2),
                       child: _helpCallout(
-                        "To set a hand for notes tap icon 'Hand Set'.\n\n"
-                            "To set a duration of notes tap icon 'Note Duration'.\n\n"
-                            "To input a note quick-single-tap grid on a correct row (pitch) and beat (column).\n\n"
-                            "To edit a note quick-single-tap it.\n\n"
-                            "To change position of a note drug it.\n\n"
-                            "To copy a note long-single tap it, then paste its copy on the grid while 'Paste Mode' icon is highlighted.\n\n"
-                            "To add grace notes to a note quick-single-tap it, choose type of grace note, then while 'Grace Notes' icon is highlighted quick-single-tap grid on correct rows (pitches) and beats (columns).\n\n"
-                            "To edit beat or measure double-tap it.\n\n"
-                            "To input or edit dynamic or pedal double-tap grid on a correct column (beat).\n\n"
-                            "To change scale, tempo, time signature tap its label.",
+                        "To set the hand for new notes, tap the 'Hand Set' icon.\n\n"
+                            "To set the duration for new notes, tap the 'Note Duration' icon.\n\n"
+                            "To add a note, tap the grid once on the correct row (pitch) and beat (column).\n\n"
+                            "To edit a note, tap it once.\n\n"
+                            "To move a note, drag it.\n\n"
+                            "To copy a note, press and hold it, then tap the grid to paste the copy while the 'Paste Mode' icon is highlighted.\n\n"
+                            "To add grace notes to a note, tap it once, choose the grace note type, then, while the 'Grace Notes' icon is highlighted, tap the grid once on the correct rows (pitches) and beats (columns).\n\n"
+                            "To edit a beat or measure, double-tap it.\n\n"
+                            "To add or edit a dynamic marking or pedal, double-tap the grid on the correct column (beat).\n\n"
+                            "To change the scale, tempo, or time signature, tap its label.",
                         maxWidth: 400,
                       ),
                     ),
@@ -1231,7 +1231,7 @@ class GridWidget extends StatelessWidget {
                     child: Align(
                       alignment: const Alignment(-1.1, -0.60),
                       child: speechBubble(
-                        'tap icons to know\n what they do',
+                        'Tap an icon to\nsee what it does.',
                         pointerSide: BubblePointerSide.left,
                       ),
                     ),

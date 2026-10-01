@@ -101,6 +101,7 @@ void sheetMusicTranscriptionDialog({
           return AlertDialog(
             backgroundColor: Colors.white,
             surfaceTintColor: Colors.white,
+            actionsAlignment: MainAxisAlignment.center,
             title: const Text(
               'Import Sheet Music Transcription',
               style: TextStyle(
@@ -295,6 +296,7 @@ void _showTranscriptionHelp(BuildContext context) {
     builder: (helpContext) => AlertDialog(
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.white,
+      actionsAlignment: MainAxisAlignment.center,
       title: const Text(
         'How to Transcribe',
         style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
@@ -365,12 +367,60 @@ void _showTranscriptionHelp(BuildContext context) {
                       'A note is transcribed:\n'
                       '- by a single line number, if the note sits on a line;\n'
                       '- by two line numbers joined by "/", if the note sits between two lines.\n\n'
-                      'Example:\n'
-                      '"0" represents the note on line 0 ("Do" in octave 4).\n'
-                      '"3/4" or "4/3" represents the note between lines 3 and 4 ("Do" in octave 5).\n'
-                      '"7" represents the note on line 7 ("Do" in octave 6).\n'
-                      '"-3/-4" or "-4/-3" represents the note between lines -3 and -4 ("Do" in octave 3).\n'
-                      '"-7" represents the note on line -7 ("Do" in octave 2).\n'
+                      'Full correspondence, line position to note name:\n'
+                      '"-12" transcripts Sol0.\n'
+                      '"-12/-11" transcripts La0.\n'
+                      '"-11" transcripts Si0.\n'
+                      '"-11/-10" transcripts Do1.\n'
+                      '"-10" transcripts Re1.\n'
+                      '"-10/-9" transcripts Mi1.\n'
+                      '"-9" transcripts Fa1.\n'
+                      '"-9/-8" transcripts Sol1.\n'
+                      '"-8" transcripts La1.\n'
+                      '"-8/-7" transcripts Si1.\n'
+                      '"-7" transcripts Do2.\n'
+                      '"-7/-6" transcripts Re2.\n'
+                      '"-6" transcripts Mi2.\n'
+                      '"-6/-5" transcripts Fa2.\n'
+                      '"-5" transcripts Sol2.\n'
+                      '"-5/-4" transcripts La2.\n'
+                      '"-4" transcripts Si2.\n'
+                      '"-4/-3" transcripts Do3.\n'
+                      '"-3" transcripts Re3.\n'
+                      '"-3/-2" transcripts Mi3.\n'
+                      '"-2" transcripts Fa3.\n'
+                      '"-2/-1" transcripts Sol3.\n'
+                      '"-1" transcripts La3.\n'
+                      '"-1/0" transcripts Si3.\n'
+                      '"0" transcripts Do4.\n'
+                      '"0/1" transcripts Re4.\n'
+                      '"1" transcripts Mi4.\n'
+                      '"1/2" transcripts Fa4.\n'
+                      '"2" transcripts Sol4.\n'
+                      '"2/3" transcripts La4.\n'
+                      '"3" transcripts Si4.\n'
+                      '"3/4" transcripts Do5.\n'
+                      '"4" transcripts Re5.\n'
+                      '"4/5" transcripts Mi5.\n'
+                      '"5" transcripts Fa5.\n'
+                      '"5/6" transcripts Sol5.\n'
+                      '"6" transcripts La5.\n'
+                      '"6/7" transcripts Si5.\n'
+                      '"7" transcripts Do6.\n'
+                      '"7/8" transcripts Re6.\n'
+                      '"8" transcripts Mi6.\n'
+                      '"8/9" transcripts Fa6.\n'
+                      '"9" transcripts Sol6.\n'
+                      '"9/10" transcripts La6.\n'
+                      '"10" transcripts Si6.\n'
+                      '"10/11" transcripts Do7.\n'
+                      '"11" transcripts Re7.\n'
+                      '"11/12" transcripts Mi7.\n'
+                      '"12" transcripts Fa7.\n'
+                      '"12/13" transcripts Sol7.\n'
+                      '"13" transcripts La7.\n'
+                      '"13/14" transcripts Si7.\n'
+                      '"14" transcripts Do8.\n'
               ),
               _HelpSection(
                   title: 'Duration',
