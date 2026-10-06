@@ -1706,9 +1706,9 @@ class CompositionController extends ChangeNotifier {
     }
     // If the removed note itself HAD grace notes (was an anchor —
     // see Note.graceOriginalDurationTicks, the anchor-only marker),
-    // they no longer have a main note to precede — a grace note
-    // without its main note doesn't make musical sense, so remove
-    // them too rather than leaving them orphaned.
+    // they no longer have a main note to precede/follow — a grace
+    // note without its main note doesn't make musical sense, so
+    // remove them too rather than leaving them orphaned.
     if (note.graceOriginalDurationTicks != null) {
       composition.notes.removeWhere(
             (n) => n.graceOfNoteId == note.id,
@@ -2266,7 +2266,11 @@ class CompositionController extends ChangeNotifier {
   /// than even a single grace note of this type). Also respects the
   /// type's own [GraceNoteType.maxCountOverride] (Appoggiatura: only
   /// 1 ever, regardless of what the duration math alone would allow)
-  /// — whichever of the two limits is stricter wins.
+  /// — whichever of the two limits is stricter wins. Direction
+  /// ([Note.graceIsAfter]) doesn't affect this at all — the
+  /// available duration to carve from is the same either way, only
+  /// WHICH end it's carved from differs (see
+  /// [_redistributeGraceNotes]).
   int maxGraceNotesForType(Note note, GraceNoteType type) {
     final originalDuration =
         note.graceOriginalDurationTicks ?? note.durationTicks;
@@ -2284,21 +2288,35 @@ class CompositionController extends ChangeNotifier {
   /// so the person can start tapping the grid. The mode stays on
   /// until [stopAddingGraceNotes] is called (the app-bar toggle).
   ///
-  /// A note can only have ONE type of grace note active at a time —
-  /// if [note] already has grace notes of a DIFFERENT type than
-  /// [type], they're deleted first (which also reverts [note] back
-  /// toward its original duration, via [_redistributeGraceNotes]'s
-  /// zero-remaining case) before the new type takes over. Calling
-  /// this again with the SAME type [note] already has just continues
-  /// adding more of it — nothing is deleted in that case.
+  /// [isAfter] chooses which side of [note] the grace notes sit on —
+  /// false (the default) places them BEFORE it, carved from the
+  /// START of its original span (its own END tick stays fixed); true
+  /// places them AFTER it instead, carved from the END of its
+  /// original span (its own START tick stays fixed). See
+  /// [Note.graceIsAfter] and [_redistributeGraceNotes] for exactly
+  /// how each direction is laid out.
+  ///
+  /// A note can only have ONE type of grace note, on ONE side, active
+  /// at a time — if [note] already has grace notes of a DIFFERENT
+  /// type than [type], OR on the OTHER side than [isAfter], they're
+  /// deleted first (which also reverts [note] back toward its
+  /// original duration, via [_redistributeGraceNotes]'s zero-
+  /// remaining case) before the new group takes over. Calling this
+  /// again with the SAME type AND SAME side [note] already has just
+  /// continues adding more of it — nothing is deleted in that case.
   ///
   /// The first time a grace note is EVER added to [note] (or
-  /// immediately after switching types, since that clears it), its
-  /// CURRENT durationTicks is captured into
+  /// immediately after switching type/side, since that clears it),
+  /// its CURRENT durationTicks is captured into
   /// [Note.graceOriginalDurationTicks] and never touched again
   /// afterward — this is the fixed reference [maxGraceNotesForType]
-  /// and [_redistributeGraceNotes] both use.
-  void startAddingGraceNotes(Note note, GraceNoteType type) {
+  /// and [_redistributeGraceNotes] both use — and [isAfter] is
+  /// stamped onto [Note.graceIsAfter] at the same time.
+  void startAddingGraceNotes(
+      Note note,
+      GraceNoteType type, {
+        bool isAfter = false,
+      }) {
     final index = notes.indexWhere((n) => n.id == note.id);
     if (index == -1) return;
 
@@ -2306,13 +2324,15 @@ class CompositionController extends ChangeNotifier {
     notes.where((n) => n.graceOfNoteId == note.id).toList();
     final existingType =
     existingGraceNotes.isNotEmpty ? existingGraceNotes.first.graceNoteType : null;
+    final existingIsAfter = notes[index].graceIsAfter;
 
-    if (existingType != null && existingType != type) {
-      // Only one type of grace note allowed per note at a time —
-      // switching types deletes whatever was there before. This also
-      // reverts the note's own start/duration back toward its
-      // original span, since there's nothing left of the old type to
-      // make room for.
+    if (existingGraceNotes.isNotEmpty &&
+        (existingType != type || existingIsAfter != isAfter)) {
+      // Only one type of grace note, on one side, is allowed per note
+      // at a time — switching EITHER one deletes whatever was there
+      // before. This also reverts the note's own start/duration back
+      // toward its original span, since there's nothing left of the
+      // old group to make room for.
       notes.removeWhere((n) => n.graceOfNoteId == note.id);
       _redistributeGraceNotes(note.id);
     }
@@ -2322,6 +2342,7 @@ class CompositionController extends ChangeNotifier {
     if (refreshed.graceOriginalDurationTicks == null) {
       notes[refreshedIndex] = refreshed.copyWith(
         graceOriginalDurationTicks: refreshed.durationTicks,
+        graceIsAfter: isAfter,
       );
     }
     _graceNoteAnchor = notes[refreshedIndex];
@@ -2401,41 +2422,59 @@ class CompositionController extends ChangeNotifier {
   /// Recomputes the anchor note's own start/duration AND every one of
   /// its grace notes', for the note with id [anchorId].
   ///
-  /// The grace region is carved out of the START of the anchor's own
-  /// ORIGINAL span (see [Note.graceOriginalDurationTicks]) rather
-  /// than the space before it: the anchor's end tick
+  /// Branches on [Note.graceIsAfter] — the anchor's grace notes are
+  /// either all BEFORE it (false, the default) or all AFTER it
+  /// (true); a single anchor is never split across both sides at
+  /// once (see [startAddingGraceNotes], which clears one side before
+  /// starting the other). The two directions are exact mirror images
+  /// of each other:
+  ///
+  /// BEFORE (false): the grace region is carved out of the START of
+  /// the anchor's own ORIGINAL span (see
+  /// [Note.graceOriginalDurationTicks]). The anchor's end tick
   /// (startTick + durationTicks) never moves, no matter how many
   /// grace notes exist — only its start tick (and thus its own
   /// duration) shifts to make room, later as grace notes are added,
   /// back toward its original position as they're removed. The
   /// anchor's original start tick is DERIVED rather than stored
   /// separately: `(current end tick) - graceOriginalDurationTicks` —
-  /// this is exactly right because the end tick is the one thing this
-  /// method itself guarantees never changes, so it's always safe to
-  /// read back from the anchor's current values, however many times
-  /// this has already run.
+  /// exactly right because the end tick is the one thing this branch
+  /// guarantees never changes.
   ///
-  /// Every grace note's duration is always exactly its own
-  /// [GraceNoteType.durationTicks] — a FIXED, absolute value that is
-  /// NEVER shrunk or scaled, unlike an earlier design. Grace notes
-  /// are placed back-to-back in the order they appear in [notes]
-  /// (i.e. the order they were tapped in), earliest-tapped placed
-  /// earliest in time. The anchor is still guaranteed at least 1 tick
-  /// of its own duration — but if the grace notes' fixed total would
-  /// leave less than that (which [maxGraceNotesForType] is meant to
-  /// prevent at add-time, but this stays robust even if it somehow
-  /// happens, e.g. the anchor's own duration changing by some other
-  /// means afterward), the anchor's start is clamped rather than any
-  /// grace note's duration being compressed — the last grace note(s)
-  /// may then end after that clamped start, overlapping the anchor,
-  /// which is accepted rather than fought.
+  /// AFTER (true): the exact mirror — the grace region is carved out
+  /// of the END of the anchor's own ORIGINAL span instead. The
+  /// anchor's START tick never moves this time; only its end tick
+  /// (and thus its own duration) shifts to make room, growing back
+  /// toward its original END as grace notes are removed. The
+  /// anchor's original end tick is similarly DERIVED:
+  /// `(current start tick) + graceOriginalDurationTicks`.
+  ///
+  /// In both directions: every grace note's duration is always
+  /// exactly its own [GraceNoteType.durationTicks] — a FIXED,
+  /// absolute value that is NEVER shrunk or scaled. Grace notes are
+  /// placed back-to-back in the order they appear in [notes] (i.e.
+  /// the order they were tapped in), earliest-tapped placed earliest
+  /// in time, filling the carved-out region starting from its own
+  /// edge nearest the anchor's remaining span (right after the
+  /// anchor's own shrunken end, in BEFORE mode that's "immediately
+  /// before the anchor's start"; in AFTER mode that's "immediately
+  /// after the anchor's shrunken end"). The anchor is still
+  /// guaranteed at least 1 tick of its own duration — but if the
+  /// grace notes' fixed total would leave less than that (which
+  /// [maxGraceNotesForType] is meant to prevent at add-time, but this
+  /// stays robust even if it somehow happens, e.g. the anchor's own
+  /// duration changing by some other means afterward), the anchor's
+  /// moving endpoint is clamped rather than any grace note's duration
+  /// being compressed — the grace notes may then end up overlapping
+  /// the anchor, which is accepted rather than fought.
   ///
   /// If NO grace notes remain (the last one was just removed), the
   /// anchor reverts exactly to its original start tick and duration,
-  /// and [Note.graceOriginalDurationTicks] is cleared — there's
-  /// nothing left for it to describe. A no-op if the anchor no longer
-  /// exists or has no [Note.graceOriginalDurationTicks] (already
-  /// fully reverted, or never had grace notes in the first place).
+  /// and both [Note.graceOriginalDurationTicks] and
+  /// [Note.graceIsAfter] are cleared/reset — there's nothing left for
+  /// them to describe. A no-op if the anchor no longer exists or has
+  /// no [Note.graceOriginalDurationTicks] (already fully reverted, or
+  /// never had grace notes in the first place).
   void _redistributeGraceNotes(int anchorId) {
     final anchorIndex = notes.indexWhere((n) => n.id == anchorId);
     if (anchorIndex == -1) return;
@@ -2449,9 +2488,59 @@ class CompositionController extends ChangeNotifier {
     }
     final count = graceIndices.length;
 
-    // Never moves, by construction of this very method — safe to
-    // treat as the fixed reference point regardless of how many times
-    // this has already run for this anchor.
+    if (anchor.graceIsAfter) {
+      // AFTER mode — mirror image of the BEFORE branch below: the
+      // anchor's own START never moves; grace notes are carved out
+      // of the END of its original span instead, placed immediately
+      // after the anchor's own (shrunken) end, filling up to the
+      // original end tick.
+      final fixedStartTick = anchor.startTick;
+      final originalEndTick = fixedStartTick + originalDuration;
+
+      if (count == 0) {
+        notes[anchorIndex] = anchor.copyWith(
+          startTick: fixedStartTick,
+          durationTicks: originalDuration,
+          graceOriginalDurationTicks: null,
+          graceIsAfter: false,
+        );
+        return;
+      }
+
+      final graceDurations = <int>[];
+      int totalGraceDuration = 0;
+      for (final idx in graceIndices) {
+        final graceType = notes[idx].graceNoteType;
+        final fixedDuration =
+            graceType?.durationTicksFor(originalDuration) ?? 1;
+        graceDurations.add(fixedDuration);
+        totalGraceDuration += fixedDuration;
+      }
+
+      final newAnchorEnd = (originalEndTick - totalGraceDuration)
+          .clamp(fixedStartTick + 1, originalEndTick);
+
+      int runningTick = newAnchorEnd;
+      for (int k = 0; k < count; k++) {
+        final idx = graceIndices[k];
+        notes[idx] = notes[idx].copyWith(
+          startTick: runningTick,
+          durationTicks: graceDurations[k],
+        );
+        runningTick += graceDurations[k];
+      }
+
+      notes[anchorIndex] = anchor.copyWith(
+        startTick: fixedStartTick,
+        durationTicks: newAnchorEnd - fixedStartTick,
+      );
+      return;
+    }
+
+    // BEFORE mode (the default/original behavior) — never moves, by
+    // construction of this very branch — safe to treat as the fixed
+    // reference point regardless of how many times this has already
+    // run for this anchor.
     final fixedEndTick = anchor.startTick + anchor.durationTicks;
     final originalStartTick = fixedEndTick - originalDuration;
 
@@ -2463,6 +2552,7 @@ class CompositionController extends ChangeNotifier {
         startTick: originalStartTick,
         durationTicks: originalDuration,
         graceOriginalDurationTicks: null,
+        graceIsAfter: false,
       );
       return;
     }
@@ -2493,9 +2583,9 @@ class CompositionController extends ChangeNotifier {
   /// that points back at it (see [Note.graceOfNoteId]), which — via
   /// [_redistributeGraceNotes] hitting its zero-remaining case — also
   /// reverts [note] itself back to its original start tick/duration
-  /// and clears its [Note.graceOriginalDurationTicks]. Called from
-  /// wherever the Grace Notes field's dialog offers a "Delete"/clear
-  /// action.
+  /// and clears its [Note.graceOriginalDurationTicks]/
+  /// [Note.graceIsAfter]. Called from wherever the Grace Notes
+  /// field's dialog offers a "Delete"/clear action.
   void clearAllGraceNotes(Note note) {
     final index = notes.indexWhere((n) => n.id == note.id);
     if (index == -1) return;

@@ -505,10 +505,48 @@ int beatIndexAtTick(
   return beatIdx > 0 ? beatIdx - 1 : 0;
 }
 
+/// The starting tick of whichever beat [tick] falls into, within
+/// [measure] — the exact same beat-by-beat walk [beatIndexAtTick]
+/// does (accounting for any earlier fermata-stretched beat), but
+/// returning the beat's own cursorTick instead of its index. Used to
+/// SNAP a tapped tick to the start of its own beat/cell before
+/// creating a note there, per request — once a measure's beats have
+/// been subdivided (see beatSubdivisionDialog), each beat is its own
+/// tappable cell, and a note placed anywhere inside one should always
+/// start exactly at that cell's own beginning, not wherever inside it
+/// was actually tapped.
+int beatStartTick(
+    CompositionController controller,
+    int measureIndex,
+    dynamic measure,
+    int tick,
+    ) {
+  final int beatTicks = measure.timeSignature.beatDuration.ticks;
+  int cursorTick = measure.startTick;
+  int lastBeatStart = measure.startTick;
+  int beatIdx = 0;
+  while (cursorTick < measure.endTick) {
+    final multiplier =
+        controller.getFermataMultiplier(measureIndex, beatIdx) ?? 1;
+    final int thisBeatTicks = beatTicks * multiplier;
+    if (tick < cursorTick + thisBeatTicks) {
+      return cursorTick;
+    }
+    lastBeatStart = cursorTick;
+    cursorTick += thisBeatTicks;
+    beatIdx++;
+  }
+  // Tick is at or past the measure's own end (shouldn't normally
+  // happen given callers clamp to maxTicks - 1 first) — fall back to
+  // the last beat's own start actually reached, same fallback
+  // philosophy as beatIndexAtTick.
+  return lastBeatStart;
+}
+
 // Shared look for the small help-mode callout labels attached to the
 // tempo/scale name containers — a bright, high-contrast pill so they
 // read clearly against either the light or dark grid background.
-Widget _helpCallout(String text, {double? maxWidth, double fontSize = 22}) {
+Widget helpCallout(String text, {double? maxWidth, double fontSize = 22}) {
   final textWidget = Text(
     text,
     style: TextStyle(
@@ -778,7 +816,26 @@ class GridWidget extends StatelessWidget {
                                 // ordinary Play button logic, since pausing
                                 // (unlike stopping) never resets the playback
                                 // position.
-                                if (isPlaying) {
+                                //
+                                // [isPlaying] is actually
+                                // controller.inputLocked (Scroll
+                                // Lock), not CompositionScreen's own
+                                // _isPlaying — Scroll Lock also turns
+                                // on for reasons that have nothing to
+                                // do with playback (Help Mode, a
+                                // raised/lowered scale), and a tap in
+                                // those cases must NOT be treated as
+                                // "pause/resume playback", per
+                                // request. The !helpMode guard here
+                                // covers the Help Mode case; the
+                                // fermata/scale/tempo/dynamic label
+                                // checks further below still need
+                                // their OWN helpMode skip (see the
+                                // comment just after this block) since
+                                // those stay reachable in Help Mode
+                                // even when this guard doesn't fire at
+                                // all (i.e. when Scroll Lock is off).
+                                if (isPlaying && !helpMode) {
                                   onTapWhilePlaying?.call();
                                   return;
                                 }
@@ -990,18 +1047,19 @@ class GridWidget extends StatelessWidget {
                                   }
                                 }
 
-                                // 7. Otherwise, normal grid/note tap handling.
-                                // While Help Mode is on, tapping the grid
-                                // never creates a note — per request, this
-                                // mode is purely informational, not for
-                                // editing. Everything above this point
-                                // (fermata/scale/tempo/dynamic labels) still
-                                // works normally even in Help Mode, since
-                                // those already open their own dialogs
-                                // rather than creating a note.
-                                if (helpMode) {
-                                  return;
-                                }
+                                // 7. Otherwise, normal grid/note tap handling
+                                // — INCLUDING while Help Mode is on, per
+                                // request, so the person can try note
+                                // input and editing right alongside the
+                                // help banner's guide rather than it
+                                // being purely a read-only mode. Nothing
+                                // above this point needs to change for
+                                // that: the fermata/scale/tempo/dynamic
+                                // label checks already run unconditionally
+                                // regardless of helpMode, and the
+                                // editingBlocked guard near the top of
+                                // this handler already exempts Help Mode
+                                // too (see that check's own comment).
                                 // The tapped screen position is converted to a
                                 // musical row: row 0 (lowest pitch) sits at the
                                 // BOTTOM of the grid, so a tap near the bottom
@@ -1011,8 +1069,37 @@ class GridWidget extends StatelessWidget {
                                 (details.localPosition.dy / cellHeight).floor();
                                 final row = visualRowToLogicalRow(controller, visualRow);
 
-                                final rawTick =
+                                final tappedTickRaw =
                                 (details.localPosition.dx / pixelsPerTick).floor();
+
+                                // Snapped to the start of whichever
+                                // beat/cell the tap landed in, per
+                                // request — a note placed anywhere
+                                // inside a beat (once that beat has
+                                // been subdivided — see
+                                // beatSubdivisionDialog) always starts
+                                // exactly at that beat's own
+                                // beginning, not wherever inside it
+                                // was actually tapped. Clamped first
+                                // so beatStartTick/getMeasureAtTick
+                                // never see a tick past the very end
+                                // of the piece.
+                                final clampedTappedTick = tappedTickRaw.clamp(
+                                  0,
+                                  controller.maxTicks > 0
+                                      ? controller.maxTicks - 1
+                                      : 0,
+                                );
+                                final tapMeasure =
+                                controller.getMeasureAtTick(clampedTappedTick);
+                                final tapMeasureIndex =
+                                controller.measures.indexOf(tapMeasure);
+                                final rawTick = beatStartTick(
+                                  controller,
+                                  tapMeasureIndex,
+                                  tapMeasure,
+                                  clampedTappedTick,
+                                );
 
                                 if (row >= 0 && row < controller.totalRows) {
                                   final existing = controller.getNoteAtPosition(
@@ -1155,7 +1242,7 @@ class GridWidget extends StatelessWidget {
                                 // below it).
                                 bottom: gridHeight - hit.rect.top + 2,
                                 child: speechBubble(
-                                  'To edit tempo or\ntime signature,\ntap its label.',
+                                  'To edit tempo or\ntime signature,\ntap its label',
                                   pointerSide: BubblePointerSide.bottom,
                                 ),
                               ),
@@ -1171,7 +1258,7 @@ class GridWidget extends StatelessWidget {
                                 left: hit.rect.left,
                                 top: hit.rect.bottom + 2,
                                 child: speechBubble(
-                                  'To edit the scale,\ntap its label.',
+                                  'To edit scale,\ntap its label',
                                   pointerSide: BubblePointerSide.top,
                                 ),
                               ),
@@ -1182,60 +1269,16 @@ class GridWidget extends StatelessWidget {
                   ),
                 ),
 
-                // HELP MODE — instructional banners about note editing,
-                // pinned to the viewport itself (outside the scrollable
-                // content above) so they stay visible regardless of
-                // scroll position, rather than scrolling away with the
-                // grid. No longer draws a sample note — per request, this
-                // mode shouldn't create/show any note (even an
-                // illustrative one) — so these use the plain, pointer-
-                // less _helpCallout style instead of speech bubbles
-                // pointing at a note that no longer exists.
-                //
-                // Combined into ONE banner, per request — previously
-                // this was 4 separate stacked callouts in the center
-                // plus a 5th one lower down explaining hand/duration
-                // setup; all 5 are now one single _helpCallout so
-                // there's just one box to read instead of several.
-                if (helpMode)
-                  Positioned.fill(
-                    child: Align(
-                      alignment: const Alignment(0.8, -0.2),
-                      child: _helpCallout(
-                        "To set the hand for new notes, tap the 'Hand Set' icon.\n\n"
-                            "To set the duration for new notes, tap the 'Note Duration' icon.\n\n"
-                            "To add a note, tap the grid once on the correct row (pitch) and beat (column).\n\n"
-                            "To edit a note, tap it once.\n\n"
-                            "To move a note, drag it.\n\n"
-                            "To copy a note, press and hold it, then tap the grid to paste the copy while the 'Paste Mode' icon is highlighted.\n\n"
-                            "To add grace notes to a note, tap it once, choose the grace note type, then, while the 'Grace Notes' icon is highlighted, tap the grid once on the correct rows (pitches) and beats (columns).\n\n"
-                            "To edit a beat or measure, double-tap it.\n\n"
-                            "To add or edit a dynamic marking or pedal, double-tap the grid on the correct column (beat).\n\n"
-                            "To change the scale, tempo, or time signature, tap its label.",
-                        maxWidth: 400,
-                      ),
-                    ),
-                  ),
-
-                // HELP MODE — points at the toolbar icons sitting just
-                // outside the grid's own left edge (in CompositionScreen's
-                // app-bar columns), per request. Positioned in the TOP-left
-                // band (not vertically centered) so it never overlaps the
-                // sample-note illustration group below, which sits at
-                // Alignment.center — the two previously shared the same
-                // vertical band (centerLeft vs center both sit at the
-                // viewport's own vertical middle), so a wide sample-note
-                // group could overlap this bubble.
-                if (helpMode)
-                  Positioned.fill(
-                    child: Align(
-                      alignment: const Alignment(-1.1, -0.60),
-                      child: speechBubble(
-                        'Tap an icon to\nsee what it does.',
-                        pointerSide: BubblePointerSide.left,
-                      ),
-                    ),
-                  ),
+                // The full-guide banner and the "tap icons" bubble
+                // both moved OUT of GridWidget entirely — into
+                // CompositionScreen's own outer Stack, per request —
+                // since GridWidget (and everything inside its build())
+                // only ever renders once the composition already HAS
+                // measures, so these could never appear before that
+                // point no matter what helpMode was set to. The
+                // toolbar icon labels (_toolbarLabel) already lived in
+                // that same outer Stack for exactly this reason; the
+                // guide banner and icon-pointer bubble now do too.
               ],
             );
           },

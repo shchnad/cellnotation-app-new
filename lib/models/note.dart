@@ -55,42 +55,59 @@ class Note {
   final int? glissandoSourceId;
 
   /// Set ONLY on grace notes themselves (never on an ordinary note,
-  /// and never on the anchor note they precede). All of one anchor's
-  /// grace notes share the SAME type at any given time — switching to
-  /// a different type (see CompositionController.startAddingGraceNotes)
-  /// deletes whatever grace notes were already there first, since a
-  /// note can only have one type of grace note active at once. This
-  /// grace note's own duration is always exactly
-  /// [GraceNoteType.durationTicks] — a FIXED, absolute value (not a
-  /// fraction of the anchor's own duration) — see
-  /// CompositionController._redistributeGraceNotes /
+  /// and never on the anchor note they precede/follow). All of one
+  /// anchor's grace notes share the SAME type at any given time —
+  /// switching to a different type (see
+  /// CompositionController.startAddingGraceNotes) deletes whatever
+  /// grace notes were already there first, since a note can only have
+  /// one type of grace note active at once. This grace note's own
+  /// duration is always exactly [GraceNoteType.durationTicks] — a
+  /// FIXED, absolute value (not a fraction of the anchor's own
+  /// duration) — see CompositionController._redistributeGraceNotes /
   /// maxGraceNotesForType for the full placement and count-limiting
   /// logic.
   final GraceNoteType? graceNoteType;
 
-  /// Set ONLY on the anchor note that grace notes precede — null
-  /// means this note currently has no grace notes. This note's own
-  /// [durationTicks] as it was BEFORE any grace notes existed,
-  /// captured once the first time a grace note is added (see
-  /// CompositionController.startAddingGraceNotes) and never touched
-  /// again afterward, even as [durationTicks] itself keeps shrinking
-  /// with each grace note added. This is the fixed reference every
-  /// grace note's own [GraceNoteType.durationDivisor] divides, and —
-  /// combined with this note's current, always-unchanged end tick —
-  /// is what lets CompositionController._redistributeGraceNotes
-  /// derive exactly where this note's original start tick was, so
-  /// removing all its grace notes shifts it back left with no drift.
+  /// Set ONLY on the anchor note that grace notes precede or follow
+  /// (see [graceIsAfter]) — null means this note currently has no
+  /// grace notes. This note's own [durationTicks] as it was BEFORE
+  /// any grace notes existed, captured once the first time a grace
+  /// note is added (see CompositionController.startAddingGraceNotes)
+  /// and never touched again afterward, even as [durationTicks]
+  /// itself keeps shrinking with each grace note added. This is the
+  /// fixed reference every grace note's own
+  /// [GraceNoteType.durationDivisor] divides, and — combined with
+  /// this note's own fixed endpoint (its end tick when [graceIsAfter]
+  /// is false, its start tick when true — see [graceIsAfter]) — is
+  /// what lets CompositionController._redistributeGraceNotes derive
+  /// exactly where this note's other, moving endpoint originally was,
+  /// so removing all its grace notes shifts it back with no drift.
   /// Cleared (along with every grace note — see [graceOfNoteId]) via
   /// CompositionController.clearAllGraceNotes, or automatically once
   /// the last grace note is individually deleted.
   final int? graceOriginalDurationTicks;
 
+  /// Set ONLY on the anchor note, alongside
+  /// [graceOriginalDurationTicks] (meaningless — and left at its
+  /// default — on any note where that field is null). False (the
+  /// default) places this anchor's grace notes BEFORE it, carved out
+  /// of the START of its original span — its own END tick never
+  /// moves. True places them AFTER it instead, carved out of the END
+  /// of its original span — its own START tick never moves this time.
+  /// Set once, the first time grace notes are started on this anchor
+  /// (see CompositionController.startAddingGraceNotes), from whichever
+  /// side was chosen there; switching to the OTHER side later is
+  /// treated the same as switching [graceNoteType] — the existing
+  /// group is cleared first, since a single anchor's grace notes are
+  /// always all on the same side at once.
+  final bool graceIsAfter;
+
   /// Set ONLY on grace notes themselves (never on an ordinary note,
   /// and never on the anchor note — the anchor instead carries
-  /// [graceOriginalDurationTicks]). Points back at the anchor note's
-  /// [id], so all of one note's grace notes can be found,
-  /// redistributed, or removed together. A grace note is otherwise an
-  /// entirely ordinary [Note] — same fields, same
+  /// [graceOriginalDurationTicks]/[graceIsAfter]). Points back at the
+  /// anchor note's [id], so all of one note's grace notes can be
+  /// found, redistributed, or removed together. A grace note is
+  /// otherwise an entirely ordinary [Note] — same fields, same
   /// [note_dialog.dart] for editing — only its position/duration are
   /// managed automatically (see [graceNoteType]'s doc) rather than
   /// set directly by the person.
@@ -112,6 +129,7 @@ class Note {
     this.glissandoSourceId,
     this.graceNoteType,
     this.graceOriginalDurationTicks,
+    this.graceIsAfter = false,
     this.graceOfNoteId,
   });
 
@@ -133,6 +151,7 @@ class Note {
     Object? glissandoSourceId = _keep,
     Object? graceNoteType = _keep,
     Object? graceOriginalDurationTicks = _keep,
+    bool? graceIsAfter,
     Object? graceOfNoteId = _keep,
   }) {
 
@@ -170,6 +189,7 @@ class Note {
       graceOriginalDurationTicks: graceOriginalDurationTicks == _keep
           ? this.graceOriginalDurationTicks
           : graceOriginalDurationTicks as int?,
+      graceIsAfter: graceIsAfter ?? this.graceIsAfter,
       graceOfNoteId: graceOfNoteId == _keep
           ? this.graceOfNoteId
           : graceOfNoteId as int?,
@@ -198,6 +218,7 @@ class Note {
       if (graceNoteType != null) 'graceNoteType': graceNoteType!.name,
       if (graceOriginalDurationTicks != null)
         'graceOriginalDurationTicks': graceOriginalDurationTicks,
+      'graceIsAfter': graceIsAfter,
       if (graceOfNoteId != null) 'graceOfNoteId': graceOfNoteId,
     };
   }
@@ -319,6 +340,10 @@ class Note {
 
       graceOriginalDurationTicks:
       _readIntOrNull(json, 'graceOriginalDurationTicks'),
+
+
+      graceIsAfter:
+      json['graceIsAfter'] as bool? ?? false,
 
 
       graceOfNoteId:

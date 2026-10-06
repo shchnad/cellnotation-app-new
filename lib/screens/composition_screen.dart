@@ -779,16 +779,14 @@ class _CompositionScreenState extends State<CompositionScreen>
                               setState(() {
                                 _helpMode = !_helpMode;
                               });
-                              // Help Mode and Scroll Lock now move
-                              // together in both directions, per request
-                              // — turning Help Mode on locks editing, and
-                              // turning it back off releases the lock
-                              // too, rather than leaving it stuck on.
-                              if (_helpMode && !controller.inputLocked) {
-                                controller.toggleInputLocked();
-                              } else if (!_helpMode && controller.inputLocked) {
-                                controller.toggleInputLocked();
-                              }
+                              // No longer touches Lock Mode at all,
+                              // per request — Help Mode is meant to
+                              // be tried alongside actually editing
+                              // the composition (note input, moving,
+                              // etc.), with the guide banner and icon
+                              // explanations layered on top, rather
+                              // than forcing the grid read-only while
+                              // it's on.
                             },
                           ),
 
@@ -834,7 +832,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                                 ? 'Finger Numbers off'
                                 : 'Finger Numbers on',
                             onPressed: _withHelp(
-                                'Fingers Mode: \nHides fingering numbers.',
+                                'No Fingers Mode: \nHides fingering numbers.',
                                     () {
                                   controller.toggleHideFingerNumbers();
                                   ScaffoldMessenger.of(context).showSnackBar(
@@ -1221,12 +1219,14 @@ class _CompositionScreenState extends State<CompositionScreen>
                                 }),
                           ),
 
-                          // SHOW REFERENCE COLUMNS
+                          // SHOW REFERENCE COLUMNS (letter name +
+                          // transcription) — independent from Show
+                          // Title, per request.
                           IconButton(
                             icon: Transform.rotate(
                               angle: controller.rotatePitchText ? -pi / 2 : 0,
                               child: Icon(
-                                Icons.assist_walker_sharp ,
+                                Icons.assist_walker_sharp,
                                 color: _toShowReferenceColumns
                                     ? Colors.blue
                                     : Colors.black,
@@ -1665,7 +1665,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                             icon: Transform.rotate(
                               angle: controller.rotatePitchText ? -pi / 2 : 0,
                               child: const Icon(
-                                Icons.numbers,
+                                Icons.airplanemode_active_sharp,
                                 color: Colors.black,
                               ),
                             ),
@@ -2043,6 +2043,158 @@ class _CompositionScreenState extends State<CompositionScreen>
               if (_helpMode) _toolbarLabel(_durationIconLink, 'Note Duration'),
               if (_helpMode) _toolbarLabel(_pasteIconLink, 'Paste Mode'),
               if (_helpMode) _toolbarLabel(_graceNotesIconLink, 'Grace Notes'),
+
+              // The full-guide banner and the "tap icons" bubble live
+              // HERE now, in this same OUTER Stack, rather than inside
+              // GridWidget — per request. GridWidget (and everything
+              // inside its own build()) only renders once the
+              // composition already has measures (see the hasMeasures
+              // ternary below), so these previously could never appear
+              // before that point no matter what Help Mode was set to.
+              // This outer Stack, by contrast, always renders, exactly
+              // like the icon labels right above.
+              if (_helpMode)
+                Positioned.fill(
+                  child: Align(
+                    alignment: const Alignment(0.8, -0.2),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(context).size.height * 0.8,
+                      ),
+                      child: SingleChildScrollView(
+                        child: helpCallout(
+                          "CREATE MEASURES\n\n"
+                              "Start by creating measures: tap the 'Add Measures' icon, or the "
+                              "'Add Measures' button in the middle of the screen.\n"
+                              "Set the scale and time signature while creating them. "
+                              "You can change the scale and time signature later if needed.\n\n"
+
+
+                              "SET HAND AND DURATION\n\n"
+                              "Before creating notes, set the hand by tapping the 'Hand Set' icon, and the duration by "
+                              "tapping the 'Note Duration' icon.\n\n"
+
+                              "CREATE, MOVE, EDIT NOTES\n\n"
+                              "To add a note, tap the grid on the correct row (pitch) and beat (column).\n"
+                              "To edit or delete a note, tap it to open the note-editing dialog.\n"
+                              "To move a note, drag it.\n"
+                              "To copy a note, press and hold it. The 'Paste Mode' icon highlights, and you can now paste the copy "
+                              "by tapping the grid. To stop pasting, tap the 'Paste Mode' icon again to turn it off.\n\n"
+
+                              "EDIT TEMPO, SCALE, TIME SIGNATURE\n\n"
+                              "To edit the tempo, scale, or time signature, tap its label on the grid. "
+                              "You can also edit it by double-tapping the measure to open the beat-and-measure dialog. "
+                              "Choose 'Set Tempo', 'Set Scale', 'Insert Beat', 'Duplicate Beat', or 'Delete Beat'.\n\n"
+
+                              "ADD FINGER NUMBER, ARTICULATION, ORNAMENT, PLAYING TECHNIQUE\n\n"
+                              "To add a finger number, articulation, ornament, or playing technique, tap a note "
+                              "to open the note-editing dialog. "
+                              "Choose 'Finger', 'Articulation', 'Ornament', or 'Playing Technique' "
+                              "to open the matching picker. "
+                              "You can delete the value using the same dialog.\n\n"
+
+                              "ADD GLISSANDO\n\n"
+                              "To add a glissando, tap a note to open the note-editing dialog. "
+                              "Choose 'Glissando', pick a direction, then tap the row (pitch) where the glissando should end. "
+                              "You can delete the glissando using the same dialog.\n\n"
+
+                              "ADD GRACE NOTES\n\n"
+                              "To add grace notes, tap a note to open the note-editing dialog. "
+                              "Choose 'Grace Notes', pick a type and then choose to add before the note or after,"
+                              " then, while the 'Grace Notes' icon is highlighted, tap the grid on the correct "
+                              "rows (pitches). To stop adding, tap this icon to turn Grace Notes Mode off. \n\n"
+                              "Appoggiatura is always half of the note's own length, and only one fits at a time.\n"
+                              "Acciaccatura Long (sixteenth), Medium (thirty-second), Short (sixty-fourth) are always a fixed length, "
+                              "however long the note is.\n\n"
+
+                              "MARK LEGATO\n\n"
+                              "To mark legato, tap the 'Legato Mode' icon; it highlights to show that"
+                              " Legato Mode is on. Now tapping a note marks it to be played legato. "
+                              "Tap the highlighted 'Legato Mode' icon again to turn it off.\n\n"
+
+                              "ADD DYNAMIC, PEDAL\n\n"
+                              "To add or edit a dynamic marking or pedal, double-tap the grid on the correct beat (column) "
+                              "to open the beat-and-measure dialog. Choose 'Set Dynamic', "
+                              "'Set Dynamic Change', or 'Set Pedal'.\n\n"
+
+                              "ADD FERMATA\n\n"
+                              "To add a fermata, double-tap the grid on the correct beat (column) "
+                              "to open the beat-and-measure dialog. Choose 'Set Fermata', then pick or enter "
+                              "how many beats this beat should last. To delete the fermata, use the same dialog.\n\n"
+
+                              "PLAYBACK\n\n"
+                              "To scroll the screen, tap the 'Play/Pause' icon. The scrolling speed depends on the tempo, so you "
+                              "can change the scrolling speed by changing the tempo. "
+                              "Scrolling can be paused by tapping the icon again, or simply by "
+                              "tapping the grid. Tapping the grid again resumes scrolling. "
+                              "Use the 'Scroll to Start' icon to jump to the beginning, and the 'Go to Measure' icon"
+                              " to jump to a chosen measure.\n\n"
+
+                              "LOCK MODE\n\n"
+                              "To prevent editing, tap the 'Lock Mode' icon; it highlights to show it's on. "
+                              "Tap it again to turn it off and allow editing.\n"
+                              "It turns on automatically during playback"
+                              " or while the scale is raised or lowered.\n\n"
+
+                              "EASY READ MODE\n\n"
+                              "While Easy Read Mode is on, notes are shown in whichever way is easiest to read. "
+                              "This mainly concerns notes with accidentals. Easy Read Mode turns on automatically during playback"
+                              " or while the scale is raised or lowered.\n\n"
+
+                              "ROTATE MODE\n\n"
+                              "Tap the 'Rotate Mode' icon to rotate labels 90°, useful to see the cellnotation as piano roll. \n"
+                              "This also turns Lock Mode and Easy Read Mode on. \nTap Rotate Mode off to turn labels back.\n\n"
+
+                              "SCALE UP/DOWN/RESET\n\n"
+                              "Scale Up and Scale Down shift the whole piece by a semitone. "
+                              "Tapping the same icon repeatedly can raise or lower the piece by up to 12 semitones.\n"
+                              "Reset Scale returns it to its original pitch.\n\n"
+
+
+                              "ACCIDENTALS MODE\n\n"
+                              "Tap the 'Accidentals Mode' icon to see every note with an accidental — in other words, every note that doesn't belong to the scale.\n"
+                              "These notes turn red. Tap this icon again to turn Accidentals Mode off.\n\n"
+
+                              "NO FINGERS MODE\n\n"
+                              "Tap the 'No Fingers Mode' icon to hide fingering numbers. Tap it again to turn this mode off.\n\n"
+
+                              "DARK MODE\n\n"
+                              "Tap the 'Dark Mode' icon to switch the grid's background to black, which can make the grid easier to see in low light. Tap it again to switch back to the normal background.\n\n"
+
+                              "REFERENCE COLUMNS\n\n"
+                              "Tapping the 'Reference Columns' icon shows two extra columns: one with each note's letter name (C4, A5#), "
+                              "and one with its transcription code used for Export and Import (0, 6/7+).\n\n"
+
+                              "EXPORT AND IMPORT\n\n"
+                              "Export shows a chosen range of measures as text in the line-position transcription notation, which can be copied to the clipboard. Import lets you paste or type that same notation to add measures and notes; its own 'Help' button explains the full notation.",
+                          // Wider in landscape, per request — more
+                          // horizontal space is actually available
+                          // there, so the long guide text reads in
+                          // fewer, less narrow lines instead of
+                          // being capped at the same width as
+                          // portrait.
+                          maxWidth:
+                          MediaQuery.of(context).orientation ==
+                              Orientation.landscape
+                              ? 600
+                              : 400,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+              if (_helpMode)
+                Positioned.fill(
+                  child: Align(
+                    alignment: const Alignment(-0.70, 0.35),
+                    child: speechBubble(
+                      maxWidth: 150,
+                      'Tap icons to\nsee what they do',
+                      pointerSide: BubblePointerSide.left,
+                    ),
+                  ),
+                ),
             ],
           );
 

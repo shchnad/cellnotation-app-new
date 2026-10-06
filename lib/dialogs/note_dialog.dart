@@ -148,6 +148,81 @@ class NoteDialog extends StatelessWidget {
     return '${names[degree] ?? '?'}$octave$accidentalWord';
   }
 
+  /// Shows a small "Before" / "After" choice for where new grace
+  /// notes should sit relative to [editedNote], then calls [onChosen]
+  /// with the result — false for Before (the default direction, grace
+  /// notes carved from the START of the note's original span), true
+  /// for After (carved from its END instead). See
+  /// CompositionController.startAddingGraceNotes's own `isAfter`
+  /// parameter and Note.graceIsAfter for what this actually controls.
+  ///
+  /// Deferred to the next frame — called right as the type picker
+  /// (noteValuesDialog, with allowToCloseNextWindow) is dismissing
+  /// itself and this whole NoteDialog along with it, so opening
+  /// immediately would race with that dismissal.
+  void _showGracePositionChoice(
+      BuildContext context,
+      void Function(bool isAfter) onChosen,
+      ) {
+    Future.delayed(Duration.zero, () {
+      showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.white,
+          title: const Text(
+            'Grace Note Position',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
+          ),
+          content: const Text(
+            'Should the grace notes play before or after this note?',
+            style: TextStyle(fontSize: 22, color: Colors.black),
+          ),
+          actions: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(dialogContext);
+                    onChosen(false);
+                  },
+                  child: const Text(
+                    'Before',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(dialogContext);
+                    onChosen(true);
+                  },
+                  child: const Text(
+                    'After',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -186,6 +261,9 @@ class NoteDialog extends StatelessWidget {
             .toList();
         final graceType =
         graceNotes.isNotEmpty ? graceNotes.first.graceNoteType : null;
+        // Direction lives on the ANCHOR itself (editedNote), not on
+        // the grace notes — see Note.graceIsAfter's own doc.
+        final graceIsAfter = editedNote.graceIsAfter;
 
         final rowWidths = <double>[
           _textWidth(
@@ -235,7 +313,8 @@ class NoteDialog extends StatelessWidget {
           _textWidth(
             graceNotes.isEmpty
                 ? 'Grace Notes: none'
-                : 'Grace Notes: ${graceNotes.length} (${graceType?.label ?? '?'})',
+                : 'Grace Notes: ${graceNotes.length} (${graceType?.label ?? '?'}, '
+                '${graceIsAfter ? 'after' : 'before'})',
           ) +
               _listTileChrome,
         ];
@@ -870,10 +949,16 @@ class NoteDialog extends StatelessWidget {
                                 ),
                               ),
                               TextSpan(
+                                // Shows the direction (before/after)
+                                // alongside the count and type, per
+                                // request — see Note.graceIsAfter,
+                                // which lives on the anchor
+                                // (editedNote) itself.
                                 text: graceNotes.isEmpty
                                     ? 'none'
                                     : '${graceNotes.length} '
-                                    '(${currentType?.label ?? '?'})',
+                                    '(${currentType?.label ?? '?'}, '
+                                    '${editedNote.graceIsAfter ? 'after' : 'before'})',
                                 style: const TextStyle(
                                   fontSize: 22,
                                   color: Colors.blue,
@@ -900,34 +985,40 @@ class NoteDialog extends StatelessWidget {
                         numberOfColumns: 1,
                         labelBuilder: (t) => t.label,
                         onSelected: (type) {
-                          // Closes this dialog too (allowToCloseNextWindow) so
-                          // the grid is ready for tapping — every tap adds one
-                          // more grace note of this type, up to
-                          // CompositionController.maxGraceNotesForType (which
-                          // depends on this note's own duration — shorter
-                          // notes allow fewer), until the mode is turned off
-                          // from the app bar — see CompositionController.
-                          // startAddingGraceNotes / GridWidget's onTapUp. A
-                          // note can only have ONE type of grace note active
-                          // at a time — picking a DIFFERENT type than
-                          // whatever's already there deletes the existing
-                          // ones first.
-                          final maxForType =
-                          controller.maxGraceNotesForType(editedNote, type);
-                          controller.startAddingGraceNotes(editedNote, type);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              duration: const Duration(seconds: 2),
-                              content: Text(
-                                maxForType == 0
-                                    ? 'This note is too short for ${type.label}'
-                                    : 'Tap the grid to add ${type.label}'
-                                    ' (max $maxForType for this note), '
-                                    'to stop click lighted button on app bar.',
-                                style: const TextStyle(fontSize: 22),
+                          // A SECOND small choice — before or after
+                          // this note — follows the type pick, per
+                          // request, since a single anchor's grace
+                          // notes can now sit on either side (see
+                          // Note.graceIsAfter /
+                          // CompositionController.
+                          // startAddingGraceNotes's own isAfter
+                          // parameter). Deferred via
+                          // _showGracePositionChoice so it doesn't
+                          // race with this dialog (and NoteDialog
+                          // itself, via allowToCloseNextWindow)
+                          // closing first.
+                          _showGracePositionChoice(context, (isAfter) {
+                            final maxForType = controller
+                                .maxGraceNotesForType(editedNote, type);
+                            controller.startAddingGraceNotes(
+                              editedNote,
+                              type,
+                              isAfter: isAfter,
+                            );
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                duration: const Duration(seconds: 2),
+                                content: Text(
+                                  maxForType == 0
+                                      ? 'This note is too short for ${type.label}'
+                                      : 'Tap the grid to add ${type.label}'
+                                      ' (max $maxForType for this note), '
+                                      'to stop click lighted button on app bar.',
+                                  style: const TextStyle(fontSize: 22),
+                                ),
                               ),
-                            ),
-                          );
+                            );
+                          });
                         },
                         onClear: () {
                           // Removes every grace note belonging to this note
