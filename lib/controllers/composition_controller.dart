@@ -37,7 +37,41 @@ class CompositionController extends ChangeNotifier {
 
   CompositionController({
     required this.composition,
-  });
+  }) {
+    // Prepare every pitch this composition uses in the background, so
+    // playback never has to wait for a sound to be built — see
+    // NoteSoundService.warmUp.
+    warmUpSounds();
+  }
+
+  /// Hands NoteSoundService every distinct pitch currently in the
+  /// composition (ordinary notes, glissando run notes and ornament
+  /// neighbors) to synthesize and load ahead of time. Cheap to call
+  /// again — pitches already prepared are skipped.
+  void warmUpSounds() {
+    try {
+      final frequencies = <double>{};
+      for (final note in notes) {
+        if (note.glissandoSourceId != null) {
+          frequencies.add(getWhiteKeyFrequencyHz(note.row));
+          continue;
+        }
+        final base = getNoteFrequencyHz(note);
+        frequencies.add(base);
+        final ornament = note.ornament;
+        if (ornament != null) {
+          for (final entry in ornament.shiftMap) {
+            final shift = ((entry as Map)['shift'] as num).toInt();
+            frequencies.add(base * math.pow(2, shift / 12));
+          }
+        }
+      }
+      NoteSoundService.instance.warmUp(frequencies);
+    } catch (_) {
+      // Warm-up is only an optimization — never let it break opening
+      // a composition.
+    }
+  }
 
 
 
@@ -2837,9 +2871,16 @@ class CompositionController extends ChangeNotifier {
     final frequencyHz = note.glissandoSourceId != null
         ? getWhiteKeyFrequencyHz(note.row)
         : getNoteFrequencyHz(note);
+    // While the sustain pedal is down at this note's start, let it
+    // keep ringing (until its sound naturally dies away) instead of
+    // stopping at the end of its written duration — the same thing a
+    // real piano's sustain pedal does.
+    final durationSeconds = isPedalDownAtTick(note.startTick)
+        ? 10.0
+        : getNoteDurationSeconds(note);
     NoteSoundService.instance.playTone(
       frequencyHz: frequencyHz,
-      durationSeconds: getNoteDurationSeconds(note),
+      durationSeconds: durationSeconds,
     );
   }
 
@@ -3747,6 +3788,7 @@ class CompositionController extends ChangeNotifier {
       ){
     composition = newComposition;
     selectedMeasureIndex = 0;
+    warmUpSounds();
     notifyListeners();
   }
 

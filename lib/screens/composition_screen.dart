@@ -27,6 +27,7 @@ import '../enums/note_duration.dart';
 import '../utils/cellnotation_transcription_parser.dart';
 
 import '../services/composition_service.dart';
+import '../services/note_sound_service.dart';
 import '../widgets/grid_widget.dart';
 import '../widgets/letter_name_column_widget.dart';
 import '../widgets/pitch_column_widget.dart';
@@ -48,7 +49,7 @@ class CompositionScreen extends StatefulWidget {
 }
 
 class _CompositionScreenState extends State<CompositionScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
 
   CompositionController get controller => widget.controller;
 
@@ -245,6 +246,13 @@ class _CompositionScreenState extends State<CompositionScreen>
     }
   }
 
+  /// How far ahead of the scroll position note sounds are started —
+  /// compensates for the phone's own audio output delay so what you
+  /// hear lines up with what you see. If notes still sound late,
+  /// increase it a little (e.g. 0.15); if they sound early, decrease
+  /// it.
+  static const double _audioLookaheadSeconds = 0.10;
+
   void _onPlaybackTick(Duration elapsed) {
     final dtSeconds =
         (elapsed - _lastTickerElapsed).inMicroseconds / 1000000.0;
@@ -264,11 +272,18 @@ class _CompositionScreenState extends State<CompositionScreen>
     _playbackTick += ticksPerSecond * dtSeconds;
 
     if (controller.soundEnabled) {
-      final newTickInt = _playbackTick.floor();
-      if (newTickInt > previousTickInt) {
+      // Sounds are triggered a little AHEAD of the scroll position —
+      // by [_audioLookaheadSeconds] — because the phone needs a short
+      // moment between "play" being requested and the sound actually
+      // coming out of the speaker. Without this, every note is heard
+      // slightly after it visibly reaches the pitch column.
+      final lookaheadTicks = ticksPerSecond * _audioLookaheadSeconds;
+      final soundFromTick = (previousTickInt + lookaheadTicks).floor();
+      final soundToTick = (_playbackTick + lookaheadTicks).floor();
+      if (soundToTick > soundFromTick) {
         for (final entry in controller.displayNotes) {
           final n = entry.note;
-          if (n.startTick >= previousTickInt && n.startTick < newTickInt) {
+          if (n.startTick >= soundFromTick && n.startTick < soundToTick) {
             if (entry.isGhost) {
               controller.playGhostNoteSound(
                 n,
@@ -469,9 +484,22 @@ class _CompositionScreenState extends State<CompositionScreen>
     );
   }
 
+  /// When the app comes back from the background, rebuild the note
+  /// sounds — the system may have released the audio resources while
+  /// the app was away, which otherwise leaves playback silent.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      NoteSoundService.instance.recover().then((_) {
+        if (mounted) controller.warmUpSounds();
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _gridVerticalController.addListener(_syncPitchColumn);
   }
 
@@ -489,6 +517,7 @@ class _CompositionScreenState extends State<CompositionScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _gridVerticalController.removeListener(_syncPitchColumn);
     _gridVerticalController.dispose();
     _pitchVerticalController.dispose();
