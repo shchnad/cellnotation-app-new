@@ -1,19 +1,31 @@
 import 'package:flutter/material.dart';
 import '../controllers/composition_controller.dart';
 
-
-void cellWidthDialog(
+/// Opens from the Play icon (see CompositionScreen): lets the person
+/// choose how fast to scroll before playback starts — built the same
+/// way as cellWidthDialog. The − / + buttons change the speed by
+/// [CompositionController.playbackSpeedStep] (10%), Reset sets it back
+/// to the speed the tempo requires (100%), and Play closes the dialog
+/// and starts playback via [onPlay]. The chosen speed is kept, so the
+/// dialog opens at the same value next time.
+void scrollSpeedDialog(
     BuildContext context,
-    CompositionController controller,
-    ){
+    CompositionController controller, {
+      required VoidCallback onPlay,
+    }) {
 
   showDialog(
     context: context,
-    builder: (_) {
+    builder: (dialogContext) {
 
       return AnimatedBuilder(
         animation: controller,
         builder: (context, _) {
+
+          final percent = (controller.playbackSpeed * 100).round();
+          final description = percent == 100
+              ? 'tempo'
+              : (percent > 100 ? 'faster' : 'slower');
 
           return AlertDialog(
             backgroundColor: Colors.white,
@@ -21,7 +33,7 @@ void cellWidthDialog(
 
             title: Center(
               child: const Text(
-                "Set Cell Width",
+                "Set Scroll Speed",
                 style: TextStyle(
                   color: Colors.black,
                   fontSize: 22,
@@ -35,7 +47,7 @@ void cellWidthDialog(
               children: [
 
                 Text(
-                  "${controller.pixelsPerTick.toStringAsFixed(0)} px",
+                  "$percent % ($description)",
                   style: const TextStyle(
                     fontSize: 22,
                     color: Colors.blue,
@@ -56,8 +68,13 @@ void cellWidthDialog(
                         color: Colors.blue,
                         size: 35,
                       ),
-                      onPressed: (){
-                        controller.changeCellWidth(-2);
+                      onPressed: controller.playbackSpeed <=
+                          CompositionController.minPlaybackSpeed
+                          ? null
+                          : (){
+                        controller.changePlaybackSpeed(
+                          -CompositionController.playbackSpeedStep,
+                        );
                       },
                     ),
 
@@ -69,8 +86,13 @@ void cellWidthDialog(
                         color: Colors.blue,
                         size: 35,
                       ),
-                      onPressed: (){
-                        controller.changeCellWidth(2);
+                      onPressed: controller.playbackSpeed >=
+                          CompositionController.maxPlaybackSpeed
+                          ? null
+                          : (){
+                        controller.changePlaybackSpeed(
+                          CompositionController.playbackSpeedStep,
+                        );
                       },
                     ),
 
@@ -87,21 +109,7 @@ void cellWidthDialog(
                 children: [
                   TextButton(
                     onPressed: (){
-                      controller.setMinimumCellWidth();
-                    },
-                    child: const Text(
-                      "Min",
-                      style: TextStyle(
-                        color: Colors.green,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-
-                  TextButton(
-                    onPressed: (){
-                      controller.resetCellWidth();
+                      controller.resetPlaybackSpeed();
                     },
                     child: const Text(
                       "Reset",
@@ -113,10 +121,9 @@ void cellWidthDialog(
                     ),
                   ),
 
-
                   TextButton(
                     onPressed: (){
-                      Navigator.pop(context);
+                      Navigator.pop(dialogContext);
                     },
                     child: const Text(
                       "Close",
@@ -127,9 +134,23 @@ void cellWidthDialog(
                       ),
                     ),
                   ),
+
+                  TextButton(
+                    onPressed: (){
+                      Navigator.pop(dialogContext);
+                      onPlay();
+                    },
+                    child: const Text(
+                      "Play",
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
                 ],
               ),
-
 
             ],
 

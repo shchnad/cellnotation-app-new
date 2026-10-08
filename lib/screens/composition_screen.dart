@@ -13,6 +13,7 @@ import '../models/note_import.dart';
 import '../dialogs/measure_range_dialog.dart';
 import '../dialogs/go_to_measure_dialog.dart';
 import '../dialogs/cell_width_dialog.dart';
+import '../dialogs/scroll_speed_dialog.dart';
 import '../dialogs/new_composition_dialog.dart';
 import '../dialogs/global_duration_dialog.dart';
 import '../dialogs/add_measures_dialog.dart';
@@ -63,6 +64,11 @@ class _CompositionScreenState extends State<CompositionScreen>
   Ticker? _playbackTicker;
   Duration _lastTickerElapsed = Duration.zero;
   double _playbackTick = 0;
+  // Every note starting BEFORE this tick has already been sounded in
+  // the current playback run. Advanced forward only — never re-checked
+  // — so each note is triggered exactly once (the previous window math
+  // could overlap two frames and play some notes twice).
+  int _soundedUpToTick = 0;
   bool _isPlaying = false;
   bool _toShowTitle = false;
   // Independent from _toShowTitle now, per request — previously the
@@ -225,6 +231,8 @@ class _CompositionScreenState extends State<CompositionScreen>
     }
 
     _lastTickerElapsed = Duration.zero;
+    // Start sounding from exactly where playback starts.
+    _soundedUpToTick = _playbackTick.floor();
     setState(() => _isPlaying = true);
     _playbackTicker = createTicker(_onPlaybackTick)..start();
   }
@@ -251,7 +259,7 @@ class _CompositionScreenState extends State<CompositionScreen>
   /// hear lines up with what you see. If notes still sound late,
   /// increase it a little (e.g. 0.15); if they sound early, decrease
   /// it.
-  static const double _audioLookaheadSeconds = 0.10;
+  static const double _audioLookaheadSeconds = 0.06;
 
   void _onPlaybackTick(Duration elapsed) {
     final dtSeconds =
@@ -263,11 +271,18 @@ class _CompositionScreenState extends State<CompositionScreen>
     final measure = controller.getMeasureAtTick(currentTickInt);
     final activeTempo = controller.getActiveTempoAtTick(currentTickInt);
 
-    final beatTicks = measure.timeSignature.beatDuration.ticks;
+    // Scrolling speed from the beat and the tempo: one tempo beat
+    // takes 60 / bpm seconds, so the grid advances one beat's worth
+    // of ticks in that time. The beat is the measure's tempo beat
+    // (see Measure.effectiveTempoBeat), which stays the ORIGINAL beat
+    // even after the measure's beats are split, so splitting doesn't
+    // slow playback down.
+    final beatTicks = measure.effectiveTempoBeat.ticks;
     final bpm = activeTempo?.tempo.value ?? 0;
-    final ticksPerSecond = beatTicks * bpm / 60.0;
+    // Multiplied by the speed chosen in the Scroll Speed dialog
+    // (1.0 = exactly the tempo).
+    final ticksPerSecond = beatTicks * bpm / 60.0 * controller.playbackSpeed;
 
-    final previousTickInt = _playbackTick.floor();
 
     _playbackTick += ticksPerSecond * dtSeconds;
 
@@ -278,9 +293,10 @@ class _CompositionScreenState extends State<CompositionScreen>
       // coming out of the speaker. Without this, every note is heard
       // slightly after it visibly reaches the pitch column.
       final lookaheadTicks = ticksPerSecond * _audioLookaheadSeconds;
-      final soundFromTick = (previousTickInt + lookaheadTicks).floor();
+      final soundFromTick = _soundedUpToTick;
       final soundToTick = (_playbackTick + lookaheadTicks).floor();
       if (soundToTick > soundFromTick) {
+        _soundedUpToTick = soundToTick;
         for (final entry in controller.displayNotes) {
           final n = entry.note;
           if (n.startTick >= soundFromTick && n.startTick < soundToTick) {
@@ -1655,17 +1671,37 @@ class _CompositionScreenState extends State<CompositionScreen>
                                 // is red only for an actual mid-piece pause
                                 // with Lock Mode on — black if back at the
                                 // beginning, or Lock Mode is off.
+                                // Otherwise blue when the scroll speed
+                                // differs from the tempo (see the Scroll
+                                // Speed dialog), black at the tempo.
                                 color: _isPlaying
                                     ? Colors.red
                                     : ((!_isAtBeginning && controller.inputLocked)
                                     ? Colors.red
-                                    : Colors.black),
+                                    : (controller.isPlaybackSpeedChanged
+                                    ? Colors.blue
+                                    : Colors.black)),
                               ),
                             ),
                             tooltip: _isPlaying ? 'Pause' : 'Play',
                             onPressed: _withHelp(
-                              'Play/Pause: \nStarts or Pauses playback of the composition.',
-                              hasMeasures ? _togglePlayback : null,
+                              'Play/Pause: \nOpens the Scroll Speed dialog to choose the speed and start playback. Tap again while playing to pause.',
+                              hasMeasures
+                                  ? () {
+                                // Pausing stays immediate; starting
+                                // goes through the Scroll Speed dialog,
+                                // whose Play button starts playback.
+                                if (_isPlaying) {
+                                  _pausePlayback();
+                                } else {
+                                  scrollSpeedDialog(
+                                    context,
+                                    controller,
+                                    onPlay: _startPlayback,
+                                  );
+                                }
+                              }
+                                  : null,
                             ),
                           ),
 

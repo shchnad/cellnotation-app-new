@@ -1,5 +1,6 @@
 import 'package:music_composer/models/time_signature.dart';
 import 'beat_event_model.dart';
+import '../enums/note_duration.dart';
 
 class Measure {
 
@@ -24,6 +25,21 @@ class Measure {
   // un-stretched boundary. Zero for a measure with no fermatas.
   int fermataExtraTicks;
 
+  /// The note value the TEMPO counts, when it differs from this
+  /// measure's own beat. Set when the measure's beats are split or
+  /// united (see CompositionController.doubleSubdivisionForMeasureRange
+  /// / halveSubdivisionForMeasureRange): splitting 6/8 into 12/16 makes
+  /// each grid beat a sixteenth, but the tempo still counts the
+  /// ORIGINAL eighth — otherwise splitting beats would silently halve
+  /// the playback speed. Null means "the tempo counts this measure's
+  /// own beat" (the normal case).
+  NoteDuration? tempoBeatDuration;
+
+  /// The note value one tempo beat lasts — what playback speed is
+  /// computed from: seconds per tempo beat = 60 / bpm.
+  NoteDuration get effectiveTempoBeat =>
+      tempoBeatDuration ?? timeSignature.beatDuration;
+
   Measure({
     required this.id,
     required this.startTick,
@@ -33,6 +49,7 @@ class Measure {
     this.pitchOffsetSemitones = 0,
     List<BeatEvent>? beatEvents,
     this.fermataExtraTicks = 0,
+    this.tempoBeatDuration,
   }) :
         originalScaleName = originalScaleName ?? scaleName,
         beatEvents = beatEvents ?? [];
@@ -94,6 +111,7 @@ class Measure {
     int? pitchOffsetSemitones,
     List<BeatEvent>? beatEvents,
     int? fermataExtraTicks,
+    Object? tempoBeatDuration = _keep,
   }) {
     return Measure(
       id: id ?? this.id,
@@ -106,8 +124,13 @@ class Measure {
       beatEvents:
       beatEvents ?? List<BeatEvent>.from(this.beatEvents),
       fermataExtraTicks: fermataExtraTicks ?? this.fermataExtraTicks,
+      tempoBeatDuration: tempoBeatDuration == _keep
+          ? this.tempoBeatDuration
+          : tempoBeatDuration as NoteDuration?,
     );
   }
+
+  static const Object _keep = Object();
 
   // ================= JSON =================
 
@@ -121,6 +144,8 @@ class Measure {
       'pitchOffsetSemitones': pitchOffsetSemitones,
       'beatEvents': beatEvents.map((e) => e.toJson()).toList(),
       'fermataExtraTicks': fermataExtraTicks,
+      if (tempoBeatDuration != null)
+        'tempoBeatDuration': tempoBeatDuration!.name,
     };
   }
 
@@ -140,7 +165,19 @@ class Measure {
       // Older saved compositions won't have this field — default to
       // 0 (no fermata stretch) rather than crashing.
       fermataExtraTicks: json['fermataExtraTicks'] as int? ?? 0,
+      // Older saved compositions won't have this — null means the
+      // tempo counts the measure's own beat, as before.
+      tempoBeatDuration: _noteDurationOrNull(json['tempoBeatDuration']),
     );
+  }
+
+  static NoteDuration? _noteDurationOrNull(dynamic raw) {
+    if (raw == null) return null;
+    try {
+      return NoteDuration.values.byName(raw as String);
+    } catch (_) {
+      return null;
+    }
   }
 
 }

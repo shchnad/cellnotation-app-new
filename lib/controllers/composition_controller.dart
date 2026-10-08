@@ -41,7 +41,34 @@ class CompositionController extends ChangeNotifier {
     // Prepare every pitch this composition uses in the background, so
     // playback never has to wait for a sound to be built — see
     // NoteSoundService.warmUp.
+    repairTempoBeats();
     warmUpSounds();
+  }
+
+  /// Fixes measures whose remembered tempo beat makes them play at a
+  /// different speed from other measures with the SAME time signature
+  /// (left by uniting beats and splitting them again with an older
+  /// version of the app). Every measure gets the tempo beat of the
+  /// FIRST measure with its time signature, so identical measures
+  /// always scroll at the same speed. Returns how many were fixed.
+  int repairTempoBeats() {
+    final reference = <String, NoteDuration?>{};
+    int fixed = 0;
+    for (int i = 0; i < measures.length; i++) {
+      final m = measures[i];
+      final key =
+          '${m.timeSignature.beats}/${m.timeSignature.beatDuration.name}';
+      if (!reference.containsKey(key)) {
+        reference[key] = m.tempoBeatDuration;
+        continue;
+      }
+      final wanted = reference[key];
+      if (m.tempoBeatDuration != wanted) {
+        measures[i] = m.copyWith(tempoBeatDuration: wanted);
+        fixed++;
+      }
+    }
+    return fixed;
   }
 
   /// Hands NoteSoundService every distinct pitch currently in the
@@ -593,6 +620,11 @@ class CompositionController extends ChangeNotifier {
           beats: measure.timeSignature.beats * 2,
           beatDuration: newDuration,
         ),
+        // The tempo keeps counting the ORIGINAL beat, so splitting
+        // beats never changes how fast the measure plays.
+        tempoBeatDuration: measure.effectiveTempoBeat == newDuration
+            ? null
+            : measure.effectiveTempoBeat,
       );
     }
 
@@ -667,11 +699,17 @@ class CompositionController extends ChangeNotifier {
       }
 
       final newDuration = NoteDuration.values[oldIndex - 1];
+      // The tempo keeps counting the beat it counted BEFORE uniting
+      // (e.g. 6/8 united to 3/4 still counts eighths), so uniting
+      // never changes how fast the measure plays. Once the measure is
+      // back at that beat there's nothing to remember.
+      final remembered = measure.effectiveTempoBeat;
       measures[i] = measure.copyWith(
         timeSignature: measure.timeSignature.copyWith(
           beats: beats ~/ 2,
           beatDuration: newDuration,
         ),
+        tempoBeatDuration: remembered == newDuration ? null : remembered,
       );
     }
 
@@ -2656,6 +2694,42 @@ class CompositionController extends ChangeNotifier {
 
   bool soundEnabled = true;
 
+  // =====================================================
+  // PLAYBACK SPEED
+  // =====================================================
+
+  /// Multiplier on the speed the tempo requires — 1.0 plays exactly
+  /// at the tempo, 1.2 is 20% faster, 0.8 is 20% slower. Changed in
+  /// steps of [playbackSpeedStep] via the Scroll Speed dialog that
+  /// opens from the Play icon (see scroll_speed_dialog.dart), and
+  /// applied to both the scrolling and the length of each note's
+  /// sound, so they always stay in step. Not saved with the
+  /// composition — it's a practice setting, not part of the music.
+  double playbackSpeed = 1.0;
+
+  static const double playbackSpeedStep = 0.1;
+  static const double minPlaybackSpeed = 0.5;
+  static const double maxPlaybackSpeed = 2.0;
+
+  /// Whether the speed differs from the tempo — used to color the
+  /// Play icon blue, the same way the Cell Width icon shows a changed
+  /// width.
+  bool get isPlaybackSpeedChanged => (playbackSpeed - 1.0).abs() > 1e-9;
+
+  void changePlaybackSpeed(double amount) {
+    // Rounded to whole percents so repeated steps never drift
+    // (0.1 isn't exact in floating point).
+    final next = ((playbackSpeed + amount) * 100).round() / 100;
+    playbackSpeed = next.clamp(minPlaybackSpeed, maxPlaybackSpeed);
+    notifyListeners();
+  }
+
+  /// Back to the speed the tempo requires.
+  void resetPlaybackSpeed() {
+    playbackSpeed = 1.0;
+    notifyListeners();
+  }
+
   void toggleSound() {
     soundEnabled = !soundEnabled;
     NoteSoundService.instance.enabled = soundEnabled;
@@ -2847,12 +2921,14 @@ class CompositionController extends ChangeNotifier {
   double getNoteDurationSeconds(Note note) {
     final measure = getMeasureAtTick(note.startTick);
     final activeTempo = getActiveTempoAtTick(note.startTick);
-    final beatTicks = measure.timeSignature.beatDuration.ticks;
+    final beatTicks = measure.effectiveTempoBeat.ticks;
     final bpm = activeTempo?.tempo.value ?? 0;
     if (bpm <= 0 || beatTicks <= 0) {
       return 0.3; // sane fallback rather than dividing by zero
     }
-    final ticksPerSecond = beatTicks * bpm / 60.0;
+    // Same playback-speed multiplier the scrolling uses, so each
+    // note's sound lasts exactly as long as it takes to scroll past.
+    final ticksPerSecond = beatTicks * bpm / 60.0 * playbackSpeed;
     return note.durationTicks / ticksPerSecond;
   }
 
@@ -3788,6 +3864,7 @@ class CompositionController extends ChangeNotifier {
       ){
     composition = newComposition;
     selectedMeasureIndex = 0;
+    repairTempoBeats();
     warmUpSounds();
     notifyListeners();
   }

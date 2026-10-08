@@ -1,53 +1,38 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:isolate';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:flutter_soloud/flutter_soloud.dart';
 
-/// Plays note sounds for the composition — rewritten for smoother,
-/// more reliable playback. What changed compared with the old version,
-/// and why:
+/// Plays note sounds — now built on flutter_soloud instead of
+/// audioplayers.
 ///
-/// 1. ONE SOUND PER PITCH, NOT PER (PITCH, DURATION). The old version
-///    synthesized and wrote a new WAV file for every different
-///    frequency + duration combination, the very first time it was
-///    needed — so notes were often late (synthesis + disk write happen
-///    right when the note should sound) and a tempo change created a
-///    whole new batch of files. Now each pitch gets one fixed-length,
-///    naturally decaying tone, and a note's own length is produced by
-///    stopping that tone at the right moment (it has already decayed by
-///    then, so the stop is soft).
+/// WHY THE CHANGE: audioplayers sends every start/stop of every note
+/// as a separate message to Android's main thread. During a dense
+/// piece (chords + fast runs, like the Polonaise) those messages
+/// arrived faster than Android could handle them, so they piled up:
+/// the app froze, and queued notes kept sounding for minutes after.
+/// flutter_soloud is a native audio engine called directly (FFI, no
+/// message queue), and it mixes all notes itself on its own audio
+/// thread — starting a note is a cheap, immediate call, so nothing
+/// can pile up.
 ///
-/// 2. ONE PLAYER PER PITCH, PRELOADED, IN LOW-LATENCY MODE. Each pitch
-///    has its own [AudioPlayer] with its sound already loaded
-///    ([PlayerMode.lowLatency] — Android's SoundPool, meant for short
-///    game-style sounds). Starting a note is just "play from the start"
-///    — no file is opened at that moment. Different pitches never
-///    compete for a shared pool any more, so chords don't drop notes;
-///    re-striking the same pitch simply restarts it, like a piano key.
+/// How it works:
+/// - Each pitch's tone is synthesized once (on a background isolate)
+///   and loaded into memory — no files.
+/// - [warmUp] prepares every pitch a composition uses before playback
+///   (called from CompositionController).
+/// - [playTone] starts the pitch's tone; at the end of the note's
+///   duration it fades out over 40 ms (no click) and stops. Striking
+///   a pitch that's still ringing fades the old one out first, like a
+///   piano key being struck again.
 ///
-/// 3. WARM-UP BEFORE PLAYBACK. [warmUp] synthesizes and loads every
-///    pitch a composition uses ahead of time, on a background isolate
-///    so the UI doesn't stutter — call it when a composition opens
-///    (see CompositionController's constructor). Playback then never
-///    waits for synthesis.
-///
-/// 4. A MORE PIANO-LIKE TONE. Instead of a plain beep, each tone is a
-///    sum of a few harmonics with a very fast attack and an
-///    exponential decay (higher harmonics fade faster, low notes ring
-///    longer than high ones), which reads much more like a struck
-///    string.
-///
-/// The public API ([playTone], [enabled], [toggle], [dispose]) is
-/// unchanged, so existing callers keep working as-is.
+/// The public API ([playTone], [warmUp], [recover], [enabled],
+/// [toggle], [dispose]) is unchanged, so callers keep working.
 class NoteSoundService {
-  NoteSoundService._() {
-    _configureAudioContext();
-  }
+  NoteSoundService._();
 
   static final NoteSoundService instance = NoteSoundService._();
 
@@ -57,263 +42,149 @@ class NoteSoundService {
     enabled = !enabled;
   }
 
-  /// Sample rate of the synthesized tones — 22.05 kHz is plenty for
-  /// these tones (their highest harmonics stay well below 11 kHz)
-  /// and halves file size and synthesis time versus 44.1 kHz.
   static const int _sampleRate = 22050;
-
-  /// Notes shorter than this are stretched to it, so very fast notes
-  /// (a sixty-fourth at a quick tempo) are still audible at all.
   static const double _minAudibleSeconds = 0.07;
+  static const Duration _releaseFade = Duration(milliseconds: 40);
 
-  /// Per-pitch players, keyed by MIDI note number (60 = middle C).
-  final Map<int, AudioPlayer> _players = {};
+  final SoLoud _soloud = SoLoud.instance;
+  Future<bool>? _initFuture;
 
-  /// Per-pitch "preparation in progress" futures, so two requests for
-  /// the same pitch at the same moment share one synthesis/load
-  /// rather than racing each other.
-  final Map<int, Future<AudioPlayer?>> _preparing = {};
+  /// Loaded tone per pitch (MIDI note number, 60 = middle C).
+  final Map<int, AudioSource> _sources = {};
+  final Map<int, Future<AudioSource?>> _loading = {};
 
-  /// Per-pitch counter bumped on every new strike of that pitch, so a
-  /// pending "stop at end of note" from an EARLIER strike can tell it
-  /// has been superseded and must not cut off the newer one.
-  final Map<int, int> _strikeGeneration = {};
+  /// The most recent voice started for each pitch, so a re-strike can
+  /// fade out the one still ringing.
+  final Map<int, SoundHandle> _lastHandle = {};
 
-  Directory? _toneDir;
-
-  Future<void> _configureAudioContext() async {
-    try {
-      await AudioPlayer.global.setAudioContext(
-        AudioContext(
-          iOS: AudioContextIOS(
-            category: AVAudioSessionCategory.ambient,
-            options: const {AVAudioSessionOptions.mixWithOthers},
-          ),
-          android: const AudioContextAndroid(
-            isSpeakerphoneOn: false,
-            stayAwake: false,
-            contentType: AndroidContentType.music,
-            usageType: AndroidUsageType.media,
-            // No exclusive focus — every pitch's player must be able to
-            // sound together with all the others (chords).
-            audioFocus: AndroidAudioFocus.none,
-          ),
-        ),
-      );
-    } catch (_) {
-      // Unsupported field on some platform/version — fall back to the
-      // platform default rather than losing sound entirely.
-    }
+  Future<bool> _ensureInit() {
+    return _initFuture ??= () async {
+      try {
+        if (!_soloud.isInitialized) {
+          await _soloud.init();
+        }
+        // Enough voices for full chords plus notes still ringing out
+        // (the default is 16).
+        _soloud.setMaxActiveVoiceCount(64);
+        return true;
+      } catch (e) {
+        debugPrint('NoteSoundService: audio engine failed to start: $e');
+        _initFuture = null; // allow a later retry
+        return false;
+      }
+    }();
   }
 
-  /// MIDI note number closest to [frequencyHz] (A4 = 440 Hz = 69).
-  /// Every pitch the app produces is in 12-tone equal temperament, so
-  /// this maps each one to exactly one cached sound.
   static int _midiFor(double frequencyHz) =>
       (69 + 12 * (math.log(frequencyHz / 440) / math.ln2)).round();
 
   static double _frequencyForMidi(int midi) =>
       440.0 * math.pow(2, (midi - 69) / 12).toDouble();
 
-  Future<Directory> _ensureToneDir() async {
-    if (_toneDir != null) return _toneDir!;
-    final tempDir = await getTemporaryDirectory();
-    // "v2" so files from the old, differently-synthesized version are
-    // never picked up by mistake.
-    final dir = Directory('${tempDir.path}/note_tones_v2');
-    if (!await dir.exists()) {
-      await dir.create(recursive: true);
-    }
-    _toneDir = dir;
-    return dir;
-  }
-
-  /// Returns a ready-to-play player for [midi], synthesizing and
-  /// loading its sound first if this is the first time it's needed.
-  Future<AudioPlayer?> _playerFor(int midi) {
-    final existing = _players[midi];
-    if (existing != null) return Future.value(existing);
-    return _preparing[midi] ??= _preparePlayer(midi).whenComplete(() {
-      _preparing.remove(midi);
+  Future<AudioSource?> _sourceFor(int midi) {
+    final ready = _sources[midi];
+    if (ready != null) return Future.value(ready);
+    return _loading[midi] ??= _load(midi).whenComplete(() {
+      _loading.remove(midi);
     });
   }
 
-  Future<AudioPlayer?> _preparePlayer(int midi) async {
+  Future<AudioSource?> _load(int midi) async {
+    if (!await _ensureInit()) return null;
     try {
-      final dir = await _ensureToneDir();
-      final file = File('${dir.path}/piano_$midi.wav');
-      if (!await file.exists()) {
-        final frequency = _frequencyForMidi(midi);
-        // Synthesis is pure number-crunching — done on a background
-        // isolate so the UI (and playback scrolling) never stutters.
-        final bytes = await Isolate.run(
-              () => _synthesizePianoTone(frequency, _sampleRate),
-        );
-        await file.writeAsBytes(bytes, flush: true);
-      }
-
-      final player = AudioPlayer();
-      await player.setPlayerMode(PlayerMode.lowLatency);
-      await player.setReleaseMode(ReleaseMode.stop);
-      await player.setSource(DeviceFileSource(file.path));
-      _players[midi] = player;
-      return player;
+      final frequency = _frequencyForMidi(midi);
+      final bytes = await Isolate.run(
+            () => _synthesizePianoTone(frequency, _sampleRate),
+      );
+      final source = await _soloud.loadMem('piano_$midi.wav', bytes);
+      _sources[midi] = source;
+      return source;
     } catch (e) {
-      debugPrint('NoteSoundService: could not prepare pitch $midi: $e');
-      _registerFailure();
+      debugPrint('NoteSoundService: could not load pitch $midi: $e');
       return null;
     }
   }
 
-  /// Failures since the last rebuild. Low-latency mode is ALWAYS kept
-  /// (the regular media-player mode starts each sound far too slowly
-  /// for playback to stay in sync with the scrolling); instead, after
-  /// a few failures every player is simply rebuilt.
-  int _failureCount = 0;
-  static const int _failuresBeforeRebuild = 3;
-
-  void _registerFailure() {
-    _failureCount++;
-    if (_failureCount >= _failuresBeforeRebuild) {
-      debugPrint('NoteSoundService: rebuilding all players');
-      _failureCount = 0;
-      _resetPlayers();
-    }
-  }
-
-  /// Throws away every per-pitch player (not the generated sound
-  /// files — those are reused), so each pitch is reloaded fresh the
-  /// next time it plays.
-  void _resetPlayers() {
-    for (final player in _players.values) {
-      try {
-        player.dispose();
-      } catch (_) {}
-    }
-    _players.clear();
-    _sounding.clear();
-  }
-
-  /// Rebuilds all players from scratch, re-applying the audio
-  /// settings. Call it when the app comes back from the background
-  /// (see CompositionScreen), since the system may have released the
-  /// audio resources while the app was away — a common reason sound
-  /// works at first and then goes silent.
-  Future<void> recover() async {
-    _resetPlayers();
-    await _configureAudioContext();
-  }
-
-  /// Synthesizes and loads, ahead of time, the sound for every
-  /// frequency in [frequenciesHz] that isn't ready yet — so playback
-  /// never has to wait for it. Safe to call repeatedly; already-ready
-  /// pitches are skipped. Pitches are prepared one after another
-  /// rather than all at once, to keep memory and CPU use gentle.
+  /// Prepares, ahead of time, every pitch in [frequenciesHz] that
+  /// isn't ready yet, one after another. Safe to call repeatedly.
   Future<void> warmUp(Iterable<double> frequenciesHz) async {
     final midis = frequenciesHz
         .where((f) => f > 0)
         .map(_midiFor)
         .toSet()
-        .where((m) => !_players.containsKey(m));
+        .where((m) => !_sources.containsKey(m))
+        .toList();
     for (final midi in midis) {
-      await _playerFor(midi);
+      await _sourceFor(midi);
     }
   }
 
-  /// Pitches whose player is currently sounding — only those need a
-  /// stop() before being struck again. Skipping that extra call for
-  /// every other note keeps each note start to a SINGLE call into the
-  /// platform's audio system.
-  final Set<int> _sounding = {};
-
   /// Plays one note: [frequencyHz] for [durationSeconds]. Silently
-  /// does nothing if sound is off or the values aren't playable —
-  /// callers don't need to guard against either.
-  ///
-  /// Kept deliberately lean: every call into the platform's audio
-  /// system goes through one shared message queue, so extra calls per
-  /// note (the old version made up to 6, including a volume fade)
-  /// pile up during fast passages and make each later note start later
-  /// and later — the growing delay between scrolling and sound. Now a
-  /// note costs one call to start (two if the same pitch is still
-  /// ringing) and one call to stop.
+  /// does nothing if sound is off or the values aren't playable.
   Future<void> playTone({
     required double frequencyHz,
     required double durationSeconds,
   }) async {
     if (!enabled || frequencyHz <= 0 || durationSeconds <= 0) return;
-
     final midi = _midiFor(frequencyHz);
-    final generation = (_strikeGeneration[midi] ?? 0) + 1;
-    _strikeGeneration[midi] = generation;
 
-    // Up to two attempts: if the player for this pitch has gone bad
-    // (e.g. the system released it), it's thrown away and rebuilt once
-    // before giving up on this note.
-    for (int attempt = 0; attempt < 2; attempt++) {
-      try {
-        final player = await _playerFor(midi);
-        if (player == null) return;
-        // Another strike of this same pitch may have started while this
-        // one was still being prepared — that newer one wins.
-        if (_strikeGeneration[midi] != generation) return;
+    try {
+      final source = await _sourceFor(midi);
+      if (source == null) return;
 
-        if (_sounding.contains(midi)) {
-          await player.stop();
-        }
-        await player.resume();
-        _sounding.add(midi);
+      // Re-strike of a pitch that's still ringing: fade the old voice.
+      final previous = _lastHandle[midi];
+      if (previous != null) _fadeOutAndStop(previous);
 
-        final holdSeconds = math.max(durationSeconds, _minAudibleSeconds);
-        Timer(
-          Duration(microseconds: (holdSeconds * 1000000).round()),
-              () => _releaseNote(midi, player, generation),
-        );
-        return;
-      } catch (e) {
-        debugPrint('NoteSoundService: playback failed for pitch $midi: $e');
-        _registerFailure();
-        _sounding.remove(midi);
-        final broken = _players.remove(midi);
-        try {
-          broken?.dispose();
-        } catch (_) {}
-      }
+      // play() is synchronous in flutter_soloud 4.x — returns the
+      // voice handle immediately.
+      final handle = _soloud.play(source);
+      _lastHandle[midi] = handle;
+
+      final holdSeconds = math.max(durationSeconds, _minAudibleSeconds);
+      Timer(
+        Duration(microseconds: (holdSeconds * 1000000).round()),
+            () {
+          _fadeOutAndStop(handle);
+          if (_lastHandle[midi] == handle) _lastHandle.remove(midi);
+        },
+      );
+    } catch (e) {
+      debugPrint('NoteSoundService: could not play pitch $midi: $e');
     }
   }
 
-  /// Ends a note at the end of its written duration — a single stop
-  /// call. The synthesized tone has already decayed by then, so the
-  /// cut is soft. Does nothing if the same pitch has been struck again
-  /// in the meantime — the newer strike now owns the player.
-  Future<void> _releaseNote(int midi, AudioPlayer player, int generation) async {
-    if (_strikeGeneration[midi] != generation) return;
-    _sounding.remove(midi);
+  void _fadeOutAndStop(SoundHandle handle) {
     try {
-      await player.stop();
-    } catch (_) {}
+      // Both run inside the audio engine itself — no waiting here.
+      _soloud.fadeVolume(handle, 0, _releaseFade);
+      _soloud.scheduleStop(handle, _releaseFade);
+    } catch (_) {
+      // The voice already ended on its own — nothing to do.
+    }
+  }
+
+  /// Called when the app returns from the background. The engine
+  /// normally keeps running; this only restarts it if it was shut
+  /// down, then the caller re-runs warm-up.
+  Future<void> recover() async {
+    if (_soloud.isInitialized) return;
+    _initFuture = null;
+    _sources.clear();
+    _lastHandle.clear();
+    await _ensureInit();
   }
 
   void dispose() {
-    for (final player in _players.values) {
-      player.dispose();
-    }
-    _players.clear();
+    _sources.clear();
+    _lastHandle.clear();
+    _initFuture = null;
+    try {
+      _soloud.deinit();
+    } catch (_) {}
   }
 }
 
-/// Builds a mono 16-bit WAV of a piano-like tone at [frequency] Hz —
-/// a top-level function (not a method) so it can run inside
-/// [Isolate.run].
-///
-/// The tone is a fundamental plus a few harmonics. Each harmonic has
-/// a fast (~4 ms) attack and its own exponential decay — higher
-/// harmonics decay faster, so the tone starts bright and mellows, the
-/// way a struck string does — and lower notes decay more slowly
-/// overall than higher ones. A very slight inharmonic stretch on the
-/// upper harmonics adds a little realism. Length depends on pitch
-/// (long for bass, shorter for treble) and the last 40 ms fade to
-/// silence so a note left to ring out ends without a click.
 Uint8List _synthesizePianoTone(double frequency, int sampleRate) {
   // How long a key keeps ringing if held: ~3 s in the bass down to
   // ~1 s in the high treble.
@@ -369,7 +240,7 @@ Uint8List _synthesizePianoTone(double frequency, int sampleRate) {
 
   // Normalize to a moderate level, leaving headroom for chords
   // (several pitches sounding at once are mixed by the system).
-  const double targetLevel = 0.35;
+  const double targetLevel = 0.25;
   final double gain = peak > 0 ? targetLevel / peak : 0;
 
   final dataBytes = sampleCount * 2;
