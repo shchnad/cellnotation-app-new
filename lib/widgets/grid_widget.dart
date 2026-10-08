@@ -13,6 +13,7 @@ import '../models/dynamic_change_event.dart';
 import '../utils/app_colors.dart';
 import '../utils/scale_resolver.dart';
 import 'note_block_widget.dart';
+import 'ink_layer_widget.dart';
 
 /// tempo — blue in light mode, white in dark mode (see
 /// AppColors.gridLabelText) for legibility against the black grid.
@@ -778,9 +779,17 @@ class GridWidget extends StatelessWidget {
                 SingleChildScrollView(
                   scrollDirection: Axis.vertical,
                   controller: verticalScrollController,
+                  // In Pen mode the finger draws, so dragging must not
+                  // scroll the grid (playback's auto-scroll still works).
+                  physics: controller.penMode
+                      ? const NeverScrollableScrollPhysics()
+                      : null,
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     controller: horizontalScrollController,
+                    physics: controller.penMode
+                        ? const NeverScrollableScrollPhysics()
+                        : null,
                     padding: EdgeInsets.only(
                       left: leadingPadding,
                       right: trailingPadding,
@@ -1263,11 +1272,32 @@ class GridWidget extends StatelessWidget {
                                 ),
                               ),
                             ),
+
+                          // RED PEN MARKS — on top of everything, so
+                          // marks are visible over notes. Takes the
+                          // finger only while Pen mode is on.
+                          Positioned.fill(
+                            child: InkLayer(
+                              controller: controller,
+                              pixelsPerTick: pixelsPerTick,
+                              cellHeight: cellHeight,
+                            ),
+                          ),
                         ],
                       ),
                     ),
                   ),
                 ),
+
+                // PEN TOOLBAR — pinned to the viewport while Pen mode
+                // is on.
+                if (controller.penMode)
+                  Positioned(
+                    top: 8,
+                    left: 0,
+                    right: 0,
+                    child: Center(child: _PenToolbar(controller: controller)),
+                  ),
 
                 // The full-guide banner and the "tap icons" bubble
                 // both moved OUT of GridWidget entirely — into
@@ -1803,4 +1833,155 @@ class GridPainter extends CustomPainter {
     return true;
   }
 
+}
+
+
+/// Small floating bar shown while Pen mode is on: Pen / Eraser / Undo /
+/// Clear all / Done.
+class _PenToolbar extends StatelessWidget {
+  final CompositionController controller;
+
+  const _PenToolbar({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    final erasing = controller.inkEraser;
+    final hasInk = controller.inkStrokeCount > 0;
+
+    Widget tool({
+      required IconData icon,
+      required String label,
+      required Color color,
+      required VoidCallback? onTap,
+      bool selected = false,
+    }) {
+      final enabled = onTap != null;
+      final fg = !enabled
+          ? Colors.grey
+          : (selected ? Colors.white : color);
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 3),
+        child: Material(
+          color: selected ? color : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: onTap,
+            child: Padding(
+              padding:
+              const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, color: fg, size: 22),
+                  const SizedBox(width: 4),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: fg,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Material(
+      color: Colors.white,
+      elevation: 6,
+      borderRadius: BorderRadius.circular(26),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              tool(
+                icon: Icons.draw,
+                label: 'Pen',
+                color: Colors.red,
+                selected: !erasing,
+                onTap: () => controller.setInkEraser(false),
+              ),
+              tool(
+                icon: Icons.cleaning_services,
+                label: 'Eraser',
+                color: Colors.blue,
+                selected: erasing,
+                onTap: hasInk ? () => controller.setInkEraser(true) : null,
+              ),
+              tool(
+                icon: Icons.undo,
+                label: 'Undo',
+                color: Colors.black,
+                onTap: controller.canUndoInk ? controller.undoLastInk : null,
+              ),
+              tool(
+                icon: Icons.delete_outline,
+                label: 'Clear all',
+                color: Colors.black,
+                onTap: hasInk
+                    ? () async {
+                  final ok = await showDialog<bool>(
+                    context: context,
+                    builder: (dialogContext) => AlertDialog(
+                      backgroundColor: Colors.white,
+                      surfaceTintColor: Colors.white,
+                      title: const Text(
+                        'Clear all red marks?',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () =>
+                              Navigator.pop(dialogContext, false),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () =>
+                              Navigator.pop(dialogContext, true),
+                          child: const Text(
+                            'Clear',
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (ok == true) controller.clearAllInk();
+                }
+                    : null,
+              ),
+              tool(
+                icon: Icons.check,
+                label: 'Done',
+                color: Colors.green,
+                onTap: controller.togglePenMode,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -19,7 +19,7 @@ import '../enums/note_duration.dart';
 import '../models/composition.dart';
 import '../models/dynamic_event.dart';
 import '../models/note.dart';
-import '../models/measure.dart';
+import '../models/measure.dart'; // also defines InkStroke
 import '../models/note_import.dart';
 import '../models/tempo_event.dart';
 import '../models/time_signature.dart';
@@ -855,6 +855,8 @@ class CompositionController extends ChangeNotifier {
     final copiedMeasure = original.copyWith(
       id: measures.length,
       startTick: newStart,
+      // Red-pen marks belong to the original only.
+      inkStrokes: [],
       beatEvents:
       original.beatEvents.map(
             (e)=>e.copyWith(
@@ -3859,11 +3861,146 @@ class CompositionController extends ChangeNotifier {
   // COMPOSITION REPLACEMENT
   // =====================================================
 
+  // ================= RED PEN (marks to check later) =================
+
+  /// While on, one finger draws red marks on the grid instead of
+  /// scrolling or editing (see InkLayer in ink_layer_widget.dart).
+  bool penMode = false;
+
+  /// While Pen mode is on: true = the finger erases marks it touches.
+  bool inkEraser = false;
+
+  /// Strokes in the order they were drawn, for Undo.
+  final List<InkStroke> _inkHistory = [];
+
+  void togglePenMode() {
+    penMode = !penMode;
+    inkEraser = false;
+    notifyListeners();
+  }
+
+  void setInkEraser(bool value) {
+    inkEraser = value;
+    notifyListeners();
+  }
+
+  int get inkStrokeCount =>
+      measures.fold(0, (sum, m) => sum + m.inkStrokes.length);
+
+  /// Every mark as absolute grid points (dx = tick, dy = row).
+  List<List<Offset>> get absoluteInkStrokes => [
+    for (final m in measures)
+      for (final s in m.inkStrokes)
+        [for (final p in s.points) Offset(p.dx + m.startTick, p.dy)],
+  ];
+
+  /// Saves a finished stroke given in absolute grid points
+  /// (dx = tick, dy = row) into the measure where it starts.
+  void addInkStroke(List<Offset> absolutePoints) {
+    if (absolutePoints.isEmpty || measures.isEmpty) return;
+    final startTick = absolutePoints.first.dx;
+    var index = measures.indexWhere(
+          (m) => startTick >= m.startTick && startTick < m.endTick,
+    );
+    if (index < 0) index = startTick < 0 ? 0 : measures.length - 1;
+    final measure = measures[index];
+    final stroke = InkStroke([
+      for (final p in absolutePoints)
+        Offset(p.dx - measure.startTick, p.dy),
+    ]);
+    measure.inkStrokes.add(stroke);
+    _inkHistory.add(stroke);
+    notifyListeners();
+  }
+
+  /// Erases every mark passing within [radiusPx] screen pixels of
+  /// [absolutePoint] (dx = tick, dy = row). Returns true if any was
+  /// erased.
+  bool eraseInkAt(
+      Offset absolutePoint, {
+        required double pixelsPerTick,
+        required double cellHeight,
+        double radiusPx = 22,
+      }) {
+    final target = Offset(
+      absolutePoint.dx * pixelsPerTick,
+      absolutePoint.dy * cellHeight,
+    );
+    bool erased = false;
+    for (final m in measures) {
+      m.inkStrokes.removeWhere((stroke) {
+        final px = [
+          for (final p in stroke.points)
+            Offset(
+              (p.dx + m.startTick) * pixelsPerTick,
+              p.dy * cellHeight,
+            ),
+        ];
+        final hit = _strokeNear(px, target, radiusPx);
+        if (hit) {
+          _inkHistory.remove(stroke);
+          erased = true;
+        }
+        return hit;
+      });
+    }
+    if (erased) {
+      // Nothing left to erase — back to the pen.
+      if (inkStrokeCount == 0) inkEraser = false;
+      notifyListeners();
+    }
+    return erased;
+  }
+
+  static bool _strokeNear(List<Offset> pts, Offset target, double radius) {
+    if (pts.isEmpty) return false;
+    if (pts.length == 1) return (pts.first - target).distance <= radius;
+    for (int i = 0; i + 1 < pts.length; i++) {
+      final a = pts[i];
+      final b = pts[i + 1];
+      final ab = b - a;
+      final len2 = ab.dx * ab.dx + ab.dy * ab.dy;
+      double t = 0;
+      if (len2 > 0) {
+        final ap = target - a;
+        t = ((ap.dx * ab.dx + ap.dy * ab.dy) / len2).clamp(0.0, 1.0);
+      }
+      final closest = a + ab * t;
+      if ((closest - target).distance <= radius) return true;
+    }
+    return false;
+  }
+
+  /// Removes the most recently drawn mark that still exists.
+  void undoLastInk() {
+    while (_inkHistory.isNotEmpty) {
+      final last = _inkHistory.removeLast();
+      for (final m in measures) {
+        if (m.inkStrokes.remove(last)) {
+          notifyListeners();
+          return;
+        }
+      }
+    }
+  }
+
+  bool get canUndoInk => _inkHistory.isNotEmpty;
+
+  void clearAllInk() {
+    for (final m in measures) {
+      m.inkStrokes.clear();
+    }
+    _inkHistory.clear();
+    inkEraser = false;
+    notifyListeners();
+  }
+
   void updateComposition(
       Composition newComposition,
       ){
     composition = newComposition;
     selectedMeasureIndex = 0;
+    _inkHistory.clear();
     repairTempoBeats();
     warmUpSounds();
     notifyListeners();

@@ -107,19 +107,6 @@ void scrollSpeedDialog(
 
               Row(
                 children: [
-                  TextButton(
-                    onPressed: (){
-                      controller.resetPlaybackSpeed();
-                    },
-                    child: const Text(
-                      "Reset",
-                      style: TextStyle(
-                        color: Colors.blue,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
 
                   TextButton(
                     onPressed: (){
@@ -129,6 +116,20 @@ void scrollSpeedDialog(
                       "Close",
                       style: TextStyle(
                         color: Colors.black,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+
+                  TextButton(
+                    onPressed: (){
+                      controller.resetPlaybackSpeed();
+                    },
+                    child: const Text(
+                      "Reset",
+                      style: TextStyle(
+                        color: Colors.blue,
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                       ),

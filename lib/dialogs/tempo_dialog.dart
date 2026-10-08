@@ -16,6 +16,8 @@ void tempoDialog(
 
       final screen = MediaQuery.of(context).size;
 
+      // A tempo change placed exactly at this tick (only this one can
+      // be deleted).
       TempoEvent? currentEvent;
 
       for(final event in controller.timeline.tempoEvents){
@@ -24,6 +26,12 @@ void tempoDialog(
           break;
         }
       }
+
+      // The tempo actually playing at this tick — the change placed
+      // here, or else the latest one before it. Its button is shown
+      // with blue, bold text.
+      final Tempo? currentTempo =
+          currentEvent?.tempo ?? controller.getActiveTempoAtTick(tick)?.tempo;
 
 
       return AlertDialog(
@@ -55,8 +63,7 @@ void tempoDialog(
             children: Tempo.values.map(
                     (tempo) {
 
-                  final selected =
-                      currentEvent?.tempo == tempo;
+                  final selected = currentTempo == tempo;
 
 
                   return ElevatedButton(
@@ -79,6 +86,9 @@ void tempoDialog(
                         color: selected
                             ? Colors.blue
                             : Colors.black,
+                        fontWeight: selected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                       ),
                     ),
 

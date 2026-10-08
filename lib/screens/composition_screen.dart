@@ -377,6 +377,23 @@ class _CompositionScreenState extends State<CompositionScreen>
     if (mounted) setState(() {});
   }
 
+  /// Scrolls the grid so the very end of the composition (the last
+  /// measure's closing bar line) sits at the right edge of the screen.
+  Future<void> _scrollToEnd() async {
+    if (!_gridHorizontalController.hasClients) return;
+    final position = _gridHorizontalController.position;
+    final endOffset = _effectiveLeadingPadding +
+        controller.maxTicks * controller.pixelsPerTick -
+        position.viewportDimension +
+        24; // a little space after the last bar line
+    await _gridHorizontalController.animateTo(
+      endOffset.clamp(0.0, position.maxScrollExtent),
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
+    if (mounted) setState(() {});
+  }
+
   /// Scrolls the grid to the start of [measureIndex] (0-based) — used
   /// by the "Go to Measure" button, right under Scroll to Start.
   /// Animated (matching _scrollToStart's own feel) rather than an
@@ -1290,6 +1307,39 @@ class _CompositionScreenState extends State<CompositionScreen>
                                 }),
                           ),
 
+                          // RED PEN — mark places to check later
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: Icon(
+                                Icons.draw,
+                                color: controller.penMode
+                                    ? Colors.red
+                                    : Colors.black,
+                              ),
+                            ),
+                            tooltip: 'Red Pen',
+                            onPressed: _withHelp(
+                              'Red Pen: \nDraw red marks on the grid with your finger to mark places to check later. While it is on, one finger draws and the grid does not scroll; use Eraser, Undo or Clear all in the bar at the top of the grid, and Done to finish. Marks are saved with the composition.',
+                              hasMeasures
+                                  ? () {
+                                controller.togglePenMode();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    duration: const Duration(seconds: 1),
+                                    content: Text(
+                                      controller.penMode
+                                          ? 'Red Pen on — draw with your finger.'
+                                          : 'Red Pen off.',
+                                      style: const TextStyle(fontSize: 22),
+                                    ),
+                                  ),
+                                );
+                              }
+                                  : null,
+                            ),
+                          ),
+
 
                           SizedBox(
                             height: 30,
@@ -1720,6 +1770,26 @@ class _CompositionScreenState extends State<CompositionScreen>
                               hasMeasures
                                   ? () {
                                 _scrollToStart();
+                              }
+                                  : null,
+                            ),
+                          ),
+
+                          // SCROLL TO END
+                          IconButton(
+                            icon: Transform.rotate(
+                              angle: controller.rotatePitchText ? -pi / 2 : 0,
+                              child: const Icon(
+                                Icons.last_page,
+                                color: Colors.black,
+                              ),
+                            ),
+                            tooltip: 'Scroll to End',
+                            onPressed: _withHelp(
+                              'Scroll to End: \nJumps the grid to the very end of the composition.',
+                              hasMeasures
+                                  ? () {
+                                _scrollToEnd();
                               }
                                   : null,
                             ),

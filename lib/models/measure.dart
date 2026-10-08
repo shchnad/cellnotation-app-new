@@ -1,3 +1,5 @@
+import 'dart:ui' show Offset;
+
 import 'package:music_composer/models/time_signature.dart';
 import 'beat_event_model.dart';
 import '../enums/note_duration.dart';
@@ -40,6 +42,10 @@ class Measure {
   NoteDuration get effectiveTempoBeat =>
       tempoBeatDuration ?? timeSignature.beatDuration;
 
+  /// Red-pen marks that START in this measure (see InkStroke), so they
+  /// move together with the measure.
+  final List<InkStroke> inkStrokes;
+
   Measure({
     required this.id,
     required this.startTick,
@@ -50,9 +56,11 @@ class Measure {
     List<BeatEvent>? beatEvents,
     this.fermataExtraTicks = 0,
     this.tempoBeatDuration,
+    List<InkStroke>? inkStrokes,
   }) :
         originalScaleName = originalScaleName ?? scaleName,
-        beatEvents = beatEvents ?? [];
+        beatEvents = beatEvents ?? [],
+        inkStrokes = inkStrokes ?? [];
 
 
   int get durationTicks =>
@@ -112,6 +120,7 @@ class Measure {
     List<BeatEvent>? beatEvents,
     int? fermataExtraTicks,
     Object? tempoBeatDuration = _keep,
+    List<InkStroke>? inkStrokes,
   }) {
     return Measure(
       id: id ?? this.id,
@@ -127,6 +136,7 @@ class Measure {
       tempoBeatDuration: tempoBeatDuration == _keep
           ? this.tempoBeatDuration
           : tempoBeatDuration as NoteDuration?,
+      inkStrokes: inkStrokes ?? List<InkStroke>.from(this.inkStrokes),
     );
   }
 
@@ -146,6 +156,8 @@ class Measure {
       'fermataExtraTicks': fermataExtraTicks,
       if (tempoBeatDuration != null)
         'tempoBeatDuration': tempoBeatDuration!.name,
+      if (inkStrokes.isNotEmpty)
+        'inkStrokes': inkStrokes.map((s) => s.toJson()).toList(),
     };
   }
 
@@ -168,6 +180,10 @@ class Measure {
       // Older saved compositions won't have this — null means the
       // tempo counts the measure's own beat, as before.
       tempoBeatDuration: _noteDurationOrNull(json['tempoBeatDuration']),
+      // Older saved compositions have no red-pen marks.
+      inkStrokes: (json['inkStrokes'] as List<dynamic>? ?? const [])
+          .map((s) => InkStroke.fromJson(s as Map<String, dynamic>))
+          .toList(),
     );
   }
 
@@ -180,4 +196,39 @@ class Measure {
     }
   }
 
+}
+
+/// One red-pen mark drawn by finger on the grid (Pen mode — see
+/// CompositionController.penMode), used to mark places to check later.
+///
+/// Stored inside the [Measure] the stroke STARTS in, with each point as
+///   dx = ticks from that measure's own startTick (fractional),
+///   dy = grid row (fractional),
+/// so a mark stays on the same notes when the grid is zoomed, the cell
+/// width changes, or measures are inserted/deleted before it.
+class InkStroke {
+  final List<Offset> points;
+
+  InkStroke(this.points);
+
+  Map<String, dynamic> toJson() => {
+    // Flat [x0, y0, x1, y1, ...], rounded to keep saved files small.
+    'p': [
+      for (final p in points) ...[
+        (p.dx * 10).round() / 10,
+        (p.dy * 100).round() / 100,
+      ],
+    ],
+  };
+
+  factory InkStroke.fromJson(Map<String, dynamic> json) {
+    final raw = (json['p'] as List<dynamic>? ?? const [])
+        .map((v) => (v as num).toDouble())
+        .toList();
+    final points = <Offset>[];
+    for (int i = 0; i + 1 < raw.length; i += 2) {
+      points.add(Offset(raw[i], raw[i + 1]));
+    }
+    return InkStroke(points);
+  }
 }
