@@ -17,6 +17,11 @@ class Composition {
   final bool isPublic;
   final List<String> likedBy;
 
+  /// How hard the piece is to play: 1 (easy), 2 (medium), 3 (hard).
+  final int complexity;
+  static const int minComplexity = 1;
+  static const int maxComplexity = 3;
+
   // Internal backing field for your mutable scaleName parameter
   String _scaleName;
 
@@ -38,6 +43,7 @@ class Composition {
     required this.numberOfOctaves,
     this.isPublic = false,
     List<String>? likedBy,
+    int complexity = 1,
     required String scaleName,
     required this.timeline,
     required this.notes,
@@ -48,6 +54,7 @@ class Composition {
         tempoEvents = tempoEvents ?? [],
         dynamicEvents = dynamicEvents ?? [],
         likedBy = likedBy ?? [],
+        complexity = complexity.clamp(minComplexity, maxComplexity).toInt(),
         _scaleName = scaleName;
 
   // The Explicit Getter
@@ -76,6 +83,7 @@ class Composition {
     int? numberOfOctaves,
     bool? isPublic,
     List<String>? likedBy,
+    int? complexity,
     String? scaleName,
     Timeline? timeline,
     List<Note>? notes,
@@ -95,6 +103,7 @@ class Composition {
       numberOfOctaves: numberOfOctaves ?? this.numberOfOctaves,
       isPublic: isPublic ?? this.isPublic,
       likedBy: likedBy ?? this.likedBy,
+      complexity: complexity ?? this.complexity,
       scaleName: scaleName ?? this.scaleName,
       timeline: timeline ?? this.timeline,
       notes: notes ?? this.notes,
@@ -118,6 +127,7 @@ class Composition {
       'numberOfOctaves': numberOfOctaves,
       'isPublic': isPublic,
       'likedBy': likedBy,
+      'complexity': complexity,
       'scaleName': scaleName,
       'timeline': timeline.toJson(),
       'notes': notes.map((n) => n.toJson()).toList(),
@@ -140,6 +150,8 @@ class Composition {
       numberOfOctaves: json['numberOfOctaves'] as int,
       isPublic: json['isPublic'] as bool? ?? false,
       likedBy: (json['likedBy'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [],
+      // Compositions saved before levels existed open as level 1.
+      complexity: (json['complexity'] as num?)?.toInt() ?? 1,
       scaleName: json['scaleName'] as String,
       timeline: Timeline.fromJson(json['timeline'] as Map<String, dynamic>),
       notes: (json['notes'] as List<dynamic>)

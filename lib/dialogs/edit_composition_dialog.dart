@@ -5,6 +5,7 @@ import '../enums/music_style.dart';
 import '../enums/instrument.dart';
 import 'confirm_delete_dialog.dart';
 import 'note_values_dialog.dart';
+import '../widgets/complexity_selector.dart';
 
 
 class EditCompositionDialog extends StatefulWidget {
@@ -35,6 +36,7 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
   late MusicStyle _selectedStyle;
   late Instrument _selectedInstrument;
   late bool _isPublic;
+  late int _complexity;
 
   @override
   void initState() {
@@ -54,6 +56,7 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
       orElse: () => Instrument.any,
     );
     _isPublic = widget.composition.isPublic;
+    _complexity = widget.composition.complexity;
   }
 
   @override
@@ -215,6 +218,12 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
                   ],
                 ),
                 const SizedBox(height: 15),
+                ComplexitySelector(
+                  value: _complexity,
+                  color: Colors.blue,
+                  onChanged: (level) => setState(() => _complexity = level),
+                ),
+                const SizedBox(height: 15),
                 Row(
                   children: [
                     const Icon(Icons.public, size: 22),
@@ -257,12 +266,12 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
             if (widget.onDelete != null && widget.allowDelete)
               TextButton(
                 onPressed: () => confirmDeleteCompositionDialog(
-                  context,
-                  title: widget.composition.title,
-                  onDelete: () {
-                    Navigator.pop(context);
-                    widget.onDelete?.call();
-                  }
+                    context,
+                    title: widget.composition.title,
+                    onDelete: () {
+                      Navigator.pop(context);
+                      widget.onDelete?.call();
+                    }
                 ),
                 child: const Text(
                   'Delete',
@@ -284,6 +293,7 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
                   style: _selectedStyle.label,
                   instrument: _selectedInstrument.label,
                   isPublic: _isPublic,
+                  complexity: _complexity,
                   editedAt: DateTime.now(),
                 );
                 Navigator.pop(context);

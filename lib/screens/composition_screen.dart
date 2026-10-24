@@ -8,12 +8,14 @@ import 'package:music_composer/utils/default_values.dart';
 
 import '../controllers/composition_controller.dart';
 
+import '../dialogs/audio_hands_dialog.dart';
 import '../models/note_import.dart';
 
 import '../dialogs/measure_range_dialog.dart';
 import '../dialogs/go_to_measure_dialog.dart';
 import '../dialogs/cell_width_dialog.dart';
 import '../dialogs/scroll_speed_dialog.dart';
+import '../dialogs/audio_hands_dialog.dart';
 import '../dialogs/new_composition_dialog.dart';
 import '../dialogs/global_duration_dialog.dart';
 import '../dialogs/add_measures_dialog.dart';
@@ -1821,7 +1823,8 @@ class _CompositionScreenState extends State<CompositionScreen>
                             ),
                           ),
 
-                          // SOUND
+                          // SOUND — opens the Audio dialog to choose
+                          // which hands are heard and which are cut off.
                           IconButton(
                             icon: Transform.rotate(
                               angle: controller.rotatePitchText ? -pi / 2 : 0,
@@ -1829,25 +1832,17 @@ class _CompositionScreenState extends State<CompositionScreen>
                                 controller.soundEnabled
                                     ? Icons.volume_up
                                     : Icons.volume_off,
-                                color: Colors.black,
+                                // Blue when only some hands are heard.
+                                color: controller.isSoundPartial
+                                    ? Colors.blue
+                                    : Colors.black,
                               ),
                             ),
-                            tooltip: controller.soundEnabled
-                                ? 'Sound On'
-                                : 'Sound Off',
+                            tooltip: 'Audio',
                             onPressed: _withHelp(
-                                'Sound: \nSet audio off/on.',
+                                'Audio: \nChoose which hands are heard during playback (Audio) and which are silent (Cut off), so each hand can be listened to separately.',
                                     () {
-                                  controller.toggleSound();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      duration: const Duration(seconds: 1),
-                                      content: Text(
-                                        controller.soundEnabled ? 'Sound on.' : 'Sound off.',
-                                        style: const TextStyle(fontSize: 22),
-                                      ),
-                                    ),
-                                  );
+                                  audioHandsDialog(context, controller);
                                 }),
                           ),
 

@@ -27,6 +27,8 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
   MusicStyle _styleFilter = MusicStyle.any;
   Instrument _instrumentFilter = Instrument.any;
   String _searchQuery = '';
+  /// Level-of-complexity filter: 0 = any level, else 1, 2 or 3.
+  int _levelFilter = 0;
 
   @override
   void dispose() {
@@ -177,6 +179,19 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
               },
             ),
           ),
+          const SizedBox(width: 10),
+          // Level filter: each tap moves Any -> 1 -> 2 -> 3 -> Any.
+          Expanded(
+            flex: 1,
+            child: _filterPill(
+              label: 'Level of complexity (tap to change)',
+              valueText: _levelFilter == 0 ? 'Any' : '$_levelFilter',
+              isActive: _levelFilter != 0,
+              icon: Icons.signal_cellular_alt,
+              showArrow: false,
+              onTap: () => setState(() => _levelFilter = (_levelFilter + 1) % 4),
+            ),
+          ),
         ],
       ),
     );
@@ -251,6 +266,10 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
                           children: [
                             _InfoChip(icon: Icons.palette, text: comp.style),
                             _InfoChip(icon: Icons.piano, text: comp.instrument),
+                            _InfoChip(
+                              icon: Icons.signal_cellular_alt,
+                              text: 'Level ${comp.complexity}',
+                            ),
                             _InfoChip(
                               icon: Icons.view_week,
                               text: '$measureCount '
@@ -378,6 +397,11 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
                     if (_instrumentFilter != Instrument.any) {
                       compositions = compositions
                           .where((c) => c.instrument == _instrumentFilter.label)
+                          .toList();
+                    }
+                    if (_levelFilter != 0) {
+                      compositions = compositions
+                          .where((c) => c.complexity == _levelFilter)
                           .toList();
                     }
                     if (_searchQuery.isNotEmpty) {

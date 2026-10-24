@@ -2694,7 +2694,48 @@ class CompositionController extends ChangeNotifier {
   // SOUND
   // =====================================================
 
-  bool soundEnabled = true;
+  /// Hands whose notes are silent ("cut off") during playback — set
+  /// in the Audio dialog (audio_hands_dialog.dart). By default every
+  /// hand is cut off.
+  final Set<Hand> mutedHands = {...Hand.values};
+
+  /// The hands that actually have notes in this composition, in the
+  /// order right, left, additional.
+  List<Hand> get handsInComposition {
+    final present = notes.map((n) => n.hand).toSet();
+    return [Hand.right, Hand.left, Hand.additional]
+        .where(present.contains)
+        .toList();
+  }
+
+  bool isHandMuted(Hand hand) => mutedHands.contains(hand);
+
+  void setHandMuted(Hand hand, bool muted) {
+    if (muted) {
+      mutedHands.add(hand);
+    } else {
+      mutedHands.remove(hand);
+    }
+    notifyListeners();
+  }
+
+  void setAllHandsMuted(bool muted) {
+    if (muted) {
+      mutedHands.addAll(Hand.values);
+    } else {
+      mutedHands.clear();
+    }
+    notifyListeners();
+  }
+
+  /// True while at least one hand that has notes is heard.
+  bool get soundEnabled =>
+      handsInComposition.any((h) => !mutedHands.contains(h));
+
+  /// True when some hands are heard and some are cut off.
+  bool get isSoundPartial =>
+      soundEnabled &&
+          handsInComposition.any((h) => mutedHands.contains(h));
 
   // =====================================================
   // PLAYBACK SPEED
@@ -2732,10 +2773,9 @@ class CompositionController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Turns every hand on, or — if any hand is heard — every hand off.
   void toggleSound() {
-    soundEnabled = !soundEnabled;
-    NoteSoundService.instance.enabled = soundEnabled;
-    notifyListeners();
+    setAllHandsMuted(soundEnabled);
   }
 
   // Semitone offset of each natural scale degree (1..7 = do..si) from
@@ -2945,7 +2985,7 @@ class CompositionController extends ChangeNotifier {
   /// including generated glissando run notes, play them correctly
   /// with no changes needed on the playback side itself.
   void playNoteSound(Note note) {
-    if (!soundEnabled) return;
+    if (mutedHands.contains(note.hand)) return;
     final frequencyHz = note.glissandoSourceId != null
         ? getWhiteKeyFrequencyHz(note.row)
         : getNoteFrequencyHz(note);
@@ -2978,7 +3018,7 @@ class CompositionController extends ChangeNotifier {
   /// (composition_screen.dart) can trigger each note of an ornament's
   /// sequence individually, at its own onset, as playback crosses it.
   void playGhostNoteSound(Note ghost, Note baseNote, int shift) {
-    if (!soundEnabled) return;
+    if (mutedHands.contains(baseNote.hand)) return;
     NoteSoundService.instance.playTone(
       frequencyHz: getOrnamentFrequencyHz(
         baseNote: baseNote,
@@ -3459,6 +3499,59 @@ class CompositionController extends ChangeNotifier {
   /// durationTicks/row/ornament are never touched; this is purely a
   /// read-only view. Playback always uses the real [notes] list
   /// regardless of this.
+  // ================= TRILL =================
+
+  /// How long each short note of a trill lasts, in seconds — about 10
+  /// notes per second, a speed a pianist can comfortably play by
+  /// alternating the two keys. Every trill uses this same speed, no
+  /// matter how long the trilled note is: a longer note simply gets
+  /// more alternations. Raise it for a slower trill, lower it for a
+  /// faster one.
+  static const double trillNoteSeconds = 0.1;
+
+  /// Upper limit on short notes in one trill (ghost ids are
+  /// note.id * 100 + index, so it must stay below 100).
+  static const int _maxTrillNotes = 98;
+
+  static bool _isTrill(Ornament ornament) =>
+      ornament == Ornament.trillDiatonic ||
+          ornament == Ornament.trillChromatic;
+
+  /// The trill for [note] as a shiftMap of equal short notes, each
+  /// lasting about [trillNoteSeconds] at the note's tempo. Alternates
+  /// the auxiliary note and the main note in the order the ornament
+  /// defines (upper note first) and always ends on the main note,
+  /// so the count is always even. Computed at the written tempo, not
+  /// the Scroll Speed setting, so the grid looks the same at any
+  /// playback speed.
+  List _trillShiftMap(Note note, Ornament ornament) {
+    final first = ((ornament.shiftMap[0] as Map)['shift'] as num).toInt();
+    final second = ((ornament.shiftMap[1] as Map)['shift'] as num).toInt();
+
+    final measure = getMeasureAtTick(note.startTick);
+    final bpm = getActiveTempoAtTick(note.startTick)?.tempo.value ?? 0;
+    final beatTicks = measure.effectiveTempoBeat.ticks;
+
+    int count;
+    if (bpm <= 0 || beatTicks <= 0) {
+      count = 8; // no tempo known — the old fixed 8-note trill
+    } else {
+      final seconds = note.durationTicks / beatTicks * 60.0 / bpm;
+      count = (seconds / trillNoteSeconds).round();
+    }
+    if (count.isOdd) count += 1; // end on the main note
+    count = count.clamp(2, _maxTrillNotes);
+    // Never shorter than one tick per short note.
+    while (count > 2 && count > note.durationTicks) {
+      count -= 2;
+    }
+
+    return [
+      for (int i = 0; i < count; i++)
+        {'coeff': 1.0, 'shift': i.isEven ? first : second},
+    ];
+  }
+
   List<({Note note, bool isGhost, bool isClickable, Note? interactionNote, int shift})>
   get displayNotes {
     final result =
@@ -3483,7 +3576,14 @@ class CompositionController extends ChangeNotifier {
       // so the ghost sequence always exactly fills the original
       // note's duration regardless of what the raw coefficients add
       // up to.
-      final totalCoeff = ornament.shiftMap.fold<double>(
+      // Trills are rebuilt from the note's real length (see
+      // _trillShiftMap) so every trill alternates at the same speed;
+      // every other ornament uses its own shiftMap as before.
+      final shiftMap = _isTrill(ornament)
+          ? _trillShiftMap(note, ornament)
+          : ornament.shiftMap;
+
+      final totalCoeff = shiftMap.fold<double>(
         0.0,
             (sum, e) => sum + ((e as Map)['coeff'] as num).toDouble(),
       );
@@ -3499,8 +3599,8 @@ class CompositionController extends ChangeNotifier {
       }
 
       double runningTick = note.startTick.toDouble();
-      for (int i = 0; i < ornament.shiftMap.length; i++) {
-        final entry = ornament.shiftMap[i] as Map;
+      for (int i = 0; i < shiftMap.length; i++) {
+        final entry = shiftMap[i] as Map;
         final coeff = (entry['coeff'] as num).toDouble() / totalCoeff;
         final shift = (entry['shift'] as num).toInt();
 

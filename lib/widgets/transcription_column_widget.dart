@@ -72,7 +72,7 @@ class TranscriptionColumnWidget extends StatelessWidget {
                 // PitchColumnWidget, so this column's rows always
                 // line up with its own and with the grid's.
                 final row = totalRows - 1 - index;
-                final position = positionForRow(row);
+                final position = _columnPosition(row);
                 final accidentalSign = _scaleAccidentalSignForRow(row);
                 final transcription = '$position$accidentalSign';
                 return Container(
@@ -116,4 +116,18 @@ class TranscriptionColumnWidget extends StatelessWidget {
       },
     );
   }
+}
+
+/// The position code shown in this column. Same as [positionForRow],
+/// except that a note BETWEEN two lines lists the line closer to 0
+/// first: "-4/-5" instead of "-5/-4", while "0/1" and "3/4" stay as
+/// they are. (Only this column — the transcription text that is
+/// imported/exported keeps its own format.)
+String _columnPosition(int row) {
+  final position = positionForRow(row);
+  final slash = position.indexOf('/');
+  if (slash < 0) return position;
+  final a = int.parse(position.substring(0, slash));
+  final b = int.parse(position.substring(slash + 1));
+  return a.abs() <= b.abs() ? '$a/$b' : '$b/$a';
 }

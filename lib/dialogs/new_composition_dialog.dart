@@ -7,6 +7,7 @@ import '../enums/music_style.dart';
 import '../enums/instrument.dart';
 import '../utils/default_values.dart';
 import 'note_values_dialog.dart';
+import '../widgets/complexity_selector.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 
@@ -31,6 +32,7 @@ class _NewCompositionDialogState extends State<NewCompositionDialog> {
   MusicStyle _selectedStyle = DefaultValues.style;
   Instrument _selectedInstrument = DefaultValues.instrument;
   bool _isPublic = false;
+  int _complexity = 1;
 
   @override
   void dispose() {
@@ -190,6 +192,12 @@ class _NewCompositionDialogState extends State<NewCompositionDialog> {
                   ],
                 ),
                 const SizedBox(height: 15),
+                ComplexitySelector(
+                  value: _complexity,
+                  color: Colors.blue,
+                  onChanged: (level) => setState(() => _complexity = level),
+                ),
+                const SizedBox(height: 15),
                 Row(
                   children: [
                     const Icon(Icons.public, size: 22),
@@ -253,6 +261,7 @@ class _NewCompositionDialogState extends State<NewCompositionDialog> {
                   numberOfOctaves: 8,
                   scaleName: DefaultValues.scale,
                   isPublic: _isPublic,
+                  complexity: _complexity,
                   timeline: Timeline(measures: <Measure>[]),
                   notes: <Note>[],
                 );

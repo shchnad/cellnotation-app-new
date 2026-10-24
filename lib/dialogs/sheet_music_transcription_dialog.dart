@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../controllers/composition_controller.dart';
 import '../models/time_signature.dart';
 import '../utils/cellnotation_transcription_parser.dart';
+import '../omr/sheet_music_pdf_import_screen.dart';
 
 /// Lets the person paste/type a transcription in the line-position
 /// notation worked out for reading directly off traditional sheet
@@ -231,6 +232,35 @@ void sheetMusicTranscriptionDialog({
               ),
             ),
             actions: [
+              // Reads the notes from a PDF of the sheet music (on the
+              // tablet, or with AI) and puts the result in the box
+              // above, to check and then Import as usual.
+              TextButton(
+                onPressed: () async {
+                  final text = await Navigator.of(dialogContext).push<String>(
+                    MaterialPageRoute(
+                      builder: (_) => SheetMusicPdfImportScreen(
+                        scales: controller.availableScales,
+                      ),
+                    ),
+                  );
+                  if (text == null || text.isEmpty) return;
+                  setDialogState(() {
+                    textController.text = text;
+                    parseErrors = null;
+                    importWarnings = null;
+                    imported = false;
+                  });
+                },
+                child: const Text(
+                  'From PDF',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+              ),
               TextButton(
                 onPressed: () {
                   setDialogState(() {
