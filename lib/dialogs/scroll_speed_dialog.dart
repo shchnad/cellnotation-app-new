@@ -2,39 +2,70 @@ import 'package:flutter/material.dart';
 import '../controllers/composition_controller.dart';
 
 /// Opens from the Play icon (see CompositionScreen): lets the person
-/// choose how fast to scroll before playback starts — built the same
-/// way as cellWidthDialog. The − / + buttons change the speed in steps
-/// of 25%: up to 200% slower (half speed) and 200% faster (twice the
-/// speed) — see [CompositionController.playbackSpeedLevel]. Reset sets it back
-/// to the speed the tempo requires (100%), and Play closes the dialog
-/// and starts playback via [onPlay]. The chosen speed is kept, so the
-/// dialog opens at the same value next time.
+/// choose how fast to scroll before playback starts. One button per
+/// speed: the left column slows down (125 % … 200 % slower, in steps of
+/// 25 %), the right column speeds up (125 % … 200 % faster), and the
+/// button in the middle is the tempo (100 %). The chosen speed is
+/// highlighted. Tapping a speed closes the dialog and starts playback
+/// via [onPlay] (after its 3-second pause); Close leaves without
+/// playing. The chosen speed is kept, so the dialog opens at the same
+/// value next time.
 void scrollSpeedDialog(
     BuildContext context,
     CompositionController controller, {
       required VoidCallback onPlay,
     }) {
+  final level = controller.playbackSpeedLevel;
 
   showDialog(
     context: context,
     builder: (dialogContext) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          Widget speedButton(int l) {
+            final selected = l == level;
+            final percent = 100 + 25 * l.abs();
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: SizedBox(
+                width: 130,
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: selected ? Colors.blue : Colors.white,
+                    side: const BorderSide(color: Colors.blue, width: 1.5),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  // Tapping a speed closes the dialog and starts
+                  // playback (after the usual 3-second pause).
+                  onPressed: () {
+                    Navigator.pop(dialogContext);
+                    controller.setPlaybackSpeedLevel(l);
+                    onPlay();
+                  },
+                  child: Text(
+                    '$percent %',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: selected ? Colors.white : Colors.blue,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }
 
-      return AnimatedBuilder(
-        animation: controller,
-        builder: (context, _) {
-
-          final level = controller.playbackSpeedLevel;
-          // 100 % = the tempo; 125 … 200 % faster or slower.
-          final percent = 100 + 25 * level.abs();
-          final description =
-          level == 0 ? 'tempo' : (level > 0 ? 'faster' : 'slower');
+          const labelStyle = TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          );
 
           return AlertDialog(
             backgroundColor: Colors.white,
             surfaceTintColor: Colors.white,
-
-            title: Center(
-              child: const Text(
+            title: const Center(
+              child: Text(
                 "Set Scroll Speed",
                 style: TextStyle(
                   color: Colors.black,
@@ -43,73 +74,49 @@ void scrollSpeedDialog(
                 ),
               ),
             ),
-
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-
-                Text(
-                  "$percent % ($description)",
-                  style: const TextStyle(
-                    fontSize: 22,
-                    color: Colors.blue,
-                    fontWeight: FontWeight.bold,
+            content: SingleChildScrollView(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // SLOWER
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Slower', style: labelStyle),
+                      const SizedBox(height: 6),
+                      for (int l = -1; l >= -4; l--) speedButton(l),
+                    ],
                   ),
-                ),
-
-                const SizedBox(height: 20),
-
-                Row(
-                  mainAxisAlignment:
-                  MainAxisAlignment.center,
-                  children: [
-
-                    IconButton(
-                      icon: const Icon(
-                        Icons.remove,
-                        color: Colors.blue,
-                        size: 35,
-                      ),
-                      onPressed: controller.playbackSpeedLevel <=
-                          CompositionController.minPlaybackSpeedLevel
-                          ? null
-                          : (){
-                        controller.changePlaybackSpeedLevel(-1);
-                      },
-                    ),
-
-                    const SizedBox(width: 30),
-
-                    IconButton(
-                      icon: const Icon(
-                        Icons.add,
-                        color: Colors.blue,
-                        size: 35,
-                      ),
-                      onPressed: controller.playbackSpeedLevel >=
-                          CompositionController.maxPlaybackSpeedLevel
-                          ? null
-                          : (){
-                        controller.changePlaybackSpeedLevel(1);
-                      },
-                    ),
-
-                  ],
-                ),
-
-              ],
+                  const SizedBox(width: 16),
+                  // TEMPO (reset)
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Tempo', style: labelStyle),
+                      const SizedBox(height: 6),
+                      speedButton(0),
+                    ],
+                  ),
+                  const SizedBox(width: 16),
+                  // FASTER
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Faster', style: labelStyle),
+                      const SizedBox(height: 6),
+                      for (int l = 1; l <= 4; l++) speedButton(l),
+                    ],
+                  ),
+                ],
+              ),
             ),
-
             actions: [
               const Divider(thickness: 1.0),
-
               Row(
                 children: [
-
                   TextButton(
-                    onPressed: (){
-                      Navigator.pop(dialogContext);
-                    },
+                    onPressed: () => Navigator.pop(dialogContext),
                     child: const Text(
                       "Close",
                       style: TextStyle(
@@ -119,46 +126,12 @@ void scrollSpeedDialog(
                       ),
                     ),
                   ),
-
-                  TextButton(
-                    onPressed: (){
-                      controller.resetPlaybackSpeed();
-                    },
-                    child: const Text(
-                      "Reset",
-                      style: TextStyle(
-                        color: Colors.blue,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-
-                  TextButton(
-                    onPressed: (){
-                      Navigator.pop(dialogContext);
-                      onPlay();
-                    },
-                    child: const Text(
-                      "Play",
-                      style: TextStyle(
-                        color: Colors.green,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
                 ],
               ),
-
             ],
-
           );
-
         },
       );
-
     },
   );
-
 }

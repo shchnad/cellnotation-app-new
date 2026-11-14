@@ -3807,6 +3807,14 @@ class CompositionController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Sets the speed step (see [playbackSpeedLevel]).
+  void setPlaybackSpeedLevel(int level) {
+    final l = level.clamp(minPlaybackSpeedLevel, maxPlaybackSpeedLevel);
+    if (l == playbackSpeedLevel) return;
+    playbackSpeedLevel = l;
+    notifyListeners();
+  }
+
   /// Back to the speed the tempo requires.
   void resetPlaybackSpeed() {
     playbackSpeedLevel = 0;

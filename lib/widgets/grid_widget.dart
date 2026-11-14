@@ -1311,7 +1311,13 @@ class GridWidget extends StatelessWidget {
                                 // directly, computed straight from the tapped
                                 // position — no note is created as a side effect
                                 // first.
-                                onDoubleTapDown: (details) {
+                                // While playing (Scroll Lock on), no
+                                // double-tap: without it Flutter doesn't
+                                // wait to see whether a second tap follows,
+                                // so a tap pauses / continues at once.
+                                onDoubleTapDown: isPlaying && !helpMode
+                                    ? null
+                                    : (details) {
                                   // Skipped in Help Mode for the same reason
                                   // as onTapUp above — double-tap only opens
                                   // a dialog here, never creates a note, so

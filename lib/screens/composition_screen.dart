@@ -214,11 +214,12 @@ class _CompositionScreenState extends State<CompositionScreen>
     if (_isPlaying) {
       _pausePlayback();
     } else {
-      _startPlayback();
+      // Continuing by a tap on the screen: only a short pause.
+      _startPlayback(delay: _tapStartPauseDuration);
     }
   }
 
-  void _startPlayback() {
+  void _startPlayback({Duration delay = _startPauseDuration}) {
     if (controller.maxTicks <= 0) {
       return;
     }
@@ -299,7 +300,8 @@ class _CompositionScreenState extends State<CompositionScreen>
     // cancels the start.
     _startDelay?.cancel();
     // The grid takes the start position at once (the composition
-    // moves to where playback begins), then waits 3 seconds.
+    // moves to where playback begins), then waits [delay] — 3 seconds
+    // from the Play dialog, half a second after a tap on the screen.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_isPlaying || _playbackTicker != null) return;
       _scrollTo(_playbackTick);
@@ -310,17 +312,28 @@ class _CompositionScreenState extends State<CompositionScreen>
         }
       });
     });
-    _startDelay = Timer(_startPauseDuration, () {
+    void go() {
       _startDelay = null;
       if (!mounted || !_isPlaying) return;
       _lastTickerElapsed = Duration.zero;
       _preparePlaybackCaches();
       _playbackTicker = createTicker(_onPlaybackTick)..start();
-    });
+    }
+    // Continuing after a tap: at once — right after the screen has
+    // been redrawn (pausing/continuing redraws it; started before, the
+    // time that redraw takes would be scrolled in one jump).
+    if (delay == Duration.zero) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => go());
+    } else {
+      _startDelay = Timer(delay, go);
+    }
   }
 
   /// The pause between pressing Play and the scrolling starting.
   static const Duration _startPauseDuration = Duration(seconds: 3);
+
+  /// The pause when playback continues after a tap on the screen: none.
+  static const Duration _tapStartPauseDuration = Duration.zero;
   Timer? _startDelay;
 
   void _pausePlayback() {
@@ -350,8 +363,12 @@ class _CompositionScreenState extends State<CompositionScreen>
   static const double _audioLookaheadSeconds = 0.06;
 
   void _onPlaybackTick(Duration elapsed) {
-    final dtSeconds =
-        (elapsed - _lastTickerElapsed).inMicroseconds / 1000000.0;
+    // At most 1/20 s per frame: when a frame comes late (the screen
+    // was busy), the scrolling doesn't jump ahead — it stays smooth.
+    final dtSeconds = min(
+      (elapsed - _lastTickerElapsed).inMicroseconds / 1000000.0,
+      0.05,
+    );
     _lastTickerElapsed = elapsed;
 
     final currentTickInt =
