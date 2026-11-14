@@ -25,30 +25,30 @@ void scrollSpeedDialog(
           Widget speedButton(int l) {
             final selected = l == level;
             final percent = 100 + 25 * l.abs();
+            // Same buttons as noteValuesDialog: grey, the chosen one
+            // with blue text.
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
-              child: SizedBox(
-                width: 130,
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: selected ? Colors.blue : Colors.white,
-                    side: const BorderSide(color: Colors.blue, width: 1.5),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                  ),
-                  // Tapping a speed closes the dialog and starts
-                  // playback (after the usual 3-second pause).
-                  onPressed: () {
-                    Navigator.pop(dialogContext);
-                    controller.setPlaybackSpeedLevel(l);
-                    onPlay();
-                  },
-                  child: Text(
-                    '$percent %',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: selected ? Colors.white : Colors.blue,
-                    ),
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.grey.shade300,
+                  minimumSize: const Size(130, 55),
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+                // Tapping a speed closes the dialog and starts
+                // playback (after the usual 3-second pause).
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  controller.setPlaybackSpeedLevel(l);
+                  onPlay();
+                },
+                child: Text(
+                  '$percent %',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 22,
+                    color: selected ? Colors.blue : Colors.black,
                   ),
                 ),
               ),
@@ -64,14 +64,13 @@ void scrollSpeedDialog(
           return AlertDialog(
             backgroundColor: Colors.white,
             surfaceTintColor: Colors.white,
-            title: const Center(
-              child: Text(
-                "Set Scroll Speed",
-                style: TextStyle(
-                  color: Colors.black,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
+            title: const Text(
+              "Set Scroll Speed",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
               ),
             ),
             content: SingleChildScrollView(
@@ -88,7 +87,7 @@ void scrollSpeedDialog(
                       for (int l = -1; l >= -4; l--) speedButton(l),
                     ],
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 8),
                   // TEMPO (reset)
                   Column(
                     mainAxisSize: MainAxisSize.min,
@@ -98,7 +97,7 @@ void scrollSpeedDialog(
                       speedButton(0),
                     ],
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 8),
                   // FASTER
                   Column(
                     mainAxisSize: MainAxisSize.min,
@@ -114,6 +113,7 @@ void scrollSpeedDialog(
             actions: [
               const Divider(thickness: 1.0),
               Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   TextButton(
                     onPressed: () => Navigator.pop(dialogContext),

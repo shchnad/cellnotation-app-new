@@ -93,10 +93,12 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
     return Tooltip(
       message: label,
       child: Material(
-        color: isActive ? _accent : Colors.white,
-        borderRadius: BorderRadius.circular(28),
+        // Grey like the dialogs' buttons; a filter in use has blue text.
+        color: Colors.grey.shade300,
+        elevation: 2,
+        borderRadius: BorderRadius.circular(20),
         child: InkWell(
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(20),
           onTap: () {
             FocusScope.of(context).unfocus();
             onTap();
@@ -105,7 +107,7 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             child: Row(
               children: [
-                Icon(icon, size: 22, color: isActive ? Colors.white : _accent),
+                Icon(icon, size: 22, color: isActive ? Colors.blue : Colors.black54),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -114,15 +116,14 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: isActive ? Colors.white : Colors.black,
+                      color: isActive ? Colors.blue : Colors.black,
                     ),
                   ),
                 ),
                 if (showArrow)
                   Icon(
                     Icons.arrow_drop_down,
-                    color: isActive ? Colors.white : Colors.black54,
+                    color: isActive ? Colors.blue : Colors.black54,
                   ),
               ],
             ),
@@ -145,7 +146,7 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
             flex: 3,
             child: TextField(
               controller: _searchController,
-              style: const TextStyle(fontSize: 20, color: Colors.black),
+              style: const TextStyle(fontSize: 22, color: Colors.blue, fontWeight: FontWeight.bold),
               decoration: InputDecoration(
                 filled: true,
                 fillColor: Colors.white,
@@ -154,7 +155,7 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
                 hintStyle: const TextStyle(fontSize: 20, color: Colors.black45),
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                prefixIcon: const Icon(Icons.search, color: _accent),
+                prefixIcon: const Icon(Icons.search, color: Colors.black54),
                 suffixIcon: _searchQuery.isEmpty
                     ? null
                     : IconButton(
@@ -164,10 +165,8 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
                     setState(() => _searchQuery = '');
                   },
                 ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(28),
-                  borderSide: BorderSide.none,
-                ),
+                // Framed like the fields of the dialogs.
+                border: const OutlineInputBorder(),
               ),
               onChanged: (value) {
                 setState(() => _searchQuery = value.trim());
@@ -261,9 +260,10 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Material(
-        color: Colors.white,
-        elevation: 3,
-        borderRadius: BorderRadius.circular(16),
+        // Grey like the dialogs' buttons.
+        color: Colors.grey.shade300,
+        elevation: 2,
+        borderRadius: BorderRadius.circular(12),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: () {
@@ -290,8 +290,6 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Accent stripe down the card's left edge.
-                Container(width: 6, color: _accent),
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
@@ -419,12 +417,12 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 56, color: Colors.white70),
+          Icon(icon, size: 56, color: Colors.black38),
           const SizedBox(height: 12),
           Text(
             text,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 22, color: Colors.white),
+            style: const TextStyle(fontSize: 22, color: Colors.black),
           ),
         ],
       ),
@@ -434,32 +432,29 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
+      // White, like the app's dialogs.
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        elevation: 1,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: _accent),
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Cloud Library',
           style: TextStyle(
             fontSize: 22,
-            color: _accent,
+            color: Colors.black,
             fontWeight: FontWeight.bold,
           ),
         ),
       ),
       body: Stack(
         children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/cellnotation_background.jpg',
-              fit: BoxFit.cover,
-            ),
-          ),
-          Positioned.fill(
-            child: Container(color: Colors.black.withOpacity(0.45)),
-          ),
+          // Plain white background, like the dialogs.
+          Positioned.fill(child: Container(color: Colors.white)),
           Column(
             children: [
               _buildSearchAndFilters(),
@@ -530,7 +525,7 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
                                   'composition${compositions.length == 1 ? '' : 's'}',
                               style: const TextStyle(
                                 fontSize: 18,
-                                color: Colors.white70,
+                                color: Colors.black54,
                               ),
                             ),
                           ),
@@ -569,14 +564,14 @@ class _InfoChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.blue.shade200),
+        border: Border.all(color: Colors.grey.shade400),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: Colors.blue.shade700),
+          Icon(icon, size: 18, color: Colors.black54),
           const SizedBox(width: 6),
           Text(
             text,

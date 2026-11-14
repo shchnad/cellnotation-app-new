@@ -3753,6 +3753,27 @@ class CompositionController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Silences ([muted] true) or turns on several hands at once (one
+  /// redraw instead of one per hand).
+  void setHandsMuted(Iterable<Hand> hands, bool muted) {
+    for (final hand in hands) {
+      if (muted) {
+        mutedHands.add(hand);
+      } else {
+        mutedHands.remove(hand);
+      }
+    }
+    notifyListeners();
+  }
+
+  /// Makes exactly [muted] the silent hands (the others are heard).
+  void setMutedHandsTo(Set<Hand> muted) {
+    mutedHands
+      ..clear()
+      ..addAll(muted);
+    notifyListeners();
+  }
+
   void setAllHandsMuted(bool muted) {
     if (muted) {
       mutedHands.addAll(Hand.values);

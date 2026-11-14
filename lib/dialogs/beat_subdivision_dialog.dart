@@ -16,7 +16,7 @@ import 'measure_range_dialog.dart';
 /// from/to picker, the same pattern as Duplicate Range/Delete Range/
 /// Clean Range).
 ///
-/// Opened two ways: from a new "Change Subdivision" entry in
+/// Opened two ways: from the "Edit Time Signature" entry in
 /// editMeasureBeatDialog's Measure column, or by tapping the time-
 /// signature label at the bottom of the grid (see grid_widget.dart).
 ///
@@ -50,9 +50,45 @@ void beatSubdivisionDialog({
     showWarnings(controller.halveSubdivisionForMeasureRange(from, to));
   }
 
+  // Same buttons as noteValuesDialog: grey, black text.
+  Widget button(String label, VoidCallback onPressed) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.grey.shade300,
+        minimumSize: const Size(220, 55),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      ),
+      onPressed: onPressed,
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        style: const TextStyle(fontSize: 22, color: Colors.black),
+      ),
+    ),
+  );
+
+  const headStyle = TextStyle(
+    fontSize: 22,
+    fontWeight: FontWeight.bold,
+    color: Colors.black,
+  );
+
   showDialog(
     context: context,
     builder: (dialogContext) {
+      void range(void Function(int, int) apply) {
+        Navigator.pop(dialogContext);
+        measureRangeDialog(
+          context: context,
+          controller: controller,
+          title: 'Change Time Signature',
+          actionLabel: 'Apply',
+          actionColor: Colors.blue,
+          onConfirm: apply,
+        );
+      }
+
       return AlertDialog(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
@@ -65,122 +101,60 @@ void beatSubdivisionDialog({
             color: Colors.black,
           ),
         ),
-
-        content: SizedBox(
-          width: 320,
-          child: Column(
+        // Two columns: split each beat in two (left), unite every two
+        // beats into one (right) — each for this measure or a range.
+        content: SingleChildScrollView(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
-              const Divider(),
-
-              const Text(
-                'Split each beat to halves',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Split each beat\nto halves',
+                      textAlign: TextAlign.center, style: headStyle),
+                  const SizedBox(height: 6),
+                  button('This measure', () {
+                    Navigator.pop(dialogContext);
+                    doubleAndReport(measureIndex, measureIndex);
+                  }),
+                  button('Measure range', () => range(doubleAndReport)),
+                ],
               ),
-              // const Text(
-              //   'Doubles the number of beats halving its duration',
-              //   style: TextStyle(fontSize: 16),
-              // ),
-              ListTile(
-                leading: const Icon(Icons.looks_one_outlined),
-                title: const Text(
-                  'This measure',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue,
-                  ),
-                ),
-                onTap: () {
-                  Navigator.pop(dialogContext);
-                  doubleAndReport(measureIndex, measureIndex);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.view_column_outlined),
-                title: const Text(
-                  'Measure range',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue,
-                  ),
-                ),
-                onTap: () {
-                  Navigator.pop(dialogContext);
-                  measureRangeDialog(
-                    context: context,
-                    controller: controller,
-                    title: 'Change Time Subdivision',
-                    actionLabel: 'Apply',
-                    actionColor: Colors.blue,
-                    onConfirm: doubleAndReport,
-                  );
-                },
-              ),
-
-              const Divider(),
-
-              const Text(
-                'Unite every two beats to one',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              ),
-              // const Text(
-              //   'Halves the number of beats doubling its duration',
-              //   style: TextStyle(fontSize: 16),
-              // ),
-              ListTile(
-                leading: const Icon(Icons.looks_one_outlined),
-                title: const Text(
-                  'This measure',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue,
-                  ),
-                ),
-                onTap: () {
-                  Navigator.pop(dialogContext);
-                  halveAndReport(measureIndex, measureIndex);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.view_column_outlined),
-                title: const Text(
-                  'Measure range',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue,
-                  ),
-                ),
-                onTap: () {
-                  Navigator.pop(dialogContext);
-                  measureRangeDialog(
-                    context: context,
-                    controller: controller,
-                    title: 'Change Time Subdivision',
-                    actionLabel: 'Apply',
-                    actionColor: Colors.blue,
-                    onConfirm: halveAndReport,
-                  );
-                },
+              const SizedBox(width: 16),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Unite every two\nbeats to one',
+                      textAlign: TextAlign.center, style: headStyle),
+                  const SizedBox(height: 6),
+                  button('This measure', () {
+                    Navigator.pop(dialogContext);
+                    halveAndReport(measureIndex, measureIndex);
+                  }),
+                  button('Measure range', () => range(halveAndReport)),
+                ],
               ),
             ],
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
+          const Divider(thickness: 1.0),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text(
+                  'Close',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ],
       );

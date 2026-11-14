@@ -64,73 +64,78 @@ void goToMeasureDialog({
               ),
             ),
 
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  hasRepeats
-                      ? 'Measures are numbered 1–$highest '
-                      '($totalMeasures with the repeats played out — '
-                      'the repeated ones have red numbers).'
-                      : 'Composition has in total $totalMeasures '
-                      'measure${totalMeasures == 1 ? '' : 's'}.',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    color: Colors.black,
+            // A narrow dialog: the text wraps instead of stretching it
+            // across the screen.
+            content: SizedBox(
+              width: 360,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    hasRepeats
+                        ? 'Measures are numbered 1–$highest '
+                        '($totalMeasures with the repeats played out — '
+                        'the repeated ones have red numbers).'
+                        : 'Composition has in total $totalMeasures '
+                        'measure${totalMeasures == 1 ? '' : 's'}.',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      color: Colors.black,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Measure Number',
-                  style: TextStyle(
-                    fontSize: 22,
-                    color: Colors.black,
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Measure Number',
+                    style: TextStyle(
+                      fontSize: 22,
+                      color: Colors.black,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                TextField(
-                  controller: measureController,
-                  keyboardType: TextInputType.number,
-                  autofocus: true,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    color: Colors.blue,
-                    fontWeight: FontWeight.bold,
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: measureController,
+                    keyboardType: TextInputType.number,
+                    autofocus: true,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      color: Colors.blue,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (_) => setState(() => timeThrough = 0),
                   ),
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    border: OutlineInputBorder(),
-                  ),
-                  onChanged: (_) => setState(() => timeThrough = 0),
-                ),
-                // The number is played more than once: which time?
-                if (found.length > 1) ...[
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: [
-                      for (int k = 0; k < found.length; k++)
-                        ChoiceChip(
-                          label: Text(
-                            '${ordinal(k)} time',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: k == timeThrough ? Colors.white : Colors.black,
+                  // The number is played more than once: which time?
+                  if (found.length > 1) ...[
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        for (int k = 0; k < found.length; k++)
+                          ChoiceChip(
+                            label: Text(
+                              '${ordinal(k)} time',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: k == timeThrough ? Colors.white : Colors.black,
+                              ),
                             ),
+                            selected: k == timeThrough,
+                            selectedColor: Colors.blue,
+                            backgroundColor: Colors.white,
+                            showCheckmark: false,
+                            onSelected: (_) => setState(() => timeThrough = k),
                           ),
-                          selected: k == timeThrough,
-                          selectedColor: Colors.blue,
-                          backgroundColor: Colors.white,
-                          showCheckmark: false,
-                          onSelected: (_) => setState(() => timeThrough = k),
-                        ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
 
             actions: [

@@ -311,14 +311,29 @@ class _RepeatsDialogState extends State<_RepeatsDialog> {
               const Divider(thickness: 1),
               const Text('Add a repeat',
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 6),
+              // The kind of repeat: the same buttons as noteValuesDialog —
+              // grey, the chosen one with blue text.
               for (final t in RepriseType.values)
-                RadioListTile<RepriseType>(
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                  value: t,
-                  groupValue: _type,
-                  title: Text(_typeName(t), style: const TextStyle(fontSize: 22)),
-                  onChanged: (v) => setState(() => _type = v!),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey.shade300,
+                      minimumSize: const Size(double.infinity, 55),
+                      alignment: Alignment.centerLeft,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                    ),
+                    onPressed: () => setState(() => _type = t),
+                    child: Text(
+                      _typeName(t),
+                      style: TextStyle(
+                        fontSize: 22,
+                        color: t == _type ? Colors.blue : Colors.black,
+                      ),
+                    ),
+                  ),
                 ),
               const SizedBox(height: 6),
               if (_type == RepriseType.voltas) ...[

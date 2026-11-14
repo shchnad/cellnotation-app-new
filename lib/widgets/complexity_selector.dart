@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 /// Picks a composition's level of complexity — how hard it is to
-/// play: 1 (easy), 2 (medium) or 3 (hard). Three buttons in a row;
-/// the chosen one is filled with [color].
+/// play: 1 (easy), 2 (medium) or 3 (hard). Three grey buttons in a
+/// row; the chosen one has [color] text.
 class ComplexitySelector extends StatelessWidget {
   final int value;
   final ValueChanged<int> onChanged;
@@ -25,7 +25,11 @@ class ComplexitySelector extends StatelessWidget {
       children: [
         const Text(
           'Level of complexity',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
         ),
         const SizedBox(height: 8),
         Row(
@@ -42,39 +46,23 @@ class ComplexitySelector extends StatelessWidget {
     );
   }
 
+  /// The same buttons as noteValuesDialog: grey, the chosen one with
+  /// [color] text.
   Widget _button(int level) {
     final selected = level == value;
-    return Material(
-      color: selected ? color : Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => onChanged(level),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color, width: 2),
-          ),
-          child: Column(
-            children: [
-              Text(
-                '$level',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: selected ? Colors.white : Colors.black,
-                ),
-              ),
-              Text(
-                _names[level]!,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: selected ? Colors.white : Colors.black54,
-                ),
-              ),
-            ],
-          ),
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.grey.shade300,
+        minimumSize: const Size(0, 55),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      ),
+      onPressed: () => onChanged(level),
+      child: Text(
+        '$level  ${_names[level]!}',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: 22,
+          color: selected ? color : Colors.black,
         ),
       ),
     );

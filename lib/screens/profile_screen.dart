@@ -131,20 +131,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ? Container(
                       margin: const EdgeInsets.all(24),
                       padding: const EdgeInsets.all(24),
+                      // White panel, like the app's dialogs.
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(28),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black26, blurRadius: 12),
+                        ],
                       ),
-                      child: const Text(
-                          'Not signed in',
-                          style: TextStyle(fontSize: 22, color: Colors.black)),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                              'Not signed in',
+                              style: TextStyle(fontSize: 22, color: Colors.black)),
+                          const SizedBox(height: 12),
+                          const Divider(thickness: 1.0),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text(
+                              'Close',
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     )
                         : Container(
                       margin: const EdgeInsets.all(24),
                       padding: const EdgeInsets.all(24),
+                      // White panel, like the app's dialogs.
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(28),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black26, blurRadius: 12),
+                        ],
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -185,24 +211,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     color: Colors.blue,
                                     fontWeight: FontWeight.bold,
                                   ),
+                                  // Framed like the fields of the dialogs.
                                   decoration: InputDecoration(
-                                    filled: true,
-                                    fillColor: Colors.white,
-                                    labelText: 'Edit user name',
-                                    labelStyle: const TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    border: OutlineInputBorder(
-                                      borderSide: BorderSide(color: Colors.grey.shade400),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderSide: BorderSide(color: Colors.grey.shade400),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderSide: BorderSide(color: Colors.grey.shade400),
-                                    ),
+                                    labelText: 'User name',
+                                    isDense: true,
+                                    border: const OutlineInputBorder(),
+                                    prefixIcon: const Icon(Icons.person, size: 22),
                                     suffixIcon: IconButton(
                                       icon: const Icon(Icons.clear),
                                       padding: EdgeInsets.zero,
@@ -219,53 +233,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                                 const SizedBox(height: 10),
 
-                                SizedBox(
-                                  width: 300,
-                                  height: 100,
-                                  child: ElevatedButton(
-                                    onPressed: _saving
-                                        ? null
-                                        : _saveName,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.black,
-                                      // foregroundColor: Colors.black,
-                                      minimumSize: const Size(300, 100),
-                                      elevation: 0,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                    ),
-                                    // Kept as a plain ElevatedButton (rather than
-                                    // ElevatedButton.icon) since it also needs to
-                                    // swap to a loading spinner while saving —
-                                    // building the icon+label Row manually gives
-                                    // the same visual result as .icon while still
-                                    // allowing that conditional.
-                                    child: _saving
-                                        ? const SizedBox(
-                                      width: 22,
-                                      height: 22,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
-                                    )
-                                        : const Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        SizedBox(
-                                            child: Icon(
-                                              Icons.save,
-                                              color: Colors.white,
-                                              size: 22,
-                                            )
-                                        ),
-                                        SizedBox(width: 8),
-                                        SizedBox(
-                                          child: Text('Save',
-                                              style: TextStyle(
-                                                fontSize: 22,
-                                                color: Colors.white,
-                                              )),
-                                        ),
-                                      ],
+                                // Same button as the dialogs (noteValuesDialog):
+                                // grey with black text.
+                                ElevatedButton.icon(
+                                  onPressed: _saving ? null : _saveName,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.grey.shade300,
+                                    minimumSize: const Size(220, 55),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 8),
+                                  ),
+                                  icon: _saving
+                                      ? const SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  )
+                                      : const Icon(Icons.save,
+                                      color: Colors.black, size: 24),
+                                  label: const Text(
+                                    'Save',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      color: Colors.black,
                                     ),
                                   ),
                                 ),
@@ -301,6 +292,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               },
                             ),
                           ),
+                          // CLOSE — like the dialogs: a divider, then
+                          // Close in the middle (back to Home).
+                          const SizedBox(height: 20),
+                          const Divider(thickness: 1.0),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text(
+                              'Close',
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -310,33 +316,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             },
           ),
 
-          // HOME — top-left corner, clickable text + icon (not a
-          // full note-block button), matching HomeScreen's own Exit
-          // treatment — arrow icon kept, per request, rather than
-          // the exit-door icon the old button used.
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: InkWell(
-                onTap: () => Navigator.pop(context),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.arrow_back, color: Colors.red),
-                    SizedBox(width: 6),
-                    Text(
-                      'Home',
-                      style: TextStyle(
-                        color: Colors.red,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );
