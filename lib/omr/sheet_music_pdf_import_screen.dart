@@ -37,9 +37,9 @@ class _SheetMusicPdfImportScreenState extends State<SheetMusicPdfImportScreen> {
   List<List<double>> _pageSizes = const [];
   int _fromPage = 1;
   int _toPage = 1;
-  late String _scale = widget.scales.contains('do major')
-      ? 'do major'
-      : (widget.scales.isNotEmpty ? widget.scales.first : 'do major');
+  /// 'Auto': the key is read from the key signatures (and key changes)
+  /// of the pages; otherwise the chosen scale is used throughout.
+  String _scale = 'Auto';
 
   /// Rendered pages, kept so the AI can reuse them.
   List<OmrPdfPage> _pages = const [];
@@ -69,7 +69,7 @@ class _SheetMusicPdfImportScreenState extends State<SheetMusicPdfImportScreen> {
   }
 
   bool get _scaleHasAccidentals =>
-      _scale != 'do major' && _scale != 'la minor';
+      _scale != 'Auto' && _scale != 'do major' && _scale != 'la minor';
 
   Future<void> _pickPdf() async {
     // file_picker 11+ : static pickFile(), bytes read with readAsBytes().
@@ -194,6 +194,9 @@ class _SheetMusicPdfImportScreenState extends State<SheetMusicPdfImportScreen> {
       final texts = <String>[];
       String? timeSignature = _meter == 'Auto' ? null : _meter;
       int nextMeasure = 1;
+      // 'Auto': the AI reads the key; later pages continue from the key
+      // the previous page ended in.
+      String pageScale = _scale;
       for (int i = 0; i < wanted.length; i++) {
         final index = wanted[i];
         setState(() => _status =
@@ -202,12 +205,13 @@ class _SheetMusicPdfImportScreenState extends State<SheetMusicPdfImportScreen> {
         final page = await _previewPage(index);
         final text = await transcribePageWithAi(
           png: page.png,
-          scaleName: _scale,
+          scaleName: pageScale,
           firstMeasure: nextMeasure,
           timeSignature: timeSignature,
           draft: _draftByPage[index],
         );
         texts.add(text);
+        if (_scale == 'Auto') pageScale = lastScaleOf(text) ?? pageScale;
         timeSignature ??= timeSignatureOf(text);
         final last = lastMeasureNumber(text);
         if (last >= nextMeasure) nextMeasure = last + 1;
@@ -318,6 +322,7 @@ class _SheetMusicPdfImportScreenState extends State<SheetMusicPdfImportScreen> {
                       value: _scale,
                       style: const TextStyle(fontSize: 20, color: Colors.black),
                       items: [
+                        const DropdownMenuItem(value: 'Auto', child: Text('Auto')),
                         for (final s in widget.scales)
                           DropdownMenuItem(value: s, child: Text(s)),
                       ],

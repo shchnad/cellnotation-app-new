@@ -185,10 +185,14 @@ class CompositionController extends ChangeNotifier {
   }
 
 
+  /// The number of the measure [note] starts in (a temporary reprise
+  /// copy shows the number of the measure it copies — see
+  /// [measureNumbers]).
   int getMeasureNumber(Note note) {
-    return measures.indexWhere( (m) =>
+    final index = measures.indexWhere( (m) =>
     note.startTick >= m.startTick && note.startTick < m.endTick,
-    ) + 1;
+    );
+    return index < 0 ? 0 : displayMeasureNumber(index);
   }
 
 
@@ -260,6 +264,10 @@ class CompositionController extends ChangeNotifier {
   /// only repositions what's left.
   void _shiftTicksFrom(int fromTick, int shiftAmount) {
     if (shiftAmount == 0) return;
+
+    for (final t in _temporaryEvents) {
+      if (t.tick >= fromTick) t.tick += shiftAmount;
+    }
 
     for (final measure in measures) {
       for (int i = 0; i < measure.beatEvents.length; i++) {
@@ -366,6 +374,26 @@ class CompositionController extends ChangeNotifier {
       scaleName: newScaleName,
       originalScaleName: newScaleName,
     );
+    notifyListeners();
+  }
+
+
+  /// Sets [newScaleName] on every measure from [fromIndex] to
+  /// [toIndex] (either order).
+  void updateMeasureScaleRange(
+      int fromIndex,
+      int toIndex,
+      String newScaleName,
+      ) {
+    final start = fromIndex <= toIndex ? fromIndex : toIndex;
+    final end = fromIndex <= toIndex ? toIndex : fromIndex;
+    for (int i = start; i <= end; i++) {
+      if (i < 0 || i >= measures.length) continue;
+      measures[i] = measures[i].copyWith(
+        scaleName: newScaleName,
+        originalScaleName: newScaleName,
+      );
+    }
     notifyListeners();
   }
 
@@ -558,6 +586,178 @@ class CompositionController extends ChangeNotifier {
     return tick;
   }
 
+  // =====================================================
+  // SPLIT BEATS (triplets, quintuplets…)
+  // =====================================================
+  //
+  // A beat can be split into 2–13 equal columns (Measure.beatDivisions).
+  // Ticks are whole numbers (a quarter is 16), so a column usually
+  // isn't a whole number of ticks: a note is STORED at the column's
+  // start rounded to a tick, and SHOWN and PLAYED at the exact
+  // position (see [displayTick]) — so the columns look and sound
+  // exactly equal.
+
+  /// The index of the measure containing [tick] (binary search).
+  int measureIndexAtTick(int tick) {
+    final list = measures;
+    if (list.isEmpty) return -1;
+    int lo = 0, hi = list.length - 1;
+    while (lo < hi) {
+      final mid = (lo + hi + 1) >> 1;
+      if (list[mid].startTick <= tick) {
+        lo = mid;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    return lo;
+  }
+
+  /// The split beat containing [tick]: its start, length in ticks and
+  /// number of columns — or null when that beat isn't split.
+  ({int start, int ticks, int columns})? dividedBeatAt(int tick) {
+    final mi = measureIndexAtTick(tick);
+    if (mi < 0) return null;
+    final measure = measures[mi];
+    if (measure.beatDivisions.isEmpty) return null;
+    if (tick < measure.startTick || tick >= measure.endTick) return null;
+    final beatTicks = measure.timeSignature.ticksPerBeat;
+    int cursor = measure.startTick;
+    for (int b = 0; b < measure.timeSignature.beats; b++) {
+      final width = beatTicks * (getFermataMultiplier(mi, b) ?? 1);
+      if (tick < cursor + width) {
+        final n = measure.beatDivisions[b];
+        if (n == null || n < 2) return null;
+        return (start: cursor, ticks: width, columns: n);
+      }
+      cursor += width;
+    }
+    return null;
+  }
+
+  /// The tick where column [k] of a split beat starts (rounded).
+  static int _columnTick(({int start, int ticks, int columns}) d, int k) =>
+      d.start + (k * d.ticks / d.columns).round();
+
+  /// The exact (fractional) position of [tick] for showing and playing
+  /// notes: in a split beat, the exact start of the nearest column;
+  /// elsewhere the tick itself.
+  double displayTick(int tick) {
+    final d = dividedBeatAt(tick);
+    if (d == null) return tick.toDouble();
+    final k = ((tick - d.start) * d.columns / d.ticks).round();
+    return d.start + k * d.ticks / d.columns;
+  }
+
+  /// The column of a split beat that [tick] falls in (start tick and
+  /// length in ticks, both rounded), or null when the beat isn't split.
+  /// Uses the stored (rounded) column ticks, so a note's own start
+  /// tick always finds its own column.
+  ({int start, int ticks})? columnAt(int tick) {
+    final d = dividedBeatAt(tick);
+    if (d == null) return null;
+    for (int k = d.columns - 1; k >= 0; k--) {
+      final start = _columnTick(d, k);
+      if (tick >= start) {
+        return (start: start, ticks: _columnTick(d, k + 1) - start);
+      }
+    }
+    return (start: d.start, ticks: _columnTick(d, 1) - d.start);
+  }
+
+  /// The column of a split beat at the exact (fractional) position
+  /// [position] (in ticks) — where the finger tapped, as the columns
+  /// are drawn exactly equal. Null when the beat isn't split.
+  ({int start, int ticks})? columnAtPosition(double position) {
+    final d = dividedBeatAt(position.floor());
+    if (d == null) return null;
+    final k = ((position - d.start) * d.columns / d.ticks)
+        .floor()
+        .clamp(0, d.columns - 1);
+    final start = _columnTick(d, k);
+    return (start: start, ticks: _columnTick(d, k + 1) - start);
+  }
+
+  /// Splits beat [beatIndex] of measure [measureIndex] into [columns]
+  /// equal columns (1 = not split). Notes in the beat move to the
+  /// nearest column. Returns a warning, or null when it worked.
+  String? setBeatDivision(int measureIndex, int beatIndex, int columns) {
+    final warning = _setBeatDivision(measureIndex, beatIndex, columns);
+    timeline.rebuild();
+    notifyListeners();
+    return warning;
+  }
+
+  /// Splits every beat of the measures [fromIndex]..[toIndex] into
+  /// [columns] columns. Returns warnings for beats that couldn't be.
+  List<String> setBeatDivisionForMeasureRange(
+      int fromIndex, int toIndex, int columns) {
+    final warnings = <String>[];
+    if (measures.isEmpty) return warnings;
+    final start = fromIndex <= toIndex ? fromIndex : toIndex;
+    final end = fromIndex <= toIndex ? toIndex : fromIndex;
+    if (start < 0 || end >= measures.length) return warnings;
+    for (int i = start; i <= end; i++) {
+      for (int b = 0; b < measures[i].timeSignature.beats; b++) {
+        final w = _setBeatDivision(i, b, columns);
+        if (w != null && !warnings.contains(w)) warnings.add(w);
+      }
+    }
+    timeline.rebuild();
+    notifyListeners();
+    return warnings;
+  }
+
+  String? _setBeatDivision(int measureIndex, int beatIndex, int columns) {
+    if (measureIndex < 0 || measureIndex >= measures.length) return null;
+    final measure = measures[measureIndex];
+    if (beatIndex < 0 || beatIndex >= measure.timeSignature.beats) return null;
+    if (columns <= 1) {
+      measure.beatDivisions.remove(beatIndex);
+      return null;
+    }
+    final width = measure.timeSignature.ticksPerBeat *
+        (getFermataMultiplier(measureIndex, beatIndex) ?? 1);
+    // Each column needs at least one tick (1/64).
+    if (columns > width) {
+      return 'Measure ${measureIndex + 1}: a ${measure.timeSignature.beatDuration.label} '
+          'beat can be split into at most $width columns.';
+    }
+    measure.beatDivisions[beatIndex] = columns;
+    final d = (
+    start: getBeatTick(measureIndex, beatIndex),
+    ticks: width,
+    columns: columns,
+    );
+    final beatEnd = d.start + d.ticks;
+    int nearestColumnTick(int tick) {
+      final k = ((tick - d.start) * columns / width).round().clamp(0, columns);
+      return _columnTick(d, k);
+    }
+    // Notes starting in the beat move to the nearest column (their end
+    // too, when it is inside the beat).
+    for (int i = 0; i < notes.length; i++) {
+      final n = notes[i];
+      if (n.startTick < d.start || n.startTick >= beatEnd) continue;
+      var newStart = nearestColumnTick(n.startTick);
+      if (newStart >= beatEnd) newStart = _columnTick(d, columns - 1);
+      var newEnd = n.startTick + n.durationTicks;
+      if (newEnd <= beatEnd) newEnd = nearestColumnTick(newEnd);
+      if (newEnd <= newStart) {
+        newEnd = columnAt(newStart) == null
+            ? newStart + 1
+            : newStart + columnAt(newStart)!.ticks;
+      }
+      if (newStart != n.startTick || newEnd != n.startTick + n.durationTicks) {
+        notes[i] = n.copyWith(
+          startTick: newStart,
+          durationTicks: newEnd - newStart,
+        );
+      }
+    }
+    return null;
+  }
+
   /// Doubles the beat-count "subdivision" of every measure from
   /// [fromIndex] through [toIndex] (inclusive, 0-based) — e.g. 3
   /// beats of a quarter note each becomes 6 beats of an eighth note
@@ -616,6 +816,8 @@ class CompositionController extends ChangeNotifier {
 
       final newDuration = NoteDuration.values[oldIndex + 1];
       measures[i] = measure.copyWith(
+        // Split beats (triplets…) don't survive a change of the beat.
+        beatDivisions: <int, int>{},
         timeSignature: measure.timeSignature.copyWith(
           beats: measure.timeSignature.beats * 2,
           beatDuration: newDuration,
@@ -705,6 +907,8 @@ class CompositionController extends ChangeNotifier {
       // back at that beat there's nothing to remember.
       final remembered = measure.effectiveTempoBeat;
       measures[i] = measure.copyWith(
+        // Split beats (triplets…) don't survive a change of the beat.
+        beatDivisions: <int, int>{},
         timeSignature: measure.timeSignature.copyWith(
           beats: beats ~/ 2,
           beatDuration: newDuration,
@@ -748,6 +952,17 @@ class CompositionController extends ChangeNotifier {
     // tick — which looks like the wrong beat got deleted.
     _shiftTicksFrom(beatEnd, -beatTicks);
     measure.removeBeat();
+    // Split beats after the deleted one move one beat back.
+    if (measure.beatDivisions.isNotEmpty) {
+      final shifted = <int, int>{
+        for (final e in measure.beatDivisions.entries)
+          if (e.key < beatIndex) e.key: e.value
+          else if (e.key > beatIndex) e.key - 1: e.value,
+      };
+      measure.beatDivisions
+        ..clear()
+        ..addAll(shifted);
+    }
     timeline.rebuild();
     notifyListeners();
   }
@@ -810,6 +1025,648 @@ class CompositionController extends ChangeNotifier {
   }
 
 
+
+  // =====================================================
+  // REPRISES
+  // =====================================================
+  //
+  // In EDIT mode a reprise is only signs on measures (Measure.
+  // repriseMarks): 𝄆 𝄇, voltas, 𝄋 Segno, Fine, To Coda, Coda, D.S.
+  // In PLAYBACK mode (Scroll Lock on) the repeated measures are
+  // inserted as temporary copies (Measure.isTemporary) right where the
+  // music goes back, so playback simply plays straight through; the
+  // copies show the numbers of the measures they copy, in red. Going
+  // back to edit mode removes the copies again.
+
+  /// The number shown on every measure, in grid order: its position,
+  /// counting only real measures; a temporary copy shows the number of
+  /// the measure it copies.
+  List<int> measureNumbers() {
+    final out = <int>[];
+    int n = 0;
+    for (final m in measures) {
+      if (m.isTemporary) {
+        out.add(m.copiedNumber ?? n);
+      } else {
+        n++;
+        out.add(n);
+      }
+    }
+    return out;
+  }
+
+  /// The number shown on the measure at grid position [index].
+  int displayMeasureNumber(int index) {
+    final numbers = measureNumbers();
+    if (index < 0 || index >= numbers.length) return index + 1;
+    return numbers[index];
+  }
+
+  /// Whether the measure at [index] is a temporary reprise copy.
+  bool isTemporaryMeasure(int index) =>
+      index >= 0 && index < measures.length && measures[index].isTemporary;
+
+  /// Where the temporary repeat measures of the last playback layout
+  /// were inserted: (tick in the edit layout, length, tick of the
+  /// measures they copy). Kept after going back to edit mode, so a
+  /// position can be carried over in both directions.
+  final List<(int, int, int)> _layoutInsertions = [];
+
+  /// A tick of the edit layout -> the same place in the playback
+  /// layout (with the repeated measures inserted). The measure the
+  /// person was at stays the same measure (its first time through).
+  double editTickToPlayback(double t) {
+    double shift = 0;
+    for (final (at, length, _) in _layoutInsertions) {
+      if (t >= at) shift += length;
+    }
+    return t + shift;
+  }
+
+  /// A tick of the playback layout -> the same place in the edit layout.
+  /// A place inside a temporary repeated measure goes to the measure it
+  /// copies.
+  double playbackTickToEdit(double t) {
+    double shift = 0;
+    for (final (at, length, source) in _layoutInsertions) {
+      final start = at + shift;
+      if (t < start) break;
+      if (t < start + length) return source + (t - start);
+      shift += length;
+    }
+    return t - shift;
+  }
+
+  /// True while the reprises are played out (temporary copies exist).
+  bool get repriseExpanded => measures.any((m) => m.isTemporary);
+
+  /// True while anything is changed for playback (reprises played out
+  /// or arpeggios spread) — the composition is then not as in edit
+  /// mode, so it must not be saved like that.
+  bool get playbackExpanded => repriseExpanded || _arpeggiosApplied;
+
+  bool _has(int i, RepriseMark mark) =>
+      i >= 0 && i < measures.length && measures[i].repriseMarks.contains(mark);
+
+  /// Every reprise set in the composition (edit mode), in order.
+  List<Reprise> get reprises {
+    final out = <Reprise>[];
+    final n = measures.length;
+    int? pendingStart;
+    int afterLastEnd = 0;
+    for (int i = 0; i < n; i++) {
+      if (measures[i].isTemporary) continue;
+      if (_has(i, RepriseMark.start)) pendingStart = i;
+      if (_has(i, RepriseMark.end)) {
+        // A lone 𝄇 goes back to the start of the piece (or to just
+        // after the previous 𝄇).
+        final s = pendingStart ?? afterLastEnd;
+        if (_has(i, RepriseMark.volta1)) {
+          int v1 = i;
+          while (v1 - 1 >= s && _has(v1 - 1, RepriseMark.volta1)) {
+            v1--;
+          }
+          int v2 = i;
+          while (v2 + 1 < n && _has(v2 + 1, RepriseMark.volta2)) {
+            v2++;
+          }
+          out.add(Reprise(RepriseType.voltas,
+              start: s, end: i, volta1Start: v1, volta2End: v2));
+        } else {
+          out.add(Reprise(RepriseType.simple, start: s, end: i));
+        }
+        pendingStart = null;
+        afterLastEnd = i + 1;
+      }
+    }
+    int lastBefore(int i, RepriseMark mark) {
+      for (int k = i; k >= 0; k--) {
+        if (_has(k, mark)) return k;
+      }
+      return -1;
+    }
+
+    int firstIn(int from, int to, RepriseMark mark) {
+      for (int k = from; k <= to; k++) {
+        if (_has(k, mark)) return k;
+      }
+      return -1;
+    }
+
+    for (int i = 0; i < n; i++) {
+      if (_has(i, RepriseMark.dalSegnoAlFine)) {
+        final segno = lastBefore(i, RepriseMark.segno);
+        final fine = segno < 0 ? -1 : firstIn(segno, i, RepriseMark.fine);
+        if (segno >= 0 && fine >= 0) {
+          out.add(Reprise(RepriseType.segnoFine,
+              segno: segno, fine: fine, dalSegno: i));
+        }
+      }
+      if (_has(i, RepriseMark.dalSegnoAlCoda)) {
+        final segno = lastBefore(i, RepriseMark.segno);
+        final toCoda = segno < 0 ? -1 : firstIn(segno, i, RepriseMark.toCoda);
+        final coda = firstIn(i + 1, n - 1, RepriseMark.coda);
+        if (segno >= 0 && toCoda >= 0) {
+          out.add(Reprise(RepriseType.segnoCoda,
+              segno: segno, toCoda: toCoda, dalSegno: i, coda: coda < 0 ? null : coda));
+        }
+      }
+    }
+    return out;
+  }
+
+  String? _checkEditable(List<int> indices) {
+    if (playbackExpanded) return 'Go back to edit mode first.';
+    for (final i in indices) {
+      if (i < 0 || i >= measures.length) {
+        return 'Measure ${i + 1} is not in the composition '
+            '(it has ${measures.length} measures).';
+      }
+    }
+    return null;
+  }
+
+  void _mark(int i, RepriseMark mark) => measures[i].repriseMarks.add(mark);
+
+  /// Option 1, simple reprise: measures [start]..[end] (0-based) are
+  /// played twice.
+  String? addSimpleReprise(int start, int end) {
+    final error = _checkEditable([start, end]);
+    if (error != null) return error;
+    if (end < start) return 'The reprise must end after it starts.';
+    _mark(start, RepriseMark.start);
+    _mark(end, RepriseMark.end);
+    notifyListeners();
+    return null;
+  }
+
+  /// Option 2, reprise with voltas: the reprise runs from [start] to
+  /// the end of volta 1 ([volta1Start]..[volta1End]); the second time
+  /// volta 2 ([volta2Start]..[volta2End]) is played instead.
+  String? addVoltaReprise(int start, int volta1Start, int volta1End,
+      int volta2Start, int volta2End) {
+    final error =
+    _checkEditable([start, volta1Start, volta1End, volta2Start, volta2End]);
+    if (error != null) return error;
+    if (!(start < volta1Start && volta1Start <= volta1End)) {
+      return 'Volta 1 must start after the reprise starts, and end after it starts.';
+    }
+    if (volta2Start != volta1End + 1) {
+      return 'Volta 2 must start right after volta 1 '
+          '(measure ${volta1End + 2}).';
+    }
+    if (volta2End < volta2Start) return 'Volta 2 must end after it starts.';
+    _mark(start, RepriseMark.start);
+    _mark(volta1End, RepriseMark.end);
+    for (int i = volta1Start; i <= volta1End; i++) {
+      _mark(i, RepriseMark.volta1);
+    }
+    for (int i = volta2Start; i <= volta2End; i++) {
+      _mark(i, RepriseMark.volta2);
+    }
+    notifyListeners();
+    return null;
+  }
+
+  /// Option 3, D.S. al Fine: at [dalSegno] go back to [segno] and play
+  /// up to [fine].
+  String? addSegnoFine(int segno, int fine, int dalSegno) {
+    final error = _checkEditable([segno, fine, dalSegno]);
+    if (error != null) return error;
+    if (!(segno <= fine && fine < dalSegno)) {
+      return 'The order must be: Segno, then Fine, then D.S. al Fine.';
+    }
+    _mark(segno, RepriseMark.segno);
+    _mark(fine, RepriseMark.fine);
+    _mark(dalSegno, RepriseMark.dalSegnoAlFine);
+    notifyListeners();
+    return null;
+  }
+
+  /// Option 4, D.S. al Coda: at [dalSegno] go back to [segno], play up
+  /// to [toCoda], then jump to the Coda at [coda].
+  String? addSegnoCoda(int segno, int toCoda, int dalSegno, int coda) {
+    final error = _checkEditable([segno, toCoda, dalSegno, coda]);
+    if (error != null) return error;
+    if (!(segno <= toCoda && toCoda < dalSegno && dalSegno < coda)) {
+      return 'The order must be: Segno, then To Coda, then D.S. al Coda, '
+          'then Coda.';
+    }
+    _mark(segno, RepriseMark.segno);
+    _mark(toCoda, RepriseMark.toCoda);
+    _mark(dalSegno, RepriseMark.dalSegnoAlCoda);
+    _mark(coda, RepriseMark.coda);
+    notifyListeners();
+    return null;
+  }
+
+  /// Removes the signs of reprise [r].
+  void removeReprise(Reprise r) {
+    void unmark(int? i, RepriseMark mark) {
+      if (i != null && i >= 0 && i < measures.length) {
+        measures[i].repriseMarks.remove(mark);
+      }
+    }
+
+    switch (r.type) {
+      case RepriseType.simple:
+        unmark(r.start, RepriseMark.start);
+        unmark(r.end, RepriseMark.end);
+        break;
+      case RepriseType.voltas:
+        unmark(r.start, RepriseMark.start);
+        unmark(r.end, RepriseMark.end);
+        for (int i = r.volta1Start!; i <= r.end!; i++) {
+          unmark(i, RepriseMark.volta1);
+        }
+        for (int i = r.end! + 1; i <= r.volta2End!; i++) {
+          unmark(i, RepriseMark.volta2);
+        }
+        break;
+      case RepriseType.segnoFine:
+        unmark(r.segno, RepriseMark.segno);
+        unmark(r.fine, RepriseMark.fine);
+        unmark(r.dalSegno, RepriseMark.dalSegnoAlFine);
+        break;
+      case RepriseType.segnoCoda:
+        unmark(r.segno, RepriseMark.segno);
+        unmark(r.toCoda, RepriseMark.toCoda);
+        unmark(r.dalSegno, RepriseMark.dalSegnoAlCoda);
+        unmark(r.coda, RepriseMark.coda);
+        break;
+    }
+    notifyListeners();
+  }
+
+  /// PLAYBACK mode: inserts the measures each reprise plays again as
+  /// temporary copies right where the music goes back, so playback
+  /// plays straight through. Called when Scroll Lock turns on.
+  void expandReprises() {
+    if (measures.isEmpty) return;
+    if (repriseExpanded) {
+      if (!_arpeggiosApplied) _applyArpeggios();
+      notifyListeners();
+      return;
+    }
+    _layoutInsertions.clear();
+    // (insert after, copy from, copy to) — 0-based measure positions.
+    final insertions = <(int, int, int)>[];
+    for (final r in reprises) {
+      switch (r.type) {
+        case RepriseType.simple:
+          insertions.add((r.end!, r.start!, r.end!));
+          break;
+        case RepriseType.voltas:
+        // Second time: from the 𝄆 up to just before volta 1, then
+        // straight on into volta 2.
+          if (r.volta1Start! > r.start!) {
+            insertions.add((r.end!, r.start!, r.volta1Start! - 1));
+          }
+          break;
+        case RepriseType.segnoFine:
+          insertions.add((r.dalSegno!, r.segno!, r.fine!));
+          break;
+        case RepriseType.segnoCoda:
+          insertions.add((r.dalSegno!, r.segno!, r.toCoda!));
+          break;
+      }
+    }
+    // From the last place to the first, so earlier positions stay valid.
+    insertions.sort((a, b) => b.$1.compareTo(a.$1));
+    for (final (after, from, to) in insertions) {
+      _insertTemporaryCopies(after, from, to);
+    }
+    // Arpeggios last, so the repeated measures' chords are spread too.
+    if (!_arpeggiosApplied) _applyArpeggios();
+    notifyListeners();
+  }
+
+  /// EDIT mode: removes the temporary copies made by [expandReprises].
+  /// Called when Scroll Lock turns off, and around saving.
+  void collapseReprises() {
+    _restoreArpeggios();
+    _removeTemporaryEvents();
+    for (int i = measures.length - 1; i >= 0; i--) {
+      if (measures[i].isTemporary) deleteMeasure(i);
+    }
+    notifyListeners();
+  }
+
+  /// Inserts copies of measures [from]..[to] (with their notes) right
+  /// after measure [after], marked as temporary.
+  void _insertTemporaryCopies(int after, int from, int to) {
+    if (from < 0 || to < from || after < to || after >= measures.length) return;
+    final insertIndex = after + 1;
+    final insertTick = measures[after].endTick;
+    final srcStart = measures[from].startTick;
+    final srcEnd = measures[to].endTick;
+    final offset = insertTick - srcStart;
+    // Snapshots BEFORE anything moves (the source lies before the
+    // insertion point, so shifting below never touches it).
+    final sources = measures.sublist(from, to + 1).toList();
+    final sourceNotes = notes
+        .where((n) => n.startTick >= srcStart && n.startTick < srcEnd)
+        .toList();
+    // Insertions go from the last to the first, so insertTick is a tick
+    // of the edit-mode layout.
+    _layoutInsertions
+      ..add((insertTick, srcEnd - srcStart, srcStart))
+      ..sort((a, b) => a.$1.compareTo(b.$1));
+    bool inSource(int tick) => tick >= srcStart && tick < srcEnd;
+    final sourceTempos = [
+      for (final e in timeline.tempoEvents)
+        if (inSource(e.tick)) (e.tick, e.tempo)
+    ];
+    final sourceDynamics = [
+      for (final e in timeline.dynamicEvents)
+        if (inSource(e.tick)) (e.tick, e.musical_dynamic)
+    ];
+    final sourceChanges = [
+      for (final e in timeline.dynamicChangeEvents)
+        if (inSource(e.tick)) (e.tick, e.dynamic_change)
+    ];
+    // Tempo / dynamic in effect: at the start of the repeated part, at
+    // the end of it, just before the copy goes in, and for the music
+    // that follows the copy.
+    final tempoAtSourceStart = getActiveTempoAtTick(srcStart)?.tempo;
+    final tempoAtSourceEnd = getActiveTempoAtTick(srcEnd - 1)?.tempo;
+    final tempoBeforeCopy = getActiveTempoAtTick(insertTick - 1)?.tempo;
+    final tempoAfterCopy = getActiveTempoAtTick(insertTick)?.tempo;
+    final dynamicAtSourceStart = _activeDynamicAt(srcStart);
+    final dynamicAtSourceEnd = _activeDynamicAt(srcEnd - 1);
+    final dynamicBeforeCopy = _activeDynamicAt(insertTick - 1);
+    final dynamicAfterCopy = _activeDynamicAt(insertTick);
+    final hadTempoAtInsert = timeline.tempoEvents.any((e) => e.tick == insertTick);
+    final hadDynamicAtInsert =
+    timeline.dynamicEvents.any((e) => e.tick == insertTick);
+
+    _shiftTicksFrom(insertTick, srcEnd - srcStart);
+
+    for (int k = 0; k < sources.length; k++) {
+      final m = sources[k];
+      measures.insert(
+        insertIndex + k,
+        m.copyWith(
+          id: measures.length + k,
+          startTick: m.startTick + offset,
+          beatEvents: m.beatEvents
+              .map((e) => e.copyWith(tick: e.tick + offset))
+              .toList(),
+          inkStrokes: <InkStroke>[],
+          repriseMarks: <RepriseMark>{},
+          isTemporary: true,
+          copiedNumber: from + k + 1,
+        ),
+      );
+    }
+
+    // Copy the notes, keeping glissando / grace-note links inside the
+    // copy pointing at the copied notes.
+    final idMap = <int, int>{
+      for (final note in sourceNotes) note.id: generateNoteId(),
+    };
+    notes.addAll(sourceNotes.map((note) => note.copyWith(
+      id: idMap[note.id],
+      startTick: note.startTick + offset,
+      glissandoSourceId: note.glissandoSourceId == null
+          ? null
+          : (idMap[note.glissandoSourceId] ?? note.glissandoSourceId),
+      graceOfNoteId: note.graceOfNoteId == null
+          ? null
+          : (idMap[note.graceOfNoteId] ?? note.graceOfNoteId),
+    )));
+
+    // Tempo, dynamics, crescendo/diminuendo and pedal marks of the
+    // repeated part are copied too (all temporary, see
+    // [_temporaryEvents]).
+    final copyStart = insertTick;
+    final copyEnd = insertTick + (srcEnd - srcStart);
+    void addTempo(int tick, Tempo tempo) {
+      if (timeline.tempoEvents.any((e) => e.tick == tick)) return;
+      timeline.tempoEvents.add(TempoEvent(tick: tick, tempo: tempo));
+      _temporaryEvents.add(_TemporaryEvent(_TemporaryEventKind.tempo, tick));
+    }
+
+    void addDynamic(int tick, MusicalDynamic level) {
+      if (timeline.dynamicEvents.any((e) => e.tick == tick)) return;
+      timeline.dynamicEvents.add(DynamicEvent(tick: tick, musical_dynamic: level));
+      _temporaryEvents.add(_TemporaryEvent(_TemporaryEventKind.dynamic, tick));
+    }
+
+    for (final (tick, tempo) in sourceTempos) {
+      addTempo(tick + offset, tempo);
+    }
+    // The repeated part starts in its own tempo, even when that tempo
+    // was set before it…
+    if (tempoAtSourceStart != null && tempoAtSourceStart != tempoBeforeCopy) {
+      addTempo(copyStart, tempoAtSourceStart);
+    }
+    // …and the music after it goes on in the tempo it had before.
+    if (!hadTempoAtInsert &&
+        tempoAfterCopy != null &&
+        tempoAfterCopy != tempoAtSourceEnd) {
+      addTempo(copyEnd, tempoAfterCopy);
+    }
+
+    for (final (tick, level) in sourceDynamics) {
+      addDynamic(tick + offset, level);
+    }
+    if (dynamicAtSourceStart != null && dynamicAtSourceStart != dynamicBeforeCopy) {
+      addDynamic(copyStart, dynamicAtSourceStart);
+    }
+    if (!hadDynamicAtInsert &&
+        dynamicAfterCopy != null &&
+        dynamicAfterCopy != dynamicAtSourceEnd) {
+      addDynamic(copyEnd, dynamicAfterCopy);
+    }
+
+    for (final (tick, change) in sourceChanges) {
+      timeline.dynamicChangeEvents
+          .add(DynamicChangeEvent(tick: tick + offset, dynamic_change: change));
+      _temporaryEvents.add(_TemporaryEvent(
+          _TemporaryEventKind.dynamicChange, tick + offset, change));
+    }
+
+    timeline.tempoEvents.sort((a, b) => a.tick.compareTo(b.tick));
+    timeline.dynamicEvents.sort((a, b) => a.tick.compareTo(b.tick));
+    timeline.dynamicChangeEvents.sort((a, b) => a.tick.compareTo(b.tick));
+
+    timeline.rebuild();
+  }
+
+  // =====================================================
+  // ARPEGGIOS
+  // =====================================================
+
+  /// Puts repeat signs and arpeggios read from an imported
+  /// transcription (see notation_marks.dart) on the measures.
+  /// [reprise]: (0-based measure, sign); [arpeggios]: (0-based measure,
+  /// beat as written — 1, 2.5…, hand). Arpeggios of both hands on the
+  /// same beat become one "both hands" arpeggio.
+  void applyNotationMarks(
+      List<(int, RepriseMark)> reprise,
+      List<(int, double, Hand)> arpeggios,
+      ) {
+    for (final (i, mark) in reprise) {
+      if (i >= 0 && i < measures.length) measures[i].repriseMarks.add(mark);
+    }
+    for (final (i, beat, hand) in arpeggios) {
+      if (i < 0 || i >= measures.length || beat < 1) continue;
+      final m = measures[i];
+      final whole = beat.floor();
+      final tick = getBeatTick(i, whole - 1) +
+          ((beat - whole) * m.timeSignature.ticksPerBeat).round();
+      final offset = tick - m.startTick;
+      final hands = <Hand>{
+        for (final a in m.arpeggios)
+          if (a.offset == offset) ...a.hands,
+        hand,
+      };
+      m.arpeggios
+        ..removeWhere((a) => a.offset == offset)
+        ..add(Arpeggio(offset, hands))
+        ..sort((a, b) => a.offset.compareTo(b.offset));
+    }
+    notifyListeners();
+  }
+
+  /// Removes every measure with its notes, dynamics, pedal marks and
+  /// tempo changes (the starting tempo stays) — used to REPLACE the
+  /// whole composition with an imported transcription.
+  void clearAllMeasures() {
+    if (measures.isEmpty) return;
+    clearMeasureRangeNotes(0, measures.length - 1);
+    timeline.tempoEvents.removeWhere((e) => e.tick != 0);
+    deleteMeasureRange(0, measures.length - 1);
+    timeline.dynamicEvents.clear();
+    timeline.dynamicChangeEvents.clear();
+    notes.clear();
+    notifyListeners();
+  }
+
+  /// The arpeggio on the chord at [tick] (null if none).
+  Arpeggio? arpeggioAt(int tick) {
+    if (measures.isEmpty) return null;
+    final m = getMeasureAtTick(tick);
+    for (final a in m.arpeggios) {
+      if (m.startTick + a.offset == tick) return a;
+    }
+    return null;
+  }
+
+  /// Puts an arpeggio on the chord at [tick] for [hands] (left, right
+  /// or both); an empty [hands] removes it. Edit mode only.
+  String? setArpeggio(int tick, Set<Hand> hands) {
+    if (measures.isEmpty) return null;
+    if (playbackExpanded) return 'Go back to edit mode first.';
+    final m = getMeasureAtTick(tick);
+    final offset = tick - m.startTick;
+    m.arpeggios.removeWhere((a) => a.offset == offset);
+    if (hands.isNotEmpty) {
+      m.arpeggios
+        ..add(Arpeggio(offset, Set<Hand>.from(hands)))
+        ..sort((a, b) => a.offset.compareTo(b.offset));
+    }
+    notifyListeners();
+    return null;
+  }
+
+  /// The notes an arpeggio at [tick] spreads: the chord notes of its
+  /// hands starting exactly there (not grace notes or glissando runs),
+  /// lowest first.
+  List<Note> arpeggioNotes(int tick, Set<Hand> hands) {
+    final chord = [
+      for (final n in notes)
+        if (n.startTick == tick &&
+            hands.contains(n.hand) &&
+            n.graceOfNoteId == null &&
+            n.glissandoSourceId == null)
+          n
+    ]..sort((a, b) => a.row.compareTo(b.row));
+    return chord;
+  }
+
+  bool _arpeggiosApplied = false;
+
+  /// The chord notes as they were before [_applyArpeggios] spread them.
+  final List<Note> _arpeggioOriginals = [];
+
+  /// PLAYBACK mode: every arpeggiated chord is played one note after
+  /// another, lowest first. The chord's duration (its shortest note) is
+  /// shared equally between its notes. Each spread note keeps its id,
+  /// so grace notes and other links still find it.
+  void _applyArpeggios() {
+    _arpeggioOriginals.clear();
+    for (final m in measures) {
+      for (final a in m.arpeggios) {
+        final tick = m.startTick + a.offset;
+        final chord = arpeggioNotes(tick, a.hands);
+        if (chord.length < 2) continue;
+        final total = chord
+            .map((n) => n.durationTicks)
+            .reduce((x, y) => x < y ? x : y);
+        final k = chord.length;
+        for (int i = 0; i < k; i++) {
+          final n = chord[i];
+          final start = tick + (i * total) ~/ k;
+          final end = tick + ((i + 1) * total) ~/ k;
+          final index = notes.indexWhere((x) => identical(x, n));
+          if (index < 0 || end <= start) continue;
+          _arpeggioOriginals.add(n);
+          notes[index] = n.copyWith(startTick: start, durationTicks: end - start);
+        }
+      }
+    }
+    _arpeggiosApplied = true;
+  }
+
+  /// EDIT mode: puts the arpeggiated chords back as chords.
+  void _restoreArpeggios() {
+    if (!_arpeggiosApplied) return;
+    final ids = {for (final n in _arpeggioOriginals) n.id};
+    notes.removeWhere((n) => ids.contains(n.id));
+    notes.addAll(_arpeggioOriginals);
+    _arpeggioOriginals.clear();
+    _arpeggiosApplied = false;
+  }
+
+  /// The dynamic (p, f…) in effect at [tick] (null before the first).
+  MusicalDynamic? _activeDynamicAt(int tick) {
+    MusicalDynamic? active;
+    for (final e in timeline.dynamicEvents) {
+      if (e.tick <= tick) {
+        active = e.musical_dynamic;
+      } else {
+        break; // kept sorted by tick
+      }
+    }
+    return active;
+  }
+
+  /// Tempo / dynamic / crescendo / pedal events added only for playing
+  /// the reprises — removed again by [collapseReprises]. Their ticks
+  /// follow every later insert/removal (see [_shiftTicksFrom]).
+  final List<_TemporaryEvent> _temporaryEvents = [];
+
+  void _removeTemporaryEvents() {
+    for (final t in _temporaryEvents) {
+      switch (t.kind) {
+        case _TemporaryEventKind.tempo:
+          timeline.tempoEvents.removeWhere((e) => e.tick == t.tick);
+          break;
+        case _TemporaryEventKind.dynamic:
+          timeline.dynamicEvents.removeWhere((e) => e.tick == t.tick);
+          break;
+        case _TemporaryEventKind.dynamicChange:
+          final i = timeline.dynamicChangeEvents.indexWhere(
+                  (e) => e.tick == t.tick && e.dynamic_change == t.change);
+          if (i >= 0) timeline.dynamicChangeEvents.removeAt(i);
+          break;
+      }
+    }
+    _temporaryEvents.clear();
+  }
+
   void deleteMeasure(int index) {
     if (index < 0 || index >= measures.length) {
       return;
@@ -842,136 +1699,105 @@ class CompositionController extends ChangeNotifier {
 
 
 
-  void copyMeasure(
-      int index,
-      ) {
-    if(index < 0 ||
-        index >= measures.length){
-      return;
-    }
-    final original =
-    measures[index];
-    final newStart = timeline.totalTicks;
-    final copiedMeasure = original.copyWith(
-      id: measures.length,
-      startTick: newStart,
-      // Red-pen marks belong to the original only.
-      inkStrokes: [],
-      beatEvents:
-      original.beatEvents.map(
-            (e)=>e.copyWith(
-          tick: e.tick - original.startTick + newStart,
-        ),
-      ).toList(),
-    );
-    measures.add(copiedMeasure,);
-    // copy notes inside measure
-    final copiedNotes =
-    notes.where( (note) =>
-    note.startTick >= original.startTick &&
-        note.startTick < original.endTick,
-    )
-        .map(
-          (note) {
-        return note.copyWith(
-          id: generateNoteId(),
-          startTick:  newStart + (note.startTick - original.startTick),
-        );
-      },
-    )
-        .toList();
-    notes.addAll(
-      copiedNotes,
-    );
-    timeline.rebuild();
-    notifyListeners();
+  /// Duplicates measure [index]: the copy goes RIGHT AFTER it (the
+  /// measures after it move one place later), with all its notes,
+  /// dynamics, pedal / crescendo marks, tempo changes and arpeggios.
+  void copyMeasure(int index) {
+    duplicateMeasureRange(index, index);
   }
 
-
-  /// Duplicates every measure from [fromIndex] through [toIndex]
-  /// (inclusive, 0-based) as one new contiguous block appended at the
-  /// end of the composition — generalizes [copyMeasure] to a whole
-  /// range instead of a single measure. [fromIndex]/[toIndex] are
-  /// treated as (min, max) regardless of which is actually larger, so
-  /// callers don't need to sort them first; out-of-range indices (or
-  /// an empty composition) make this a no-op.
-  ///
-  /// Each measure in the range keeps its own time signature/scale and
-  /// its own beatEvents (shifted by the same total offset as
-  /// everything else). Every note whose startTick falls anywhere
-  /// within the ORIGINAL range is copied too, shifted by that same
-  /// offset, so the whole block lands intact at the end. Unlike
-  /// [copyMeasure], this ALSO remaps [Note.glissandoSourceId] /
-  /// [Note.graceOfNoteId] so that an anchor note and its own
-  /// glissando run / grace notes — when BOTH are duplicated together
-  /// within the same range — end up correctly pointing at each
-  /// other's NEW copies rather than dangling back to the originals.
-  /// (If only one half of such a pair falls inside the range, the
-  /// copy's reference is left pointing at the original outside note,
-  /// same as it always did — there's no other note in the new block
-  /// for it to point at instead.)
-  ///
-  /// Like [copyMeasure], this does NOT duplicate any tempo/dynamic/
-  /// dynamic-change events that happen to fall within the range.
+  /// Duplicates measures [fromIndex]..[toIndex] (inclusive, 0-based,
+  /// either order): the copy goes right after [toIndex], with all the
+  /// notes, dynamics, pedal / crescendo marks, tempo changes and
+  /// arpeggios of the range. Glissando / grace-note links inside the
+  /// range point at the copied notes. Repeat signs and red-pen marks
+  /// stay on the originals.
   void duplicateMeasureRange(int fromIndex, int toIndex) {
     if (measures.isEmpty) return;
     final start = fromIndex <= toIndex ? fromIndex : toIndex;
     final end = fromIndex <= toIndex ? toIndex : fromIndex;
     if (start < 0 || end >= measures.length) return;
+    // In playback mode the measures are not as written — go back to
+    // edit mode first (the copies would otherwise mix with the
+    // temporary repeat measures).
+    if (playbackExpanded) return;
 
-    final rangeStartTick = measures[start].startTick;
-    final rangeEndTick = measures[end].endTick;
-    // Computed once, before any measures are appended below — those
-    // appends grow timeline.totalTicks, which this offset is derived
-    // from, so it must be captured up front rather than recomputed
-    // mid-loop.
-    final offset = timeline.totalTicks - rangeStartTick;
+    final srcStart = measures[start].startTick;
+    final srcEnd = measures[end].endTick;
+    final length = srcEnd - srcStart;
+    final insertTick = srcEnd;
+    final offset = insertTick - srcStart;
 
-    // Snapshot the range before mutating `measures` — appending to it
-    // below would otherwise shift indices out from under an in-place
-    // iteration.
-    final originalRange = measures.sublist(start, end + 1).toList();
-    for (final original in originalRange) {
-      final newStart = original.startTick + offset;
-      measures.add(original.copyWith(
-        id: measures.length,
-        startTick: newStart,
-        beatEvents: original.beatEvents
-            .map((e) => e.copyWith(tick: e.tick + offset))
-            .toList(),
-      ));
+    // Snapshots BEFORE anything moves (the source lies before the
+    // insertion point, so the shift below never touches it).
+    final sources = measures.sublist(start, end + 1).toList();
+    bool inSource(int tick) => tick >= srcStart && tick < srcEnd;
+    final sourceNotes = notes.where((n) => inSource(n.startTick)).toList();
+    final sourceTempos = [
+      for (final e in timeline.tempoEvents)
+        if (inSource(e.tick) && e.tick != 0) (e.tick, e.tempo)
+    ];
+    final sourceDynamics = [
+      for (final e in timeline.dynamicEvents)
+        if (inSource(e.tick)) (e.tick, e.musical_dynamic)
+    ];
+    final sourceChanges = [
+      for (final e in timeline.dynamicChangeEvents)
+        if (inSource(e.tick)) (e.tick, e.dynamic_change)
+    ];
+
+    // Make room: everything after the range moves later.
+    _shiftTicksFrom(insertTick, length);
+
+    for (int k = 0; k < sources.length; k++) {
+      final m = sources[k];
+      measures.insert(
+        end + 1 + k,
+        m.copyWith(
+          id: measures.length + k,
+          startTick: m.startTick + offset,
+          beatEvents: m.beatEvents
+              .map((e) => e.copyWith(tick: e.tick + offset))
+              .toList(),
+          inkStrokes: <InkStroke>[],
+          repriseMarks: <RepriseMark>{},
+          isTemporary: false,
+          copiedNumber: null,
+          arpeggios: List<Arpeggio>.from(m.arpeggios),
+        ),
+      );
     }
 
-    final originalNotesInRange = notes
-        .where((note) =>
-    note.startTick >= rangeStartTick && note.startTick < rangeEndTick)
-        .toList();
-
-    // Maps each duplicated note's OLD id to its brand-new copy's id
-    // — used below to correctly relink glissando/grace-note
-    // relationships that fall entirely within this range (see the
-    // method doc above).
     final idMap = <int, int>{
-      for (final note in originalNotesInRange) note.id: generateNoteId(),
+      for (final note in sourceNotes) note.id: generateNoteId(),
     };
-
-    final copiedNotes = originalNotesInRange.map((note) {
-      final newGlissandoSourceId = note.glissandoSourceId == null
+    notes.addAll(sourceNotes.map((note) => note.copyWith(
+      id: idMap[note.id],
+      startTick: note.startTick + offset,
+      glissandoSourceId: note.glissandoSourceId == null
           ? null
-          : (idMap[note.glissandoSourceId] ?? note.glissandoSourceId);
-      final newGraceOfNoteId = note.graceOfNoteId == null
+          : (idMap[note.glissandoSourceId] ?? note.glissandoSourceId),
+      graceOfNoteId: note.graceOfNoteId == null
           ? null
-          : (idMap[note.graceOfNoteId] ?? note.graceOfNoteId);
-      return note.copyWith(
-        id: idMap[note.id],
-        startTick: note.startTick + offset,
-        glissandoSourceId: newGlissandoSourceId,
-        graceOfNoteId: newGraceOfNoteId,
-      );
-    }).toList();
+          : (idMap[note.graceOfNoteId] ?? note.graceOfNoteId),
+    )));
 
-    notes.addAll(copiedNotes);
+    for (final (tick, tempo) in sourceTempos) {
+      timeline.tempoEvents.add(TempoEvent(tick: tick + offset, tempo: tempo));
+    }
+    for (final (tick, level) in sourceDynamics) {
+      timeline.dynamicEvents
+          .add(DynamicEvent(tick: tick + offset, musical_dynamic: level));
+    }
+    for (final (tick, change) in sourceChanges) {
+      timeline.dynamicChangeEvents
+          .add(DynamicChangeEvent(tick: tick + offset, dynamic_change: change));
+    }
+    timeline.tempoEvents.sort((a, b) => a.tick.compareTo(b.tick));
+    timeline.dynamicEvents.sort((a, b) => a.tick.compareTo(b.tick));
+    timeline.dynamicChangeEvents.sort((a, b) => a.tick.compareTo(b.tick));
 
+    if (selectedMeasureIndex > end) selectedMeasureIndex += sources.length;
     timeline.rebuild();
     notifyListeners();
   }
@@ -1048,6 +1874,15 @@ class CompositionController extends ChangeNotifier {
     )
         .toList();
     notes.addAll(copiedNotes);
+    // The copy gets the same split columns (triplet…) as the original.
+    final division = measure.beatDivisions[beatIndex];
+    if (beatIndex + 1 < measure.timeSignature.beats) {
+      if (division != null) {
+        measure.beatDivisions[beatIndex + 1] = division;
+      } else {
+        measure.beatDivisions.remove(beatIndex + 1);
+      }
+    }
     // Copy beat events
     final beatEvents = measure.beatEvents.where((event)=>
     event.tick >= beatStart && event.tick < beatEnd,
@@ -1422,9 +2257,10 @@ class CompositionController extends ChangeNotifier {
 
   void addNoteAtGridPosition(
       int tick,
-      int row,
-      ){
-    final newDuration = currentDuration.ticks;
+      int row, {
+        int? durationTicks,
+      }){
+    final newDuration = durationTicks ?? currentDuration.ticks;
     // Prevent any horizontal overlap
     final overlaps = notes.any(
           (note) {
@@ -1547,36 +2383,106 @@ class CompositionController extends ChangeNotifier {
       // all (e.g. Measure 4/5/7/8 of the reference score, where RH
       // and LH both start on beat 1) — grouping by tick alone would
       // silently merge them into a single mislabeled event.
+      // A note with grace notes BEFORE it is written from where its
+      // grace notes start, with its whole length ("gs(l5) l4 d4"); the
+      // grace notes themselves are written with it, not as notes.
+      int startOf(Note n) =>
+          n.graceOriginalDurationTicks != null && !n.graceIsAfter
+              ? n.startTick + n.durationTicks - n.graceOriginalDurationTicks!
+              : n.startTick;
+      int lengthOf(Note n) => n.graceOriginalDurationTicks ?? n.durationTicks;
+
       final notesInMeasure = notes.where(
-            (n) => n.startTick >= measure.startTick &&
-            n.startTick < measure.endTick,
+            (n) => n.graceOfNoteId == null &&
+            startOf(n) >= measure.startTick &&
+            startOf(n) < measure.endTick,
       ).toList()
-        ..sort((a, b) => a.startTick.compareTo(b.startTick));
+        ..sort((a, b) => startOf(a).compareTo(startOf(b)));
 
       final byStartTickAndHand = <String, List<Note>>{};
       for (final n in notesInMeasure) {
-        final key = '${n.startTick}_${n.hand}';
+        final key = '${startOf(n)}_${n.hand}';
         byStartTickAndHand.putIfAbsent(key, () => []).add(n);
       }
 
       final events = <ImportEvent>[];
       final sortedGroups = byStartTickAndHand.values.toList()
-        ..sort((a, b) => a.first.startTick.compareTo(b.first.startTick));
+        ..sort((a, b) => startOf(a.first).compareTo(startOf(b.first)));
       for (final chordNotes in sortedGroups) {
-        final tick = chordNotes.first.startTick;
-        final beat = 1 +
+        chordNotes.sort((a, b) => a.row.compareTo(b.row));
+        final tick = startOf(chordNotes.first);
+        var beat = 1 +
             (tick - measure.startTick) / measure.timeSignature.ticksPerBeat;
         // A chord's notes could in principle have different
         // durations; the first note's duration is used for the
         // whole event, matching how a chord is always specified on
         // the way in (one shared durationParts list per event).
-        final durationParts = decomposeDurationTicks(
-          chordNotes.first.durationTicks,
+        var durationParts = decomposeDurationTicks(
+          lengthOf(chordNotes.first),
         );
+        var tuplet = 1;
+        // A note in a split beat (triplet…): its exact position, and its
+        // written length with ":3" (see the transcription parser).
+        final split = dividedBeatAt(tick);
+        if (split != null) {
+          final first = chordNotes.first;
+          final exactStart = displayTick(tick);
+          final exactLength =
+              displayTick(tick + lengthOf(first)) - exactStart;
+          beat = 1 +
+              (exactStart - measure.startTick) /
+                  measure.timeSignature.ticksPerBeat;
+          // (a length that is a whole number of 1/64s is written as is)
+          final ordinary = (exactLength - exactLength.round()).abs() < 1e-6;
+          for (final k in ordinary ? const <int>{} : {split.columns, 3, 6, 5, 7, 2}) {
+            if (k < 2) continue;
+            final written = exactLength / tupletFactor(k);
+            final rounded = written.round();
+            if ((written - rounded).abs() < 1e-6 && rounded > 0) {
+              final parts = decomposeDurationTicks(rounded);
+              if (parts.length <= 2) {
+                durationParts = parts;
+                tuplet = k;
+                break;
+              }
+            }
+          }
+        }
+        // Grace notes before a note of the chord.
+        GraceNoteType? graceType;
+        var graces = const <ImportNoteSpec>[];
+        var graceAfter = false;
+        for (final n in chordNotes.reversed) {
+          if (n.graceOriginalDurationTicks == null) continue;
+          final gs = notes.where((g) => g.graceOfNoteId == n.id).toList()
+            ..sort((a, b) => a.startTick.compareTo(b.startTick));
+          if (gs.isEmpty) continue;
+          graceType = gs.first.graceNoteType;
+          graceAfter = n.graceIsAfter;
+          graces = [
+            for (final g in gs)
+              ImportNoteSpec(
+                degree: getDegree(g),
+                octave: g.row ~/ 7,
+                accidental: g.accidental,
+                hand: g.hand,
+              ),
+          ];
+          break;
+        }
         events.add(
           ImportEvent(
             beat: beat,
+            tuplet: tuplet,
             durationParts: durationParts,
+            // The ornament and grace notes (of the chord's top note).
+            ornament: chordNotes
+                .lastWhere((n) => n.ornament != null,
+                orElse: () => chordNotes.last)
+                .ornament,
+            graceType: graceType,
+            graces: graces,
+            graceAfter: graceAfter,
             pitches: [
               for (final n in chordNotes)
                 ImportNoteSpec(
@@ -1631,7 +2537,7 @@ class CompositionController extends ChangeNotifier {
       final measureIndex = measures.indexOf(measure);
       final beat = 1 +
           (tick - measure.startTick) / measure.timeSignature.ticksPerBeat;
-      return 'Measure ${measureIndex + 1}, beat $beat';
+      return 'Measure ${displayMeasureNumber(measureIndex)}, beat $beat';
     }
 
     // (tick, text) pairs, sorted by tick before formatting — sorting
@@ -1689,15 +2595,78 @@ class CompositionController extends ChangeNotifier {
 
       final measure = measures[importMeasure.measureIndex];
       final ticksPerBeat = measure.timeSignature.ticksPerBeat;
+      final mi = importMeasure.measureIndex;
+      final beatCount = measure.timeSignature.beats;
+
+      // TUPLETS (triplets…): a beat holding a note that starts or ends
+      // between its 1/64 steps is split into equal columns — the
+      // fewest (2–13) that every note start and end in it falls on.
+      final fractionsByBeat = <int, List<double>>{};
+      final offGridBeats = <int>{};
+      void addPosition(double pos) {
+        final b = (pos + 1e-9).floor();
+        if (b < 0 || b >= beatCount) return;
+        final f = pos - b;
+        if (f.abs() < 1e-9) return;
+        fractionsByBeat.putIfAbsent(b, () => []).add(f);
+        final t = f * ticksPerBeat;
+        if ((t - t.round()).abs() > 1e-6) offGridBeats.add(b);
+      }
+      for (final event in importMeasure.events) {
+        final start = event.beat - 1;
+        addPosition(start);
+        addPosition(start + event.exactDurationTicks / ticksPerBeat);
+      }
+      bool fits(int n, List<double> fs) =>
+          fs.every((f) => ((f * n) - (f * n).round()).abs() < 1e-6);
+      for (final b in offGridBeats) {
+        final fs = fractionsByBeat[b]!;
+        final current = measure.beatDivisions[b];
+        if (current != null && fits(current, fs)) continue;
+        for (int n = 2; n <= 13; n++) {
+          if (fits(n, fs)) {
+            _setBeatDivision(mi, b, n);
+            break;
+          }
+        }
+      }
+
+      // The tick of a position (in beats from the measure's start):
+      // in a split beat, the start of its column.
+      int tickAt(double pos) {
+        var b = (pos + 1e-9).floor();
+        var f = pos - b;
+        if (b >= beatCount) {
+          b = beatCount - 1;
+          f = 1;
+        }
+        if (b < 0) {
+          b = 0;
+          f = 0;
+        }
+        final start = getBeatTick(mi, b);
+        final n = measure.beatDivisions[b];
+        if (n != null && n > 1) {
+          final width = ticksPerBeat * (getFermataMultiplier(mi, b) ?? 1);
+          return start + ((f * n).round() * width / n).round();
+        }
+        return start + (f * ticksPerBeat).round();
+      }
 
       for (final event in importMeasure.events) {
         if (event.pitches.isEmpty) continue; // rest — nothing to create
 
-        final wholeBeatIndex = (event.beat - 1).floor();
-        final fraction = (event.beat - 1) - wholeBeatIndex;
-        final tick = getBeatTick(importMeasure.measureIndex, wholeBeatIndex) +
-            (fraction * ticksPerBeat).round();
-        final durationTicks = event.durationTicks;
+        final startPos = event.beat - 1;
+        final endPos = startPos + event.exactDurationTicks / ticksPerBeat;
+        final tick = tickAt(startPos);
+        final int durationTicks = event.durationTicks <= 0
+            ? 0
+            : math.max(
+          1,
+          endPos <= beatCount + 1e-9
+              ? tickAt(endPos) - tick
+              : event.exactDurationTicks.round(),
+        );
 
         if (durationTicks <= 0) {
           warnings.add(
@@ -1710,6 +2679,7 @@ class CompositionController extends ChangeNotifier {
           continue;
         }
 
+        final createdNotes = <Note>[];
         for (final pitch in event.pitches) {
           final row = pitch.row;
           if (row < 0 || row >= totalRows) {
@@ -1744,19 +2714,21 @@ class CompositionController extends ChangeNotifier {
             continue;
           }
 
-          composition.notes.add(
-            Note(
-              id: generateNoteId(),
-              startTick: tick,
-              durationTicks: durationTicks,
-              row: row,
-              hand: pitch.hand,
-              accidental: pitch.accidental,
-              articulation: pitch.articulation,
-              legato: pitch.legato,
-            ),
+          final created = Note(
+            id: generateNoteId(),
+            startTick: tick,
+            durationTicks: durationTicks,
+            row: row,
+            hand: pitch.hand,
+            accidental: pitch.accidental,
+            articulation: pitch.articulation,
+            legato: pitch.legato,
           );
+          composition.notes.add(created);
+          createdNotes.add(created);
         }
+        _importOrnamentAndGraces(
+            event, createdNotes, importMeasure.measureIndex, warnings);
       }
     }
 
@@ -1764,6 +2736,61 @@ class CompositionController extends ChangeNotifier {
     return warnings;
   }
 
+
+  /// The ornament ("trill"…) and grace notes ("gs(l5)") of an imported
+  /// [event], put on the top note of [created] (the chord's highest).
+  void _importOrnamentAndGraces(
+      ImportEvent event,
+      List<Note> created,
+      int measureIndex,
+      List<ImportWarning> warnings,
+      ) {
+    if (created.isEmpty) return;
+    final top = created.reduce((a, b) => a.row >= b.row ? a : b);
+    var idx = notes.indexWhere((n) => n.id == top.id);
+    if (idx == -1) return;
+    if (event.ornament != null) {
+      notes[idx] = notes[idx].copyWith(ornament: event.ornament);
+    }
+    final type = event.graceType;
+    if (type == null || event.graces.isEmpty) return;
+    final anchor = notes[idx];
+    final valid = [
+      for (final g in event.graces)
+        if (g.row >= 0 && g.row < totalRows) g,
+    ];
+    final max = maxGraceNotesForType(anchor, type);
+    if (valid.length > max) {
+      warnings.add(ImportWarning(
+        measureIndex: measureIndex,
+        beat: event.beat,
+        message: max == 0
+            ? 'The note is too short for ${type.label} grace notes — skipped.'
+            : 'At most $max ${type.label} grace notes on this note — '
+            'the others were skipped.',
+      ));
+    }
+    final use = valid.take(max).toList();
+    if (use.isEmpty) return;
+    notes[idx] = anchor.copyWith(
+      graceOriginalDurationTicks: anchor.durationTicks,
+      // "l4 d4 gs(l5)": after the note; "gs(l5) l4 d4": before it.
+      graceIsAfter: event.graceAfter,
+    );
+    for (final g in use) {
+      notes.add(Note(
+        id: generateNoteId(),
+        startTick: anchor.startTick,
+        durationTicks: 1,
+        row: g.row,
+        hand: anchor.hand,
+        accidental: g.accidental,
+        graceOfNoteId: anchor.id,
+        graceNoteType: type,
+      ));
+    }
+    _redistributeGraceNotes(anchor.id);
+  }
 
   void removeNote(Note note){
     composition.notes.removeWhere(
@@ -1916,6 +2943,13 @@ class CompositionController extends ChangeNotifier {
     }
     if(row < 0 ||
         row >= totalRows) {
+      return;
+    }
+    // In a split beat (triplet…) the note starts at the column and
+    // lasts one column.
+    final column = columnAt(rawTick);
+    if (column != null) {
+      addNoteAtGridPosition(column.start, row, durationTicks: column.ticks);
       return;
     }
     addNoteAtGridPosition(
@@ -2742,34 +3776,40 @@ class CompositionController extends ChangeNotifier {
   // =====================================================
 
   /// Multiplier on the speed the tempo requires — 1.0 plays exactly
-  /// at the tempo, 1.2 is 20% faster, 0.8 is 20% slower. Changed in
-  /// steps of [playbackSpeedStep] via the Scroll Speed dialog that
-  /// opens from the Play icon (see scroll_speed_dialog.dart), and
-  /// applied to both the scrolling and the length of each note's
-  /// sound, so they always stay in step. Not saved with the
-  /// composition — it's a practice setting, not part of the music.
-  double playbackSpeed = 1.0;
+  /// at the tempo. Set in steps ([playbackSpeedLevel]) via the Scroll
+  /// Speed dialog that opens from the Play icon (see
+  /// scroll_speed_dialog.dart), and applied to both the scrolling and
+  /// the length of each note's sound, so they always stay in step. Not
+  /// saved with the composition — it's a practice setting, not part of
+  /// the music.
+  double get playbackSpeed => speedForLevel(playbackSpeedLevel);
 
-  static const double playbackSpeedStep = 0.1;
-  static const double minPlaybackSpeed = 0.5;
-  static const double maxPlaybackSpeed = 2.0;
+  /// Steps of 25%: +1 = 125% faster (1.25× speed) … +4 = 200% faster
+  /// (twice as fast); −1 = 125% slower (the music takes 1.25× as long)
+  /// … −4 = 200% slower (half the speed). 0 = the tempo.
+  int playbackSpeedLevel = 0;
+  static const int minPlaybackSpeedLevel = -4;
+  static const int maxPlaybackSpeedLevel = 4;
+
+  /// The speed multiplier of a [level] (see [playbackSpeedLevel]).
+  static double speedForLevel(int level) =>
+      level >= 0 ? 1 + 0.25 * level : 1 / (1 + 0.25 * -level);
 
   /// Whether the speed differs from the tempo — used to color the
   /// Play icon blue, the same way the Cell Width icon shows a changed
   /// width.
-  bool get isPlaybackSpeedChanged => (playbackSpeed - 1.0).abs() > 1e-9;
+  bool get isPlaybackSpeedChanged => playbackSpeedLevel != 0;
 
-  void changePlaybackSpeed(double amount) {
-    // Rounded to whole percents so repeated steps never drift
-    // (0.1 isn't exact in floating point).
-    final next = ((playbackSpeed + amount) * 100).round() / 100;
-    playbackSpeed = next.clamp(minPlaybackSpeed, maxPlaybackSpeed);
+  /// One step faster (+1) or slower (−1).
+  void changePlaybackSpeedLevel(int delta) {
+    playbackSpeedLevel = (playbackSpeedLevel + delta)
+        .clamp(minPlaybackSpeedLevel, maxPlaybackSpeedLevel);
     notifyListeners();
   }
 
   /// Back to the speed the tempo requires.
   void resetPlaybackSpeed() {
-    playbackSpeed = 1.0;
+    playbackSpeedLevel = 0;
     notifyListeners();
   }
 
@@ -2915,6 +3955,22 @@ class CompositionController extends ChangeNotifier {
     required int startTick,
     required Accidental? accidental,
   }) {
+    final semitones = _semitonesForRowAndAccidental(
+      row: row,
+      startTick: startTick,
+      accidental: accidental,
+    );
+    if (semitones == null) return 0;
+    return _referenceFrequencyC4 * math.pow(2, semitones / 12);
+  }
+
+  /// The pitch in semitones from Do4 (C4) of [row] at [startTick] with
+  /// [accidental] in effect — null when the measure's scale is unknown.
+  int? _semitonesForRowAndAccidental({
+    required int row,
+    required int startTick,
+    required Accidental? accidental,
+  }) {
     final measure = getMeasureAtTick(startTick);
     final shiftedScale = ScaleResolver.transposeScale(
       measure.scaleName,
@@ -2922,7 +3978,7 @@ class CompositionController extends ChangeNotifier {
     );
     final scale = ScaleResolver.getScale(shiftedScale);
     if (scale.isEmpty) {
-      return 0;
+      return null;
     }
 
     final degreeIndex = row % scale.length;
@@ -2951,10 +4007,7 @@ class CompositionController extends ChangeNotifier {
     final octave = row ~/ 7;
     final octaveShift = (octave - 4) * 12;
 
-    final totalSemitonesFromC4 =
-        naturalSemitone + scaleAlteration + accidentalShift + octaveShift;
-
-    return _referenceFrequencyC4 * math.pow(2, totalSemitonesFromC4 / 12);
+    return naturalSemitone + scaleAlteration + accidentalShift + octaveShift;
   }
 
   /// How long [note] actually lasts in real time — same tempo/beat-unit
@@ -3097,7 +4150,24 @@ class CompositionController extends ChangeNotifier {
   /// When on, tapping the grid never creates/moves notes — lets a
   /// person scroll around the composition without accidentally adding
   /// a note on every tap.
-  bool inputLocked = false;
+  ///
+  /// Scroll Lock is also the PLAYBACK mode (starting playback turns it
+  /// on): turning it on plays reprises by inserting the repeated
+  /// measures as temporary copies; turning it off (edit mode) removes
+  /// them again and the reprise signs reappear.
+  bool _inputLocked = false;
+
+  bool get inputLocked => _inputLocked;
+
+  set inputLocked(bool value) {
+    if (value == _inputLocked) return;
+    _inputLocked = value;
+    if (value) {
+      expandReprises();
+    } else {
+      collapseReprises();
+    }
+  }
 
   void toggleInputLocked() {
     inputLocked = !inputLocked;
@@ -3515,7 +4585,8 @@ class CompositionController extends ChangeNotifier {
 
   static bool _isTrill(Ornament ornament) =>
       ornament == Ornament.trillDiatonic ||
-          ornament == Ornament.trillChromatic;
+          ornament == Ornament.trillChromatic ||
+          ornament == Ornament.trillChromaticSharp;
 
   /// The trill for [note] as a shiftMap of equal short notes, each
   /// lasting about [trillNoteSeconds] at the note's tempo. Alternates
@@ -3702,7 +4773,70 @@ class CompositionController extends ChangeNotifier {
   /// added partway through a sequence of raises/lowers.
   final Map<int, int> _noteRowShiftLog = {};
 
+  /// Each note's accidental before the first raise/lower (since the
+  /// last commit/reset), keyed by note id — [_keepIntervals] may change
+  /// accidentals, and [resetAllScales] puts them back.
+  final Map<int, Accidental?> _noteAccidentalLog = {};
+
+  /// Every note's sounding pitch (semitones), for [_keepIntervals].
+  Map<int, int> _soundingSemitones() => {
+    for (final n in notes)
+      if (_semitonesForRowAndAccidental(
+        row: n.row,
+        startTick: n.startTick,
+        accidental: getEffectiveAccidental(n),
+      ) case final int st)
+        n.id: st,
+  };
+
+  /// After the scales (and note rows) moved by [direction] semitones:
+  /// every note must sound exactly [direction] semitones from where it
+  /// sounded before ([before]), so the distances between the notes stay
+  /// the same. Where the new scale doesn't give that by itself (a
+  /// natural sign, a degree the new scale alters differently…), the
+  /// note gets the accidental that does. Notes are fixed in time order,
+  /// because an accidental also holds for the later notes of its row in
+  /// the measure.
+  void _keepIntervals(Map<int, int> before, int direction) {
+    final order = [for (int i = 0; i < notes.length; i++) i]
+      ..sort((a, b) {
+        final c = notes[a].startTick.compareTo(notes[b].startTick);
+        return c != 0 ? c : notes[a].id.compareTo(notes[b].id);
+      });
+    int? soundingNow(int i) => _semitonesForRowAndAccidental(
+      row: notes[i].row,
+      startTick: notes[i].startTick,
+      accidental: getEffectiveAccidental(notes[i]),
+    );
+    for (final i in order) {
+      final note = notes[i];
+      final was = before[note.id];
+      if (was == null) continue;
+      final target = was + direction;
+      if (soundingNow(i) == target) continue;
+      final original = note.accidental;
+      // Try: no accidental of its own, then each sign.
+      Accidental? found;
+      var ok = false;
+      for (final candidate in <Accidental?>[null, ...Accidental.values]) {
+        notes[i] = note.copyWith(accidental: candidate);
+        if (soundingNow(i) == target) {
+          found = candidate;
+          ok = true;
+          break;
+        }
+      }
+      if (!ok) {
+        notes[i] = note.copyWith(accidental: original);
+        continue;
+      }
+      _noteAccidentalLog.putIfAbsent(note.id, () => original);
+      notes[i] = note.copyWith(accidental: found);
+    }
+  }
+
   void raiseAllScales(){
+    final before = _soundingSemitones();
     final oldScaleNames = measures.map((m) => m.scaleName).toList();
     for(int i = 0; i < measures.length; i++){
       measures[i] = measures[i].copyWith(
@@ -3713,12 +4847,14 @@ class CompositionController extends ChangeNotifier {
       );
     }
     _shiftNotesForScaleChange(oldScaleNames, 1);
+    _keepIntervals(before, 1);
     notifyListeners();
   }
 
 
   /// Same as [raiseAllScales] but one step down instead of up.
   void lowerAllScales(){
+    final before = _soundingSemitones();
     final oldScaleNames = measures.map((m) => m.scaleName).toList();
     for(int i = 0; i < measures.length; i++){
       measures[i] = measures[i].copyWith(
@@ -3729,6 +4865,7 @@ class CompositionController extends ChangeNotifier {
       );
     }
     _shiftNotesForScaleChange(oldScaleNames, -1);
+    _keepIntervals(before, -1);
     notifyListeners();
   }
 
@@ -3792,8 +4929,13 @@ class CompositionController extends ChangeNotifier {
         final restoredRow = (note.row - shift).clamp(0, totalRows - 1);
         notes[i] = note.copyWith(row: restoredRow);
       }
+      // The accidentals added to keep the distances between notes.
+      if (_noteAccidentalLog.containsKey(note.id)) {
+        notes[i] = notes[i].copyWith(accidental: _noteAccidentalLog[note.id]);
+      }
     }
     _noteRowShiftLog.clear();
+    _noteAccidentalLog.clear();
     notifyListeners();
   }
 
@@ -3863,6 +5005,7 @@ class CompositionController extends ChangeNotifier {
       );
     }
     _noteRowShiftLog.clear();
+    _noteAccidentalLog.clear();
     notifyListeners();
   }
 
@@ -4106,4 +5249,53 @@ class CompositionController extends ChangeNotifier {
     notifyListeners();
   }
 
+}
+
+
+/// The four kinds of reprise (see the Repeats dialog).
+enum RepriseType { simple, voltas, segnoFine, segnoCoda }
+
+/// One reprise, read from the signs on the measures. All positions are
+/// 0-based measure positions (edit mode).
+class Reprise {
+  final RepriseType type;
+
+  /// simple / voltas: 𝄆 at [start], 𝄇 at [end] (the end of volta 1).
+  final int? start;
+  final int? end;
+
+  /// voltas: volta 1 is [volta1Start]..[end], volta 2 is
+  /// [end] + 1..[volta2End].
+  final int? volta1Start;
+  final int? volta2End;
+
+  /// segnoFine / segnoCoda.
+  final int? segno;
+  final int? fine;
+  final int? toCoda;
+  final int? dalSegno;
+  final int? coda;
+
+  Reprise(
+      this.type, {
+        this.start,
+        this.end,
+        this.volta1Start,
+        this.volta2End,
+        this.segno,
+        this.fine,
+        this.toCoda,
+        this.dalSegno,
+        this.coda,
+      });
+}
+
+enum _TemporaryEventKind { tempo, dynamic, dynamicChange }
+
+/// An event added only while the reprises are played out.
+class _TemporaryEvent {
+  final _TemporaryEventKind kind;
+  int tick;
+  final DynamicChange? change;
+  _TemporaryEvent(this.kind, this.tick, [this.change]);
 }

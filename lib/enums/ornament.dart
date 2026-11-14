@@ -12,6 +12,13 @@ enum Ornament {
         {'coeff':1/8, 'shift':0}, {'coeff':1/8, 'shift':1},{'coeff':1/8, 'shift':0}, {'coeff':1/8, 'shift':1},
       ]),
 
+  // The upper note raised a half step (a sharp above "tr").
+  trillChromaticSharp('chromatic trill sharp','tr+',
+      [
+        {'coeff':1/8, 'shift':0}, {'coeff':1/8, 'shift':3},{'coeff':1/8, 'shift':0}, {'coeff':1/8, 'shift':3},
+        {'coeff':1/8, 'shift':0}, {'coeff':1/8, 'shift':3},{'coeff':1/8, 'shift':0}, {'coeff':1/8, 'shift':3},
+      ]),
+
   upperMordent('upper mordent','UM',
       [{'coeff': 1/8, 'shift': 0}, {'coeff': 1/8, 'shift': 2}, {'coeff': 6/8, 'shift': 0}]),
   lowerMordent('lower mordent','LM',
@@ -45,23 +52,23 @@ enum Ornament {
 
 
   upperGruppetto('upper gruppetto','UG',
-    [{'coeff':1/4, 'shift':2}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':-2}, {'coeff':1/4, 'shift':0}]),
+      [{'coeff':1/4, 'shift':2}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':-2}, {'coeff':1/4, 'shift':0}]),
   lowerGruppetto('lower gruppetto','LG',
       [{'coeff':1/4, 'shift':-2}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':2}, {'coeff':1/4, 'shift':0}]),
 
 
   upperGruppetto1Flat('upper gruppetto 1st flat','UG -x',
-    [{'coeff':1/4, 'shift':1}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':-2}, {'coeff':1/4, 'shift':0}]),
+      [{'coeff':1/4, 'shift':1}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':-2}, {'coeff':1/4, 'shift':0}]),
   lowerGruppetto1Flat('lower gruppetto 1st flat','LG -x',
       [{'coeff':1/4, 'shift':-3}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':2}, {'coeff':1/4, 'shift':0}]),
 
   upperGruppetto1Sharp('upper gruppetto 1st sharp','UG +x',
-    [{'coeff':1/4, 'shift':3}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':-2}, {'coeff':1/4, 'shift':0}]),
+      [{'coeff':1/4, 'shift':3}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':-2}, {'coeff':1/4, 'shift':0}]),
   lowerGruppetto1Sharp('lower gruppetto 1st sharp','LG +x',
       [{'coeff':1/4, 'shift':-1}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':2}, {'coeff':1/4, 'shift':0}]),
 
   upperGruppetto2Flat('upper gruppetto 2nd flat','UG x-',
-    [{'coeff':1/4, 'shift':2}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':-3}, {'coeff':1/4, 'shift':0}]),
+      [{'coeff':1/4, 'shift':2}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':-3}, {'coeff':1/4, 'shift':0}]),
   lowerGruppetto2Flat('lower gruppetto 2nd flat','LG x-',
       [{'coeff':1/4, 'shift':-2}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':1}, {'coeff':1/4, 'shift':0}]),
 
@@ -71,24 +78,24 @@ enum Ornament {
       [{'coeff':1/4, 'shift':-2}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':3}, {'coeff':1/4, 'shift':0}]),
 
   upperGruppettoFlatSharp('upper gruppetto flat sharp','UG -+',
-    [{'coeff':1/4, 'shift':1}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':-1}, {'coeff':1/4, 'shift':0}]),
+      [{'coeff':1/4, 'shift':1}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':-1}, {'coeff':1/4, 'shift':0}]),
   lowerGruppettoFlatSharp('lower gruppetto flat sharp','LG -+',
       [{'coeff':1/4, 'shift':-3}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':3}, {'coeff':1/4, 'shift':0}]),
 
   upperGruppettoSharpFlat('upper gruppetto sharp flat','UG +-',
-    [{'coeff':1/4, 'shift':3}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':-3}, {'coeff':1/4, 'shift':0}]),
+      [{'coeff':1/4, 'shift':3}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':-3}, {'coeff':1/4, 'shift':0}]),
   lowerGruppettoSharpFlat('lower gruppetto sharp flat','LG +-',
       [{'coeff':1/4, 'shift':-1}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':1}, {'coeff':1/4, 'shift':0}]),
 
   upperGruppettoFlatFlat('upper gruppetto flat flat','UG --',
-    [{'coeff':1/4, 'shift':1}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':-3}, {'coeff':1/4, 'shift':0}]),
+      [{'coeff':1/4, 'shift':1}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':-3}, {'coeff':1/4, 'shift':0}]),
   lowerGruppettoFlatFlat('lower gruppetto flat flat','LG --',
       [{'coeff':1/4, 'shift':-3}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':1}, {'coeff':1/4, 'shift':0}]),
 
   upperGruppettoSharpSharp('upper gruppetto sharp sharp','UG ++',
-    [{'coeff':1/4, 'shift':3}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':-1}, {'coeff':1/4, 'shift':0}]),
+      [{'coeff':1/4, 'shift':3}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':-1}, {'coeff':1/4, 'shift':0}]),
   lowerGruppettoSharpSharp('lower gruppetto sharp sharp','LG ++',
-    [{'coeff':1/4, 'shift':-1}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':3}, {'coeff':1/4, 'shift':0}]),
+      [{'coeff':1/4, 'shift':-1}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':3}, {'coeff':1/4, 'shift':0}]),
 
   betweenUpperGruppetto('between upper gruppetto','bUG',
       [{'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':2}, {'coeff':1/4, 'shift':0}, {'coeff':1/4, 'shift':-2}]),
@@ -141,7 +148,7 @@ enum Ornament {
         {'coeff':1/8, 'shift':0}, {'coeff':1/8, 'shift':0},{'coeff':1/8, 'shift':0}, {'coeff':1/8, 'shift':0},
       ]),
 
-;
+  ;
 
 
   final String label;

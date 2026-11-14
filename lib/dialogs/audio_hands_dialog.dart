@@ -96,7 +96,7 @@ void audioHandsDialog(
                   ),
                   Wrap(
                     children: [
-                      choice(hand, false, 'Audio', Colors.green),
+                      choice(hand, false, 'Audio', Colors.blue),
                       choice(hand, true, 'Cut off', Colors.red),
                     ],
                   ),
@@ -146,7 +146,7 @@ void audioHandsDialog(
                     child: const Text(
                       "All on",
                       style: TextStyle(
-                        color: Colors.green,
+                        color: Colors.blue,
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                       ),

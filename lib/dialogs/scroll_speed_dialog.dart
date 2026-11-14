@@ -3,8 +3,9 @@ import '../controllers/composition_controller.dart';
 
 /// Opens from the Play icon (see CompositionScreen): lets the person
 /// choose how fast to scroll before playback starts — built the same
-/// way as cellWidthDialog. The − / + buttons change the speed by
-/// [CompositionController.playbackSpeedStep] (10%), Reset sets it back
+/// way as cellWidthDialog. The − / + buttons change the speed in steps
+/// of 25%: up to 200% slower (half speed) and 200% faster (twice the
+/// speed) — see [CompositionController.playbackSpeedLevel]. Reset sets it back
 /// to the speed the tempo requires (100%), and Play closes the dialog
 /// and starts playback via [onPlay]. The chosen speed is kept, so the
 /// dialog opens at the same value next time.
@@ -22,10 +23,11 @@ void scrollSpeedDialog(
         animation: controller,
         builder: (context, _) {
 
-          final percent = (controller.playbackSpeed * 100).round();
-          final description = percent == 100
-              ? 'tempo'
-              : (percent > 100 ? 'faster' : 'slower');
+          final level = controller.playbackSpeedLevel;
+          // 100 % = the tempo; 125 … 200 % faster or slower.
+          final percent = 100 + 25 * level.abs();
+          final description =
+          level == 0 ? 'tempo' : (level > 0 ? 'faster' : 'slower');
 
           return AlertDialog(
             backgroundColor: Colors.white,
@@ -68,13 +70,11 @@ void scrollSpeedDialog(
                         color: Colors.blue,
                         size: 35,
                       ),
-                      onPressed: controller.playbackSpeed <=
-                          CompositionController.minPlaybackSpeed
+                      onPressed: controller.playbackSpeedLevel <=
+                          CompositionController.minPlaybackSpeedLevel
                           ? null
                           : (){
-                        controller.changePlaybackSpeed(
-                          -CompositionController.playbackSpeedStep,
-                        );
+                        controller.changePlaybackSpeedLevel(-1);
                       },
                     ),
 
@@ -86,13 +86,11 @@ void scrollSpeedDialog(
                         color: Colors.blue,
                         size: 35,
                       ),
-                      onPressed: controller.playbackSpeed >=
-                          CompositionController.maxPlaybackSpeed
+                      onPressed: controller.playbackSpeedLevel >=
+                          CompositionController.maxPlaybackSpeedLevel
                           ? null
                           : (){
-                        controller.changePlaybackSpeed(
-                          CompositionController.playbackSpeedStep,
-                        );
+                        controller.changePlaybackSpeedLevel(1);
                       },
                     ),
 

@@ -3,6 +3,71 @@ import 'dart:ui' show Offset;
 import 'package:music_composer/models/time_signature.dart';
 import 'beat_event_model.dart';
 import '../enums/note_duration.dart';
+import '../enums/hand.dart';
+
+/// An arpeggio sign (wavy vertical line) before the chord at one beat
+/// of a measure. In playback mode the chord's notes of [hands] are
+/// played one after another (lowest first), each for an equal share of
+/// the chord's duration.
+class Arpeggio {
+  /// Ticks from the start of the measure to the chord.
+  final int offset;
+
+  /// Which hands' notes are arpeggiated (left, right, or both).
+  final Set<Hand> hands;
+
+  const Arpeggio(this.offset, this.hands);
+
+  Map<String, dynamic> toJson() => {
+    'o': offset,
+    'h': [for (final h in hands) h.name],
+  };
+
+  factory Arpeggio.fromJson(Map<String, dynamic> json) => Arpeggio(
+    (json['o'] as num).toInt(),
+    {
+      for (final name in (json['h'] as List<dynamic>? ?? const []))
+        for (final h in Hand.values)
+          if (h.name == name) h
+    },
+  );
+}
+
+/// Reprise (repeat) signs that can be put on a measure in edit mode.
+/// During playback the reprise is played by temporarily inserting the
+/// repeated measures (see CompositionController.expandReprises).
+enum RepriseMark {
+  /// 𝄆 at the start of the measure: the reprise starts here.
+  start,
+
+  /// 𝄇 at the end of the measure: go back to the 𝄆 (or to the start
+  /// of the piece when there is none).
+  end,
+
+  /// The measure belongs to the 1st ending (volta 1).
+  volta1,
+
+  /// The measure belongs to the 2nd ending (volta 2).
+  volta2,
+
+  /// 𝄋 Segno at the start of the measure.
+  segno,
+
+  /// "Fine" at the end of the measure.
+  fine,
+
+  /// "D.S. al Fine" at the end of the measure.
+  dalSegnoAlFine,
+
+  /// "To Coda" at the end of the measure.
+  toCoda,
+
+  /// "D.S. al Coda" at the end of the measure.
+  dalSegnoAlCoda,
+
+  /// Coda sign at the start of the measure.
+  coda,
+}
 
 class Measure {
 
@@ -46,6 +111,26 @@ class Measure {
   /// move together with the measure.
   final List<InkStroke> inkStrokes;
 
+  /// Reprise signs on this measure (see [RepriseMark]).
+  final Set<RepriseMark> repriseMarks;
+
+  /// True for a measure inserted only for playback — a copy of a
+  /// measure that a reprise plays again. Removed when going back to
+  /// edit mode and never saved.
+  bool isTemporary;
+
+  /// For a temporary copy: the number of the measure it copies, shown
+  /// (in red) instead of its own position.
+  int? copiedNumber;
+
+  /// Arpeggio signs on chords of this measure (see [Arpeggio]).
+  final List<Arpeggio> arpeggios;
+
+  /// Beats split into equal columns (triplets, quintuplets…): beat
+  /// index → number of columns (2–13). A beat not in the map is one
+  /// column, as before.
+  final Map<int, int> beatDivisions;
+
   Measure({
     required this.id,
     required this.startTick,
@@ -57,7 +142,15 @@ class Measure {
     this.fermataExtraTicks = 0,
     this.tempoBeatDuration,
     List<InkStroke>? inkStrokes,
+    Set<RepriseMark>? repriseMarks,
+    this.isTemporary = false,
+    this.copiedNumber,
+    List<Arpeggio>? arpeggios,
+    Map<int, int>? beatDivisions,
   }) :
+        beatDivisions = beatDivisions ?? <int, int>{},
+        arpeggios = arpeggios ?? <Arpeggio>[],
+        repriseMarks = repriseMarks ?? <RepriseMark>{},
         originalScaleName = originalScaleName ?? scaleName,
         beatEvents = beatEvents ?? [],
         inkStrokes = inkStrokes ?? [];
@@ -121,6 +214,11 @@ class Measure {
     int? fermataExtraTicks,
     Object? tempoBeatDuration = _keep,
     List<InkStroke>? inkStrokes,
+    Set<RepriseMark>? repriseMarks,
+    bool? isTemporary,
+    Object? copiedNumber = _keep,
+    List<Arpeggio>? arpeggios,
+    Map<int, int>? beatDivisions,
   }) {
     return Measure(
       id: id ?? this.id,
@@ -137,6 +235,12 @@ class Measure {
           ? this.tempoBeatDuration
           : tempoBeatDuration as NoteDuration?,
       inkStrokes: inkStrokes ?? List<InkStroke>.from(this.inkStrokes),
+      repriseMarks: repriseMarks ?? Set<RepriseMark>.from(this.repriseMarks),
+      isTemporary: isTemporary ?? this.isTemporary,
+      copiedNumber:
+      copiedNumber == _keep ? this.copiedNumber : copiedNumber as int?,
+      arpeggios: arpeggios ?? List<Arpeggio>.from(this.arpeggios),
+      beatDivisions: beatDivisions ?? Map<int, int>.from(this.beatDivisions),
     );
   }
 
@@ -158,6 +262,14 @@ class Measure {
         'tempoBeatDuration': tempoBeatDuration!.name,
       if (inkStrokes.isNotEmpty)
         'inkStrokes': inkStrokes.map((s) => s.toJson()).toList(),
+      if (repriseMarks.isNotEmpty)
+        'reprise': [for (final m in repriseMarks) m.name],
+      if (arpeggios.isNotEmpty)
+        'arpeggios': [for (final a in arpeggios) a.toJson()],
+      if (beatDivisions.isNotEmpty)
+        'div': {
+          for (final e in beatDivisions.entries) '${e.key}': e.value,
+        },
     };
   }
 
@@ -184,6 +296,23 @@ class Measure {
       inkStrokes: (json['inkStrokes'] as List<dynamic>? ?? const [])
           .map((s) => InkStroke.fromJson(s as Map<String, dynamic>))
           .toList(),
+      // Older saved compositions have no reprise signs.
+      repriseMarks: {
+        for (final name in (json['reprise'] as List<dynamic>? ?? const []))
+          for (final m in RepriseMark.values)
+            if (m.name == name) m
+      },
+      // Older saved compositions have no arpeggios.
+      arpeggios: [
+        for (final a in (json['arpeggios'] as List<dynamic>? ?? const []))
+          Arpeggio.fromJson(a as Map<String, dynamic>)
+      ],
+      // Older saved compositions have no split beats.
+      beatDivisions: {
+        for (final e
+        in ((json['div'] as Map<String, dynamic>?) ?? const {}).entries)
+          int.parse(e.key): (e.value as num).toInt(),
+      },
     );
   }
 

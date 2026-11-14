@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:music_composer/dialogs/tempo_dialog.dart';
 
 import '../controllers/composition_controller.dart';
-import '../utils/scale_resolver.dart';
+import 'arpeggio_dialog.dart';
 import 'beat_subdivision_dialog.dart';
+import 'beat_split_dialog.dart';
 import 'dynamic_change_dialog.dart';
 import 'dynamic_dialog.dart';
 import 'measure_range_dialog.dart';
 import 'pedal_dialog.dart';
-import 'scale_dialog.dart';
+import 'set_scale_dialog.dart';
 
 
 /// Asks how many ordinary beats long a fermata-stretched beat should
@@ -110,39 +111,42 @@ void fermataDialog({
                   ),
                 ],
               ),
-              if (currentMultiplier != null) ...[
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.delete_outline),
-                  iconColor: Colors.red,
-                  title: const Text(
-                    'Delete Fermata',
-                    style: TextStyle(
-                      fontSize: 22,
-                      color: Colors.red,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  onTap: () {
-                    controller.deleteFermata(measureIndex, beatIndex);
-                    Navigator.pop(dialogContext);
-                  },
-                ),
-              ],
             ],
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Greyed out when this beat has no fermata.
+              TextButton(
+                onPressed: currentMultiplier == null
+                    ? null
+                    : () {
+                  controller.deleteFermata(measureIndex, beatIndex);
+                  Navigator.pop(dialogContext);
+                },
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                  ),
+                ),
               ),
-            ),
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text(
+                  'Close',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       );
@@ -150,6 +154,18 @@ void fermataDialog({
   );
 }
 
+
+/// Duplicating works in edit mode only (in playback mode the repeats
+/// are played out with extra measures).
+void _editModeFirst(BuildContext context) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      duration: Duration(seconds: 2),
+      content: Text('Go back to edit mode first (pen icon).',
+          style: TextStyle(fontSize: 22)),
+    ),
+  );
+}
 
 void editMeasureBeatDialog({
   required BuildContext context,
@@ -259,8 +275,13 @@ void editMeasureBeatDialog({
                             ),
                           ),
                           onTap: () {
-                            controller.copyMeasure(measureIndex);
                             Navigator.pop(context);
+                            if (controller.playbackExpanded) {
+                              _editModeFirst(context);
+                              return;
+                            }
+                            // The copy goes right after this measure.
+                            controller.copyMeasure(measureIndex);
                           },
                         ),
 
@@ -283,6 +304,11 @@ void editMeasureBeatDialog({
                               actionLabel: 'Duplicate',
                               actionColor: Colors.blue,
                               onConfirm: (from, to) {
+                                if (controller.playbackExpanded) {
+                                  _editModeFirst(context);
+                                  return;
+                                }
+                                // The copy goes right after the range.
                                 controller.duplicateMeasureRange(from, to);
                               },
                             );
@@ -414,18 +440,11 @@ void editMeasureBeatDialog({
                           ),
                           onTap: () {
                             Navigator.pop(context);
-                            scaleDialog(
+                            // This measure or a range of measures.
+                            setScaleDialog(
                               context: context,
                               controller: controller,
-                              currentScale: ScaleResolver.normalizeScaleName(
-                                controller.measures[measureIndex].scaleName,
-                              ),
-                              onSelected: (scale) {
-                                controller.updateMeasureScale(
-                                  measureIndex,
-                                  scale,
-                                );
-                              },
+                              measureIndex: measureIndex,
                             );
                           },
                         ),
@@ -442,7 +461,7 @@ void editMeasureBeatDialog({
                           leading: const Icon(Icons.call_split),
                           iconColor: Colors.black,
                           title: const Text(
-                            "Change Subdivision",
+                            "Edit Time Signature",
                             style: TextStyle(
                               fontSize: 22,
                               color: Colors.black,
@@ -579,6 +598,32 @@ void editMeasureBeatDialog({
                           },
                         ),
 
+                        // ARPEGGIO — wavy line before the chord on this
+                        // beat; played spread out in playback mode.
+                        ListTile(
+                          leading: const Icon(Icons.waves),
+                          iconColor: Colors.blue,
+                          title: const Text(
+                            "Set Arpeggio",
+                            style: TextStyle(
+                              fontSize: 22,
+                              color: Colors.blue,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          onTap: () {
+                            Navigator.pop(context);
+                            arpeggioDialog(
+                              context: context,
+                              controller: controller,
+                              tick: controller.getBeatTick(
+                                measureIndex,
+                                beatIndex,
+                              ),
+                            );
+                          },
+                        ),
+
 
                         const Divider(height: 8),
 
@@ -655,6 +700,32 @@ void editMeasureBeatDialog({
                                 measureIndex,
                                 beatIndex,
                               ),
+                            );
+                          },
+                        ),
+
+                        const Divider(),
+
+                        // SPLIT BEAT — triplet, quintuplet… (2–13
+                        // equal columns), see beatSplitDialog.
+                        ListTile(
+                          leading: const Icon(Icons.view_week_outlined),
+                          iconColor: Colors.black,
+                          title: const Text(
+                            "Split beat",
+                            style: TextStyle(
+                              fontSize: 22,
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          onTap: () {
+                            Navigator.pop(context);
+                            beatSplitDialog(
+                              context: context,
+                              controller: controller,
+                              measureIndex: measureIndex,
+                              beatIndex: beatIndex,
                             );
                           },
                         ),

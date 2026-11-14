@@ -70,7 +70,24 @@ class OmrEvent {
 
   bool get isRest => notes.isEmpty;
 
-  OmrEvent(this.x, this.duration, this.notes);
+  /// A wavy arpeggio line was found before this chord.
+  final bool arpeggio;
+
+  /// A note of a tuplet: 3 for a triplet (3 in the time of 2), 5, 6, 7…;
+  /// 1 for an ordinary note. Its real length is [duration] ×
+  /// 2/3 (triplet), 4/5, 4/6, 4/7.
+  int tuplet;
+
+  /// The tuplet number ("3") was found printed over/under it.
+  bool tupletPrinted = false;
+
+  /// Highest and lowest point of the chord (heads and stem end) on the
+  /// page — to tell whether a tuplet number belongs to it.
+  final double top;
+  final double bottom;
+
+  OmrEvent(this.x, this.duration, this.notes,
+      {this.arpeggio = false, this.tuplet = 1, this.top = 0, this.bottom = 0});
 }
 
 class OmrMeasure {
@@ -83,7 +100,17 @@ class OmrMeasure {
   /// 'hr' (upper staff) and 'hl' (lower staff) events, sorted by x.
   final Map<String, List<OmrEvent>> hands;
 
-  OmrMeasure(this.x0, this.x1, this.spacing, this.hands);
+  /// Repeat barlines: 𝄆 at the start / 𝄇 at the end of the measure.
+  final bool repeatStart;
+  final bool repeatEnd;
+
+  /// Key signature written at the start of this measure (the first of
+  /// a system, or a key change): +n sharps, -n flats, 0 none; null when
+  /// nothing is written (the key goes on).
+  final int? key;
+
+  OmrMeasure(this.x0, this.x1, this.spacing, this.hands,
+      {this.repeatStart = false, this.repeatEnd = false, this.key});
 
   bool get isEmpty =>
       (hands['hr'] ?? const []).isEmpty && (hands['hl'] ?? const []).isEmpty;
@@ -123,8 +150,47 @@ OmrPageResult recognizeSheetMusicPage(Uint8List gray, int width, int height) {
       .where((s) => s.x1 - s.x0 >= 8 * sp && _lineCoverage(s) >= 0.25)
       .toList();
 
-  var heads = <_Head>[..._findFilledHeads(bw, sp), ..._findHollowHeads(bw, sp)];
-  final index = _CompIndex(_components(nos, eight: true));
+  final hollow = _findHollowHeads(bw, sp);
+  // (and those whose hole a staff line cuts in two)
+  for (final h in _findHollowHeads(bw, sp, nos)) {
+    if (!hollow.any((g) => (h.cx - g.cx).abs() < 0.5 * sp && (h.cy - g.cy).abs() < 0.5 * sp)) {
+      hollow.add(h);
+    }
+  }
+  // The centre of a hollow head is the middle of its ring (the hole
+  // alone can be cut short by a staff line running through it).
+  for (int i = 0; i < hollow.length; i++) {
+    final h = hollow[i];
+    final tops = <int>[], bots = <int>[];
+    for (int x = h.cx.toInt() - 1; x <= h.cx.toInt() + 1; x++) {
+      if (x < 0 || x >= nos.w) continue;
+      int y = h.cy.round();
+      while (y > 0 && !nos.at(x, y) && h.cy - y < sp) {
+        y--;
+      }
+      while (y > 0 && nos.at(x, y - 1) && h.cy - y < 1.2 * sp) {
+        y--;
+      }
+      tops.add(y);
+      y = h.cy.round();
+      while (y < nos.h - 1 && !nos.at(x, y) && y - h.cy < sp) {
+        y++;
+      }
+      while (y < nos.h - 1 && nos.at(x, y + 1) && y - h.cy < 1.2 * sp) {
+        y++;
+      }
+      bots.add(y);
+    }
+    if (tops.isEmpty) continue;
+    tops.sort();
+    bots.sort();
+    final t = tops[tops.length ~/ 2].toDouble(), b = bots[bots.length ~/ 2].toDouble();
+    if (0.6 * sp <= b - t && b - t <= 1.3 * sp && ((t + b) / 2 - h.cy).abs() <= 0.4 * sp) {
+      hollow[i] = _Head(h.x0, h.x1, h.cx, (t + b) / 2, false, whole: h.whole);
+    }
+  }
+  var heads = <_Head>[..._findFilledHeads(bw, sp, nos), ...hollow];
+  final index = _CompIndex(_components(nos, eight: true), nos);
 
   for (final h in heads) {
     if (h.filled) h.stem = _findStem(nos, h, sp);
@@ -176,11 +242,34 @@ OmrPageResult recognizeSheetMusicPage(Uint8List gray, int width, int height) {
           math.max(h.cy, h.stem!.end.toDouble()),
         ]
   ];
+  index.stems = stems;
 
   // Pair staves into piano systems: the two staves of a system are
   // closer together than one system is to the next.
   final pairs = <List<_Staff>>[];
-  for (int i = 0; i + 1 < staves.length;) {
+  // An even number of staves, all pairing up neatly in order (each pair
+  // close and side by side): that is the page — a gap that is a little
+  // wide (high bass notes, low treble notes) does not matter then.
+  if (staves.length.isEven && staves.length >= 2) {
+    final neat = [
+      for (int k = 0; k + 1 < staves.length; k += 2) [staves[k], staves[k + 1]]
+    ];
+    bool ok = neat.every((p) =>
+    p[1].lines[0] - p[0].lines[4] <= 12 * sp &&
+        math.min(p[0].x1, p[1].x1) - math.max(p[0].x0, p[1].x0) >= 8 * sp);
+    if (ok && neat.length >= 2) {
+      double maxInside = 0, minBetween = double.infinity;
+      for (int k = 0; k < neat.length; k++) {
+        maxInside = math.max(maxInside, neat[k][1].lines[0] - neat[k][0].lines[4]);
+        if (k + 1 < neat.length) {
+          minBetween = math.min(minBetween, neat[k + 1][0].lines[0] - neat[k][1].lines[4]);
+        }
+      }
+      ok = maxInside < 1.5 * minBetween;
+    }
+    if (ok) pairs.addAll(neat);
+  }
+  for (int i = pairs.isEmpty ? 0 : staves.length; i + 1 < staves.length;) {
     final a = staves[i], b = staves[i + 1];
     final gap = b.lines[0] - a.lines[4];
     final overlap = math.min(a.x1, b.x1) - math.max(a.x0, b.x0);
@@ -195,6 +284,8 @@ OmrPageResult recognizeSheetMusicPage(Uint8List gray, int width, int height) {
 
   final measures = <OmrMeasure>[];
   int systems = 0;
+  // An octave sign still running at the end of a system, per hand.
+  final carriedOctave = <String, int?>{'hr': null, 'hl': null};
   for (final pair in pairs) {
     systems++;
     final tr = pair[0];
@@ -209,13 +300,59 @@ OmrPageResult recognizeSheetMusicPage(Uint8List gray, int width, int height) {
     if (x1 - bars.last > 3 * sp) bars.add(x1.toDouble());
 
     // Music starts after the clef / key / time signature.
+    final infos = {'hr': _HeaderInfo(), 'hl': _HeaderInfo()};
     final headerEnd = {
-      'hr': _staffHeaderEnd(index, tr, x0.toDouble(), sp, stems, heads, nos),
-      'hl': _staffHeaderEnd(index, bs, x0.toDouble(), sp, stems, heads, nos),
+      'hr': _staffHeaderEnd(index, tr, x0.toDouble(), sp, stems, heads, nos, infos['hr']),
+      'hl': _staffHeaderEnd(index, bs, x0.toDouble(), sp, stems, heads, nos, infos['hl']),
     };
+    // Key signature of the system: the signs between the clef and the
+    // time signature (or the first note).
+    final keyCounts = <List<int>>[];
+    for (final hand in const ['hr', 'hl']) {
+      final inf = infos[hand]!;
+      if (inf.clefEnd == null) continue;
+      final ke = inf.timeX ?? inf.end ?? inf.clefEnd!;
+      keyCounts.add(_signCounts(_keySignList(
+          nos, hand == 'hr' ? tr : bs, inf.clefEnd! + 0.2 * sp, ke - 0.1 * sp, sp)));
+    }
+    final int? systemKey =
+    keyCounts.isEmpty ? null : (_keyFromCounts(keyCounts) ?? 0);
+
+    // 8va / 15ma lines over the treble staff, 8vb / 15mb under the bass
+    // staff. A line going on from the previous system keeps its sign.
+    final octaveLines = <String, List<_OctaveLine>>{
+      'hr': _findOctaveLines(index, tr, true, x0.toDouble(), x1.toDouble(), sp,
+          heads, carriedOctave['hr']),
+      'hl': _findOctaveLines(index, bs, false, x0.toDouble(), x1.toDouble(), sp,
+          heads, carriedOctave['hl']),
+    };
+    for (final hand in const ['hr', 'hl']) {
+      final lines = octaveLines[hand]!;
+      carriedOctave[hand] =
+      lines.isNotEmpty && lines.last.x1 >= x1 - 3 * sp ? lines.last.octaves : null;
+    }
+    // The "8" / "15" of a sign is not a note.
+    final signBoxes = [
+      for (final l in [...octaveLines['hr']!, ...octaveLines['hl']!])
+        if (l.glyph != null) l.glyph!
+    ];
+    bool inSign(_Head h) => signBoxes.any((b) =>
+    b[0] - 0.2 * sp <= h.cx && h.cx <= b[2] + 0.2 * sp &&
+        b[1] - 0.2 * sp <= h.cy && h.cy <= b[3] + 0.2 * sp);
+
     for (int mi = 0; mi + 1 < bars.length; mi++) {
       final mx0 = bars[mi];
       final mx1 = bars[mi + 1];
+      // A new key signature right after the bar line.
+      double mstart = mx0;
+      int? mkey = mi == 0 ? systemKey : null;
+      if (mi > 0) {
+        final change = _keyChangeAt(nos, [tr, bs], mx0, sp, heads);
+        if (change != null) {
+          mkey = change[0].round();
+          mstart = change[1];
+        }
+      }
       final hands = <String, List<OmrEvent>>{};
       for (final hand in const ['hr', 'hl']) {
         final treble = hand == 'hr';
@@ -242,13 +379,14 @@ OmrPageResult recognizeSheetMusicPage(Uint8List gray, int width, int height) {
                 h.stem != null &&
                 bars.any((b) => (h.stem!.x - b).abs() <= 0.6 * sp);
 
-        final start = math.max(mx0, headerEnd[hand]!);
+        final start = math.max(mstart, headerEnd[hand]!);
         final hs = heads
             .where((h) =>
         start + 0.3 * sp < h.cx &&
             h.cx < mx1 - 0.3 * sp &&
             inStaff(h) &&
-            !onBar(h))
+            !onBar(h) &&
+            !inSign(h))
             .toList();
 
         final chords = <_Chord>[];
@@ -272,7 +410,19 @@ OmrPageResult recognizeSheetMusicPage(Uint8List gray, int width, int height) {
               if (stem.len > found.stem!.len) found.stem = stem;
             }
           } else {
-            chords.add(_Chord(null, [h], false));
+            // Whole notes stacked on top of each other are one chord.
+            _Chord? stack;
+            for (final c in chords) {
+              if (c.stem == null && (c.heads.first.cx - h.cx).abs() < 0.6 * sp) {
+                stack = c;
+                break;
+              }
+            }
+            if (stack != null) {
+              stack.heads.add(h);
+            } else {
+              chords.add(_Chord(null, [h], false));
+            }
           }
         }
         // Attach a chord's displaced head (the other note of a second
@@ -280,12 +430,31 @@ OmrPageResult recognizeSheetMusicPage(Uint8List gray, int width, int height) {
         for (final h in loose) {
           if (!(mx0 < h.cx && h.cx < mx1 && inStaff(h))) continue;
           for (final c in chords) {
-            if (c.stem == null) continue;
-            if ((h.cx - c.stem!.x).abs() > 1.0 * sp) continue;
-            if (c.heads.any((o) => (h.cy - o.cy).abs() <= 1.1 * sp)) {
-              c.heads.add(h);
-              break;
+            final st = c.stem;
+            if (st == null) continue;
+            if ((h.cx - st.x).abs() > 1.0 * sp) continue;
+            if (!c.heads.any((o) => (h.cy - o.cy).abs() <= 1.1 * sp)) {
+              // Farther off, at the stem's open end, with the stem
+              // running on to it (e.g. a second at the top of a chord).
+              var edge = c.heads.first;
+              for (final o in c.heads) {
+                if (st.dir == 1 ? o.cy < edge.cy : o.cy > edge.cy) edge = o;
+              }
+              final beyond = st.dir == 1 ? h.cy < edge.cy : h.cy > edge.cy;
+              if (!beyond || (h.cy - edge.cy).abs() > 2.8 * sp) continue;
+              final ya = math.min(h.cy, edge.cy).toInt(), yb = math.max(h.cy, edge.cy).toInt();
+              bool reached = true;
+              for (int yy = ya; yy <= yb && reached; yy++) {
+                bool any = false;
+                for (int xx = st.x - 1; xx <= st.x + 1; xx++) {
+                  if (xx >= 0 && xx < nos.w && yy >= 0 && yy < nos.h && nos.at(xx, yy)) any = true;
+                }
+                reached = any;
+              }
+              if (!reached) continue;
             }
+            c.heads.addAll(_splitSecond(nos, h, st.x, sp));
+            break;
           }
         }
 
@@ -332,7 +501,8 @@ OmrPageResult recognizeSheetMusicPage(Uint8List gray, int width, int height) {
           }
           final notes = <OmrNote>[];
           for (final h in hs2) {
-            final pos = _positionOf(st, treble, h.cx, h.cy);
+            final pos = _positionOf(st, treble, h.cx, h.cy,
+                _octaveShiftAt(octaveLines[hand]!, h.cx, sp));
             final acc = _classifyAccidental(index, h, sp, mx0 + 2, headCentres);
             notes.add(OmrNote(pos, acc, h.cy));
           }
@@ -340,17 +510,37 @@ OmrPageResult recognizeSheetMusicPage(Uint8List gray, int width, int height) {
           for (final h in hs2) {
             ex = math.min(ex, h.x0);
           }
-          events.add(OmrEvent(ex, dur, notes));
+          final arp = hs2.length >= 2 && _hasArpeggio(nos, index, hs2, sp);
+          double top = hs2.first.cy, bottom = hs2.first.cy;
+          for (final h in hs2) {
+            top = math.min(top, h.cy);
+            bottom = math.max(bottom, h.cy);
+          }
+          if (stem != null) {
+            top = math.min(top, stem.end.toDouble());
+            bottom = math.max(bottom, stem.end.toDouble());
+          }
+          events.add(OmrEvent(ex, dur, notes,
+              arpeggio: arp, top: top, bottom: bottom));
         }
         final staffHeads = heads.where(inStaff).toList();
         for (final r in _findRests(
-            index, st, mx0, mx1, sp, staffHeads, stems, headerEnd[hand]!)) {
+            index, st, mx0, mx1, sp, staffHeads, stems,
+            math.max(headerEnd[hand]!, mstart))) {
           events.add(OmrEvent(r[0].toDouble(), r[1], const []));
         }
         events.sort((a, b) => a.x.compareTo(b.x));
+        // Tuplet numbers ("3"…) over or under a group of notes.
+        _markTuplets(
+            _tupletNumerals(index, st, mx0, mx1, sp, heads), events, sp);
         hands[hand] = events;
       }
-      measures.add(OmrMeasure(mx0, mx1, sp, hands));
+      // Repeat barlines: dots left of the closing bar line / right of
+      // the opening one.
+      measures.add(OmrMeasure(mx0, mx1, sp, hands,
+          key: mkey,
+          repeatStart: mi > 0 && _repeatDots(index, [tr, bs], mx0, sp)[1],
+          repeatEnd: _repeatDots(index, [tr, bs], mx1, sp)[0]));
     }
   }
   return OmrPageResult(staves.length, systems, measures);
@@ -371,20 +561,420 @@ OmrPageResult recognizeSheetMusicPage(Uint8List gray, int width, int height) {
 /// quarter — or an eighth when the music has thirty-second notes or
 /// the meter isn't a whole number of quarters (so every note still
 /// falls on a quarter-of-a-beat position).
+/// The grid a note of [dur] (1/128ths) starts on: its own length — a
+/// quarter starts on a beat, an eighth on an eighth… — at most [unit].
+int _noteGrid(int dur, int unit) {
+  int g = unit;
+  while (g > 4 && g > dur) {
+    g ~/= 2;
+  }
+  return g;
+}
+
+/// Time is counted in 1/(128 × [_tupletScale]) of a whole note inside
+/// [_measureOnsets], so the notes of triplets, quintuplets and
+/// septuplets (2/3, 4/5, 4/7 of their written length) are whole numbers.
+const int _tupletScale = 105; // 3 × 5 × 7
+
+/// The real length of [e] in 1/(128 × [_tupletScale]) — its written
+/// length, shortened when it is a note of a tuplet.
+int _effectiveDuration(OmrEvent e) {
+  final k = e.tuplet;
+  final d = e.duration * _tupletScale;
+  if (k <= 1) return d;
+  if (k == 2) return d * 3 ~/ 2;
+  int p = 1;
+  while (p * 2 < k) {
+    p *= 2;
+  }
+  return d * p ~/ k;
+}
+
+/// Start time (1/(128 × [_tupletScale]) from the bar line) of every
+/// event of each hand
+/// of [m]. A hand whose durations fill the measure exactly is placed
+/// note after note. The other hand's notes take the start of the note
+/// right above / below them (notes under each other start together),
+/// else the time between such known points by their x position, snapped
+/// to the grid of their own length — so notes start where cells start.
+/// [meter] and [unit] are in 1/128ths.
+Map<String, List<int>> _measureOnsets(OmrMeasure m, int meter, int unit) {
+  final sp = m.spacing;
+  final hands = <String, List<OmrEvent>>{};
+  for (final hand in const ['hr', 'hl']) {
+    hands[hand] = [
+      for (final e in m.hands[hand] ?? const <OmrEvent>[])
+        e.duration == OmrEvent.wholeMeasure ? OmrEvent(e.x, meter, e.notes) : e
+    ];
+  }
+  final meterS = meter * _tupletScale;
+  final result = <String, List<int>>{};
+  final anchors = <List<double>>[]; // [x, t]
+  for (final hand in const ['hr', 'hl']) {
+    final ev = hands[hand]!;
+    final total = ev.fold<int>(0, (s, e) => s + _effectiveDuration(e));
+    if (ev.isNotEmpty && total == meterS) {
+      int t = 0;
+      final starts = <int>[];
+      for (final e in ev) {
+        starts.add(t);
+        anchors.add([e.x, t.toDouble()]);
+        t += _effectiveDuration(e);
+      }
+      result[hand] = starts;
+    }
+  }
+  final xs = [for (final ev in hands.values) for (final e in ev) e.x];
+  if (xs.isEmpty) return {'hr': [], 'hl': []};
+  final xFirst = xs.reduce(math.min);
+  final xEnd = m.x1 - 0.8 * sp;
+  final pts = [...anchors]..sort((a, b) => a[0].compareTo(b[0]));
+  if (pts.isEmpty || pts.first[0] > xFirst + 0.5 * sp) pts.insert(0, [xFirst, 0]);
+  pts.add([math.max(xEnd, pts.last[0] + 1), meterS.toDouble()]);
+
+  for (final hand in const ['hr', 'hl']) {
+    if (result.containsKey(hand)) continue;
+    final ev = hands[hand]!;
+    final starts = <int>[];
+    int prev = -1;
+    for (final e in ev) {
+      // A note of a tuplet starts on the grid of its own real length.
+      final g = e.tuplet > 1
+          ? _effectiveDuration(e)
+          : _noteGrid(e.duration, unit) * _tupletScale;
+      int t;
+      List<double>? near;
+      for (final a in anchors) {
+        if ((a[0] - e.x).abs() <= 1.0 * sp &&
+            (near == null || (a[0] - e.x).abs() < (near[0] - e.x).abs())) {
+          near = a;
+        }
+      }
+      if (near != null) {
+        t = near[1].round();
+      } else {
+        // Between the known points left and right of it.
+        var left = pts.first, right = pts.last;
+        for (final p in pts) {
+          if (p[0] <= e.x && p[0] >= left[0]) left = p;
+        }
+        for (final p in pts.reversed) {
+          if (p[0] > e.x && p[0] <= right[0]) right = p;
+        }
+        final tf = right[0] <= left[0]
+            ? left[1]
+            : left[1] + (e.x - left[0]) / (right[0] - left[0]) * (right[1] - left[1]);
+        t = (tf / g).round() * g;
+      }
+      t = t.clamp(0, meterS - math.min(g, meterS)).toInt();
+      if (t <= prev) t = prev + g < meterS ? prev + g : prev;
+      starts.add(t);
+      prev = t;
+    }
+    result[hand] = starts;
+  }
+  return result;
+}
+
+/// The beat marker for a start [t] (see [_measureOnsets]) with beats of
+/// [unit] 1/128ths: "b2", "b2&1/2", "b2&1/3"…
+String _beatMarker(int t, int unit) {
+  final beatS = unit * _tupletScale;
+  final whole = t ~/ beatS + 1;
+  final rem = t % beatS;
+  if (rem == 0) return 'b$whole';
+  final g = rem.gcd(beatS);
+  return 'b$whole&${rem ~/ g}/${beatS ~/ g}';
+}
+
+/// Settles the tuplets of one hand of a measure against the meter
+/// (1/128ths): a printed "3" that is really a fingering (the measure is
+/// already full without it) is dropped; and when no number is printed
+/// (it is often left out after the first few) but the measure is too
+/// long, groups of 3 equal notes are made triplets until it fits.
+void _settleTuplets(List<OmrEvent> ev, int meter, {bool allowUnmarked = true}) {
+  if (ev.isEmpty || ev.any((e) => e.duration <= 0)) {
+    for (final e in ev) {
+      e.tuplet = 1;
+    }
+    return;
+  }
+  final target = meter * _tupletScale;
+  final written = ev.fold<int>(0, (s, e) => s + e.duration) * _tupletScale;
+  int real() => ev.fold<int>(0, (s, e) => s + _effectiveDuration(e));
+  if (ev.any((e) => e.tuplet > 1)) {
+    final r = real();
+    if (r == target) return;
+    if (written == target || (written - target).abs() < (r - target).abs()) {
+      for (final e in ev) {
+        e.tuplet = 1;
+      }
+    }
+    return;
+  }
+  // Triplets without a printed number only once the piece has had
+  // printed ones (otherwise a too-long measure is a reading mistake,
+  // not a triplet).
+  if (written <= target || !allowUnmarked) return;
+  final marked = <OmrEvent>[];
+  for (int i = 0; i + 3 <= ev.length;) {
+    final g = ev.sublist(i, i + 3);
+    final d = g.first.duration;
+    if (d <= 32 && g.every((e) => e.duration == d)) {
+      for (final e in g) {
+        e.tuplet = 3;
+      }
+      marked.addAll(g);
+      i += 3;
+      final r = real();
+      if (r == target) return;
+      if (r < target) break;
+    } else {
+      i++;
+    }
+  }
+  for (final e in marked) {
+    e.tuplet = 1;
+  }
+}
+
+/// Small upright marks near staff [st] between [x0] and [x1] that can
+/// be tuplet numbers ("3", "5", "6"…): about a space tall, not a
+/// notehead, not crossed by a stem, outside the staff lines.
+List<_Comp> _tupletNumerals(_CompIndex index, _Staff st, double x0, double x1,
+    double sp, List<_Head> heads) {
+  final result = <_Comp>[];
+  for (final c in index.comps) {
+    if (c.x1 < x0 || c.x0 > x1) continue;
+    if (c.h < 0.75 * sp || c.h > 1.9 * sp) continue;
+    if (c.w < 0.35 * sp || c.w > 1.4 * sp || c.w > 1.2 * c.h) continue;
+    final fill = c.area / (c.w * c.h);
+    if (fill < 0.15 || fill > 0.6) continue;
+    final cx = (c.x0 + c.x1) / 2, cy = (c.y0 + c.y1) / 2;
+    final top = _lineY(st, 0, cx), bottom = _lineY(st, 4, cx);
+    if (cy > top - 0.3 * sp && cy < bottom + 0.3 * sp) continue;
+    if (cy < top - 8 * sp || cy > bottom + 8 * sp) continue;
+    if (heads.any((h) =>
+    c.x0 - 0.2 * sp <= h.cx && h.cx <= c.x1 + 0.2 * sp &&
+        c.y0 - 0.2 * sp <= h.cy && h.cy <= c.y1 + 0.2 * sp)) {
+      continue;
+    }
+    if (index.stems.any((s) =>
+    s[0] >= c.x0 && s[0] <= c.x1 && s[1] <= c.y1 && s[2] >= c.y0)) {
+      continue;
+    }
+    result.add(c);
+  }
+  return result;
+}
+
+/// Marks the group of notes each tuplet number in [numerals] stands
+/// over (or under): 3, 6, 5 or 7 notes of equal length centred on the
+/// number — or 2 notes, one twice as long as the other (a quarter and
+/// an eighth of a triplet).
+void _markTuplets(List<_Comp> numerals, List<OmrEvent> events, double sp) {
+  bool near(List<OmrEvent> g, double cy) {
+    final notes = g.where((e) => !e.isRest).toList();
+    if (notes.isEmpty) return false;
+    double lo = notes.first.top, hi = notes.first.bottom;
+    for (final e in notes) {
+      lo = math.min(lo, e.top);
+      hi = math.max(hi, e.bottom);
+    }
+    // Beyond the notes and beam, within a few spaces of them.
+    return (cy < lo && lo - cy <= 3.5 * sp) || (cy > hi && cy - hi <= 3.5 * sp);
+  }
+
+  for (final c in numerals) {
+    final cx = (c.x0 + c.x1) / 2, cy = (c.y0 + c.y1) / 2;
+    var done = false;
+    for (final k in const [3, 6, 5, 7]) {
+      for (int i = 0; i + k <= events.length && !done; i++) {
+        final g = events.sublist(i, i + k);
+        final d = g.first.duration;
+        if (d <= 0 || d > 64) continue;
+        if (g.any((e) => e.tuplet > 1 || e.duration != d)) continue;
+        final mid = (g.first.x + g.last.x) / 2 + 0.6 * sp;
+        if ((mid - cx).abs() > 1.2 * sp) continue;
+        if (g.last.x - g.first.x > k * 6 * sp) continue;
+        if (!near(g, cy)) continue;
+        for (final e in g) {
+          e.tuplet = k;
+          e.tupletPrinted = true;
+        }
+        done = true;
+      }
+      if (done) break;
+    }
+    for (int i = 0; i + 2 <= events.length && !done; i++) {
+      final a = events[i], b = events[i + 1];
+      if (a.tuplet > 1 || b.tuplet > 1 || a.duration <= 0 || b.duration <= 0) {
+        continue;
+      }
+      if (a.duration != 2 * b.duration && b.duration != 2 * a.duration) continue;
+      final mid = (a.x + b.x) / 2 + 0.6 * sp;
+      if ((mid - cx).abs() > 1.5 * sp) continue;
+      if (!near([a, b], cy)) continue;
+      a.tuplet = 3;
+      b.tuplet = 3;
+      a.tupletPrinted = true;
+      b.tupletPrinted = true;
+      done = true;
+    }
+  }
+}
+
+const _majorSharps = ['do major', 'sol major', 're major', 'la major', 'mi major',
+  'si major', 'fa sharp major', 'do sharp major'];
+const _minorSharps = ['la minor', 'mi minor', 'si minor', 'fa sharp minor',
+  'do sharp minor', 'sol sharp minor', 're sharp minor', 'la sharp minor'];
+const _majorFlats = ['do major', 'fa major', 'si flat major', 'mi flat major',
+  'la flat major', 're flat major', 'sol flat major', 'si major'];
+const _minorFlats = ['la minor', 're minor', 'sol minor', 'do minor', 'fa minor',
+  'si flat minor', 'mi flat minor', 'la flat minor'];
+const _letters = 'cdefgab';
+
+/// The scale for a key signature (+n sharps / -n flats), major or minor.
+String scaleForKey(int key, bool minor) {
+  key = key.clamp(-7, 7).toInt();
+  if (key >= 0) return (minor ? _minorSharps : _majorSharps)[key];
+  return (minor ? _minorFlats : _majorFlats)[-key];
+}
+
+/// Grid row of a line position ("4", "4/5", "-5/-4"): middle C = 28.
+int _rowOfPosition(String pos) {
+  // Only the numbers count (anything else, e.g. an accidental, is
+  // ignored), so an unusual position can never stop the import.
+  final nums = <int>[
+    for (final m in RegExp(r'-?\d+').allMatches(pos)) int.parse(m.group(0)!)
+  ];
+  if (nums.isEmpty) return 28;
+  if (nums.length == 1) return 2 * nums[0] + 28;
+  final int low = nums[0] < nums[1] ? nums[0] : nums[1];
+  return 2 * low + 29;
+}
+
+String _letterOfPosition(String pos) => _letters[_rowOfPosition(pos) % 7];
+
+/// Major or minor, for measures with the same key signature [key]: the
+/// music of a key ends on its tonic, so the lowest note of the last
+/// chord decides; the first bass note and raised leading tones (the 7th
+/// of the minor key, with a sharp or natural) help when it is unclear.
+bool _isMinor(List<OmrMeasure> section, int key) {
+  final major = key >= 0 ? 'cgdaebfc'[key] : 'cfbeadgc'[-key];
+  final minor = key >= 0 ? 'aebfcgda'[key] : 'adgcfbea'[-key];
+  OmrNote? bassOf(OmrEvent e) {
+    OmrNote? low;
+    for (final n in e.notes) {
+      if (low == null || _rowOfPosition(n.position) < _rowOfPosition(low.position)) low = n;
+    }
+    return low;
+  }
+
+  OmrNote? lastBass, firstBass;
+  for (final m in section.reversed) {
+    for (final hand in const ['hl', 'hr']) {
+      final ev = (m.hands[hand] ?? const <OmrEvent>[]).where((e) => !e.isRest).toList();
+      if (ev.isNotEmpty) {
+        lastBass = bassOf(ev.last);
+        break;
+      }
+    }
+    if (lastBass != null) break;
+  }
+  for (final m in section) {
+    for (final hand in const ['hl', 'hr']) {
+      final ev = (m.hands[hand] ?? const <OmrEvent>[]).where((e) => !e.isRest).toList();
+      if (ev.isNotEmpty) {
+        firstBass = bassOf(ev.first);
+        break;
+      }
+    }
+    if (firstBass != null) break;
+  }
+  double score = 0; // > 0: minor
+  for (final (n, weight) in [(lastBass, 3.0), (firstBass, 1.0)]) {
+    if (n == null) continue;
+    final l = _letterOfPosition(n.position);
+    if (l == minor) score += weight;
+    if (l == major) score -= weight;
+  }
+  final leading = _letters[(_letters.indexOf(minor) + 6) % 7];
+  int raised = 0;
+  for (final m in section) {
+    for (final hand in const ['hr', 'hl']) {
+      for (final e in m.hands[hand] ?? const <OmrEvent>[]) {
+        for (final n in e.notes) {
+          if (_letterOfPosition(n.position) == leading &&
+              (n.accidental == '+' || n.accidental == 'x')) {
+            raised++;
+          }
+        }
+      }
+    }
+  }
+  score += 0.5 * math.min(raised, 4);
+  return score > 0;
+}
+
+/// Writes the recognized measures as a transcription. [scaleName] null
+/// (or 'Auto'): the scale is found from the key signatures and the
+/// notes, and every key change gets its own scale line in the measure
+/// where it happens; otherwise the given scale is used throughout.
 String omrMeasuresToTranscription(
     List<OmrMeasure> allMeasures, {
-      String scaleName = 'do major',
+      String? scaleName,
       bool scaleHasAccidentals = false,
       List<int>? timeSignature,
     }) {
-  final measures = allMeasures.where((m) => !m.isEmpty).toList();
+  // A key change on an empty "measure" moves on to the next one.
+  final measures = <OmrMeasure>[];
+  int? pendingKey;
+  for (final m in allMeasures) {
+    if (m.isEmpty) {
+      pendingKey = m.key ?? pendingKey;
+      continue;
+    }
+    if (pendingKey != null && m.key == null) {
+      measures.add(OmrMeasure(m.x0, m.x1, m.spacing, m.hands,
+          repeatStart: m.repeatStart, repeatEnd: m.repeatEnd, key: pendingKey));
+    } else {
+      measures.add(m);
+    }
+    pendingKey = null;
+  }
+
+  // The scale of each key section.
+  final auto = scaleName == null || scaleName == 'Auto';
+  final scales = List<String?>.filled(measures.length, null);
+  if (auto) {
+    final starts = <int>[];
+    int? current;
+    for (int i = 0; i < measures.length; i++) {
+      final k = measures[i].key;
+      if (k != null && k != current) {
+        current = k;
+        starts.add(i);
+      }
+    }
+    for (int s = 0; s < starts.length; s++) {
+      final i0 = starts[s];
+      final i1 = s + 1 < starts.length ? starts[s + 1] : measures.length;
+      final key = measures[i0].key!;
+      scales[i0] = scaleForKey(key, _isMinor(measures.sublist(i0, i1), key));
+    }
+  }
+  final String firstScale =
+  auto ? ((scales.isNotEmpty ? scales.first : null) ?? 'do major') : scaleName!;
 
   final totals = <int>[];
   for (final m in measures) {
     for (final hand in const ['hr', 'hl']) {
       final ev = m.hands[hand] ?? const <OmrEvent>[];
       // A whole-measure rest says nothing about the meter.
-      if (ev.isNotEmpty && ev.every((e) => e.duration > 0)) {
+      if (ev.isNotEmpty &&
+          ev.every((e) => e.duration > 0) &&
+          !ev.any((e) => e.tuplet > 1)) {
         totals.add(ev.fold<int>(0, (s, e) => s + e.duration));
       }
     }
@@ -429,16 +1019,38 @@ String omrMeasuresToTranscription(
   if (timeSignature != null) unit = math.max(2, 128 ~/ timeSignature[1]);
   if (unit > 16 && (has32 || meter % unit != 0)) unit = 16; // eighth
   final out = StringBuffer();
-  out.writeln(scaleName);
+  out.writeln(firstScale);
+  var currentScale = firstScale;
   if (meter % unit == 0) {
     out.writeln('t${meter ~/ unit}/${128 ~/ unit}');
   } else {
     out.writeln('t3/4');
   }
 
+  // Set once a printed tuplet number was confirmed (see _settleTuplets).
+  var printedTupletSeen = false;
   for (int i = 0; i < measures.length; i++) {
     final m = measures[i];
     out.writeln('m${i + 1}');
+    // The key changes here.
+    if (i > 0 && scales[i] != null && scales[i] != currentScale) {
+      currentScale = scales[i]!;
+      out.writeln(currentScale);
+    }
+    for (final hand in const ['hr', 'hl']) {
+      final ev = m.hands[hand] ?? <OmrEvent>[];
+      _settleTuplets(ev, meter, allowUnmarked: printedTupletSeen);
+      if (ev.any((e) => e.tuplet > 1 && e.tupletPrinted)) {
+        printedTupletSeen = true;
+      }
+    }
+    final onsets = _measureOnsets(m, meter, unit);
+    final keyHasAccidentals = auto
+        ? currentScale != 'do major' && currentScale != 'la minor'
+        : scaleHasAccidentals;
+    // Repeat barlines (see notation_marks.dart for these words).
+    final signs = [if (m.repeatStart) '|:', if (m.repeatEnd) ':|'];
+    if (signs.isNotEmpty) out.writeln(signs.join(' '));
     for (final hand in const ['hr', 'hl']) {
       final ev = [
         for (final e in m.hands[hand] ?? const <OmrEvent>[])
@@ -447,35 +1059,18 @@ String omrMeasuresToTranscription(
               : e
       ];
       if (!ev.any((e) => !e.isRest)) continue;
-      final total = ev.fold<int>(0, (s, e) => s + e.duration);
       final toks = <String>[hand];
-      int onset = 0;
       final carried = <String, String>{};
-      final xf = ev.first.x;
-      final xe = m.x1 - 0.8 * m.spacing;
-      int prev = -1;
-      for (final e in ev) {
-        int t;
-        if (total == meter) {
-          t = onset;
-        } else {
-          // Durations don't add up: place by x position, with the first
-          // note on beat 1 and the bar line as the end of the measure.
-          const grid = 8; // a sixteenth
-          final frac = (e.x - xf) / math.max(1.0, xe - xf);
-          t = (frac * meter / grid).round() * grid;
-          t = math.max(0, math.min(t, meter - grid));
-          if (t <= prev) t = prev + grid < meter ? prev + grid : prev;
-        }
-        prev = t;
+      final starts = onsets[hand]!;
+      for (int ei = 0; ei < ev.length; ei++) {
+        final e = ev[ei];
+        final int t = starts[ei];
         if (e.isRest) {
           // A rest only takes up time; the beats of the notes say it.
-          onset += e.duration;
           continue;
         }
-        final b = 1 + t / unit;
-        final q = (b * 4).round() / 4;
-        toks.add(q == q.roundToDouble() ? 'b${q.round()}' : 'b$q');
+        toks.add(_beatMarker(t, unit));
+        if (e.arpeggio) toks.add('arp');
 
         final notes = <String>[];
         final sortedNotes = [...e.notes]..sort((a, b) => b.y.compareTo(a.y));
@@ -485,20 +1080,34 @@ String omrMeasuresToTranscription(
           if (acc.isEmpty && carried.containsKey(n.position)) {
             acc = carried[n.position]!;
           } else if (acc == 'x') {
-            carried.remove(n.position);
-            if (!scaleHasAccidentals) acc = '';
+            // A printed natural: written (and kept for the rest of the
+            // measure) when the key has sharps or flats; in do major /
+            // la minor it only cancels an earlier accidental.
+            if (keyHasAccidentals) {
+              carried[n.position] = 'x';
+            } else {
+              carried.remove(n.position);
+              acc = '';
+            }
           } else if (acc.isNotEmpty) {
             carried[n.position] = acc;
           }
-          notes.add('${n.position}$acc');
+          notes.add('l${n.position}$acc'); // "l" = line position
         }
-        final dc = _durationCode(e.duration);
+        // A note of a tuplet: ":3" after its written length.
+        // Never longer than what is left of the measure (a whole note
+        // in 3/8 is a misread head).
+        final left = meter - t ~/ _tupletScale;
+        final written = e.tuplet <= 1 && e.duration > left && left > 0
+            ? left
+            : e.duration;
+        final dc = _durationCode(written) +
+            (e.tuplet > 1 ? ':${e.tuplet}' : '');
         if (notes.length == 1) {
-          toks.add('${notes.first}$dc');
+          toks.add('${notes.first} $dc');
         } else {
-          toks.add('(${notes.join(', ')})$dc');
+          toks.add('(${notes.join(', ')}) $dc');
         }
-        onset += e.duration;
       }
       out.writeln(toks.join(' '));
     }
@@ -831,7 +1440,13 @@ List<_Comp> _components(_Bin img, {bool eight = true, int value = 1}) {
 
 class _CompIndex {
   final List<_Comp> comps;
-  _CompIndex(this.comps);
+
+  /// The line-free image the components come from.
+  final _Bin? nos;
+
+  /// Every stem as (x, top row, bottom row) — set once they are found.
+  List<List<double>> stems = const [];
+  _CompIndex(this.comps, [this.nos]);
 
   List<_Comp> inside(double x0, double y0, double x1, double y1) => [
     for (final c in comps)
@@ -1295,14 +1910,22 @@ bool _stemThrough(List<List<double>> stems, double x0, double x1, double y0, dou
 /// start of a staff: the clef is the tall shape right at the start;
 /// the signs right after it (each about an accidental or a digit in
 /// size, close together, without stems) belong to the header too.
+/// Where the parts of a staff's header are (see [_staffHeaderEnd]).
+class _HeaderInfo {
+  double? clefEnd;
+  double? timeX;
+  double? end;
+}
+
 double _staffHeaderEnd(_CompIndex index, _Staff st, double xStart, double sp,
-    List<List<double>> stems, List<_Head> heads, _Bin nos) {
+    List<List<double>> stems, List<_Head> heads, _Bin nos, [_HeaderInfo? info]) {
   final top = _lineY(st, 0, xStart), bot = _lineY(st, 4, xStart);
   final near = index.comps
       .where((c) =>
   c.y0 <= bot &&
       c.y1 >= top &&
       c.h <= 9 * sp &&
+      c.w <= 4 * sp && // (not a long line, e.g. a volta bracket)
       xStart - 0.5 * sp <= c.x0 &&
       c.x0 <= xStart + 3.0 * sp)
       .toList();
@@ -1311,10 +1934,12 @@ double _staffHeaderEnd(_CompIndex index, _Staff st, double xStart, double sp,
       .toList();
   if (clef.isEmpty) return xStart;
   double end = clef.map((k) => k[1]).reduce(math.max).toDouble();
+  info?.clefEnd = end;
+  // (a key signature's sharps reach well above the staff)
   final others = index.comps
       .where((c) =>
-  c.y0 >= top - 1.0 * sp &&
-      c.y1 <= bot + 1.0 * sp &&
+  c.y0 >= top - 2.0 * sp &&
+      c.y1 <= bot + 1.5 * sp &&
       c.x0 > end)
       .toList();
   for (final g in _clustersByX(others)) {
@@ -1336,6 +1961,7 @@ double _staffHeaderEnd(_CompIndex index, _Staff st, double xStart, double sp,
       }
       isTime = wide / (gy1 - gy0 + 1) >= 0.6;
     }
+    if (isTime && info != null && info.timeX == null) info.timeX = gx0.toDouble();
     if (!isTime) {
       // A note (with its stem) ends the header.
       if (_stemThrough(stems, gx0 - 1.0, gx1 + 1.0, gy0.toDouble(), gy1.toDouble())) break;
@@ -1353,7 +1979,172 @@ double _staffHeaderEnd(_CompIndex index, _Staff st, double xStart, double sp,
     }
     end = math.max(end, gx1.toDouble());
   }
+  info?.end = end + 0.2 * sp;
   return end + 0.2 * sp;
+}
+
+// =====================================================================
+// Key signatures
+// =====================================================================
+
+/// Long thin vertical strokes (the strokes of sharps, flats and
+/// naturals) between columns [xa]..[xb], rows [y0]..[y1]:
+/// [x, top, bottom] each. An accidental's stroke is at most about 3
+/// spaces long; a longer one is a bar line or a stem.
+List<List<double>> _verticalStrokes(
+    _Bin nos, double xa, double xb, double y0, double y1, double sp) {
+  final x0 = math.max(0, xa.floor()), x1 = math.min(nos.w - 1, xb.floor());
+  final ya = math.max(0, y0.floor()), yb = math.min(nos.h - 1, y1.floor());
+  final strokes = <List<int>>[]; // [first x, last x, top, bottom]
+  for (int x = x0; x <= x1; x++) {
+    for (final r in _columnRunsAt(nos, x, ya, yb)) {
+      if (r[1] < 1.3 * sp) continue;
+      final t = r[0], b = r[0] + r[1] - 1;
+      List<int>? joined;
+      for (final s in strokes) {
+        if (x - s[1] <= 1 && t <= s[3] && b >= s[2]) {
+          joined = s;
+          break;
+        }
+      }
+      if (joined != null) {
+        joined[1] = x;
+        joined[2] = math.min(joined[2], t);
+        joined[3] = math.max(joined[3], b);
+      } else {
+        strokes.add([x, x, t, b]);
+      }
+    }
+  }
+  final out = [
+    for (final s in strokes)
+      if (s[1] - s[0] + 1 <= 0.3 * sp && s[3] - s[2] <= 3.2 * sp)
+        [(s[0] + s[1]) / 2, s[2].toDouble(), s[3].toDouble()]
+  ];
+  out.sort((a, b) => a[0].compareTo(b[0]));
+  return out;
+}
+
+/// Fraction of black pixels in a rectangle (0 when it is empty).
+double _inkMean(_Bin img, int x0, int y0, int x1, int y1) {
+  x0 = math.max(0, x0);
+  y0 = math.max(0, y0);
+  x1 = math.min(img.w - 1, x1);
+  y1 = math.min(img.h - 1, y1);
+  if (x1 < x0 || y1 < y0) return 0;
+  int n = 0;
+  for (int y = y0; y <= y1; y++) {
+    for (int x = x0; x <= x1; x++) {
+      if (img.at(x, y)) n++;
+    }
+  }
+  return n / ((x1 - x0 + 1) * (y1 - y0 + 1));
+}
+
+/// One sign of a key signature.
+class _KeySign {
+  final double x;
+  final String kind; // '+' sharp, '-' flat, 'x' natural
+  final double top, bottom;
+  _KeySign(this.x, this.kind, this.top, this.bottom);
+}
+
+/// The sharps, flats and naturals written between [xa] and [xb] in
+/// staff [st], left to right — told apart by their strokes: a sharp
+/// has two level strokes, a natural two strokes of which the left goes
+/// up higher and the right down lower, a flat one stroke with a bowl at
+/// the bottom right.
+List<_KeySign> _keySignList(_Bin nos, _Staff st, double xa, double xb, double sp) {
+  if (xb - xa < 0.4 * sp) return const [];
+  final xm = (xa + xb) / 2;
+  final top = _lineY(st, 0, xm), bot = _lineY(st, 4, xm);
+  final strokes = _verticalStrokes(nos, xa, xb, top - 1.6 * sp, bot + 1.0 * sp, sp);
+  final signs = <_KeySign>[];
+  final used = <int>{};
+  for (int i = 0; i < strokes.length; i++) {
+    if (used.contains(i)) continue;
+    final x = strokes[i][0], t = strokes[i][1], b = strokes[i][2];
+    int? pair;
+    for (int j = i + 1; j < strokes.length; j++) {
+      final x2 = strokes[j][0], t2 = strokes[j][1], b2 = strokes[j][2];
+      if (x2 - x > 0.75 * sp) break;
+      if (x2 - x < 0.2 * sp) continue;
+      final overlap = math.min(b, b2) - math.max(t, t2);
+      if (overlap >= 0.4 * math.min(b - t, b2 - t2)) {
+        pair = j;
+        break;
+      }
+    }
+    if (pair != null) {
+      final x2 = strokes[pair][0], t2 = strokes[pair][1], b2 = strokes[pair][2];
+      used.add(pair);
+      final natural = t < t2 - 0.45 * sp && b2 > b + 0.45 * sp;
+      signs.add(_KeySign((x + x2) / 2, natural ? 'x' : '+', math.min(t, t2), math.max(b, b2)));
+      continue;
+    }
+    final xr0 = (x + 0.15 * sp).floor(), xr1 = (x + 0.8 * sp).floor();
+    final bowl = _inkMean(nos, xr0, (b - 0.9 * sp).floor(), xr1, b.floor());
+    final above = _inkMean(nos, xr0, t.floor(), xr1, (t + 0.6 * sp).floor() - 1);
+    if (bowl >= 0.12 && above < 0.12) {
+      signs.add(_KeySign(x + 0.3 * sp, '-', t, b));
+    }
+  }
+  return signs;
+}
+
+/// [sharps, flats, naturals] of a list of signs.
+List<int> _signCounts(List<_KeySign> signs) => [
+  signs.where((s) => s.kind == '+').length,
+  signs.where((s) => s.kind == '-').length,
+  signs.where((s) => s.kind == 'x').length,
+];
+
+/// The key from the sign counts of the staves: +n sharps, -n flats, 0
+/// when only naturals cancel the old key; null when there is no sign.
+int? _keyFromCounts(List<List<int>> counts) {
+  if (counts.isEmpty) return null;
+  var best = counts.first;
+  for (final c in counts) {
+    if (math.max(c[0], c[1]) > math.max(best[0], best[1])) best = c;
+  }
+  if (best[0] == 0 && best[1] == 0) {
+    return counts.any((c) => c[2] > 0) ? 0 : null;
+  }
+  return best[0] >= best[1] ? best[0] : -best[1];
+}
+
+/// A new key signature at the start of a measure (right after its bar
+/// line, before the first note): [key, x where the music starts], or
+/// null. The run of signs must be in every staff and must not be just
+/// the accidental of the first note.
+List<double>? _keyChangeAt(
+    _Bin nos, List<_Staff> staves, double mx0, double sp, List<_Head> heads) {
+  final counts = <List<int>>[];
+  double end = mx0;
+  for (final st in staves) {
+    final signs = _keySignList(nos, st, mx0 + 0.3 * sp, mx0 + 8 * sp, sp);
+    final run = <_KeySign>[];
+    for (final sg in signs) {
+      final prev = run.isEmpty ? mx0 : run.last.x;
+      if (sg.x - prev > (run.isEmpty ? 2.0 : 1.6) * sp) break;
+      run.add(sg);
+    }
+    if (run.isEmpty) return null;
+    final last = run.last;
+    if (run.length == 1 &&
+        heads.any((h) =>
+        h.x0 - last.x >= 0 &&
+            h.x0 - last.x <= 1.4 * sp &&
+            last.top - 0.5 * sp <= h.cy &&
+            h.cy <= last.bottom + 0.5 * sp)) {
+      return null;
+    }
+    counts.add(_signCounts(run));
+    end = math.max(end, last.x + 0.7 * sp);
+  }
+  final key = _keyFromCounts(counts);
+  if (key == null) return null;
+  return [key.toDouble(), end];
 }
 
 /// Quarter, eighth, half and whole rests inside one staff of one
@@ -1493,7 +2284,7 @@ class _Chord {
   _Chord(this.stem, this.heads, this.filled);
 }
 
-List<_Head> _findFilledHeads(_Bin bw, double sp) {
+List<_Head> _findFilledHeads(_Bin bw, double sp, [_Bin? nos]) {
   final kw = (0.5 * sp).round();
   final kh = (0.65 * sp).round();
   final e = _erodeBox(bw, kw, kh);
@@ -1549,11 +2340,14 @@ List<_Head> _findFilledHeads(_Bin bw, double sp) {
           final xb = (px1 - 0.25 * (px1 - px0)).toInt() + 1;
           final ya = math.max(0, (cy - 0.75 * sp).toInt());
           final yb = math.min(bw.h, (cy + 0.75 * sp).toInt() + 1);
+          // (in the image without staff lines: a full-width staff line
+          // row next to the head would pull the centre towards it)
+          final img = nos ?? bw;
           int firstFull = -1, lastFull = -1, fullRows = 0;
           for (int y = ya; y < yb; y++) {
             int ink = 0;
             for (int x = math.max(0, xa); x < math.min(bw.w, xb); x++) {
-              if (bw.at(x, y)) ink++;
+              if (img.at(x, y)) ink++;
             }
             if (ink >= 0.7 * (xb - xa)) {
               if (firstFull == -1) firstFull = y;
@@ -1574,15 +2368,26 @@ List<_Head> _findFilledHeads(_Bin bw, double sp) {
 
 /// Half/whole noteheads: small enclosed white holes inside a ring of
 /// notehead size.
-List<_Head> _findHollowHeads(_Bin bw, double sp) {
+/// Half/whole noteheads: small enclosed white holes. [holesFrom]: the
+/// image to look for the holes in (default [bw]) — in the image without
+/// staff lines a hole crossed by a staff line is one hole.
+List<_Head> _findHollowHeads(_Bin bw, double sp, [_Bin? holesFrom]) {
   final holes = <List<int>>[];
-  for (final c in _components(bw, eight: false, value: 0)) {
+  for (final c in _components(holesFrom ?? bw, eight: false, value: 0)) {
     if (c.touchesBorder) continue;
     if (0.25 * sp <= c.w &&
         c.w <= 1.2 * sp &&
         0.15 * sp <= c.h &&
-        c.h <= 0.8 * sp &&
+        c.h <= 0.95 * sp &&
         c.area >= 0.06 * sp * sp) {
+      if (c.h > 0.8 * sp) {
+        // A hole the height of a whole space: only a head in a space,
+        // next to a staff line (black far to both sides).
+        final xa = (c.x0 - sp).floor(), xb = (c.x1 + sp).floor();
+        final above = c.y0 >= 1 ? _inkMean(bw, xa, c.y0 - 1, xb, c.y0 - 1) : 0.0;
+        final below = c.y1 + 1 < bw.h ? _inkMean(bw, xa, c.y1 + 1, xb, c.y1 + 1) : 0.0;
+        if (above <= 0.9 && below <= 0.9) continue;
+      }
       holes.add([c.x0, c.y0, c.x1, c.y1]);
     }
   }
@@ -1592,9 +2397,12 @@ List<_Head> _findHollowHeads(_Bin bw, double sp) {
   for (final r in holes) {
     bool done = false;
     for (final m in merged) {
+      // (only into one head-sized hole: the holes of a chord's stacked
+      // heads stay apart)
       if (((r[0] + r[2]) / 2 - (m[0] + m[2]) / 2).abs() < 0.4 * sp &&
           (r[1] - m[3]) <= 0.4 * sp &&
-          (m[1] - r[3]) <= 0.4 * sp) {
+          (m[1] - r[3]) <= 0.4 * sp &&
+          math.max(m[3], r[3]) - math.min(m[1], r[1]) + 1 <= 0.9 * sp) {
         m[0] = math.min(m[0], r[0]);
         m[1] = math.min(m[1], r[1]);
         m[2] = math.max(m[2], r[2]);
@@ -1609,9 +2417,20 @@ List<_Head> _findHollowHeads(_Bin bw, double sp) {
   for (final m in merged) {
     final x0 = m[0], y0 = m[1], x1 = m[2], y1 = m[3];
     final hh = y1 - y0 + 1;
-    if (!(0.35 * sp <= hh && hh <= 0.9 * sp)) continue;
+    if (!(0.35 * sp <= hh && hh <= 0.95 * sp)) continue;
     final cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-    final iy = cy.round(), ix = cx.round();
+    final ix = cx.round();
+    var iy = cy.round();
+    // A head ON a staff line: its middle row is the line itself, so
+    // measure across a row of the hole just above or below it.
+    for (final d in const [0, 1, -1, 2, -2, 3, -3]) {
+      final yy = iy + d;
+      if (yy >= 0 && yy < bw.h && yy >= y0 && yy <= y1 && ix >= 0 && ix < bw.w &&
+          !bw.at(ix, yy)) {
+        iy = yy;
+        break;
+      }
+    }
     int walk(int dx) {
       int x = ix;
       while (x >= 0 && x < bw.w && !bw.at(x, iy)) {
@@ -1625,11 +2444,65 @@ List<_Head> _findHollowHeads(_Bin bw, double sp) {
       return x;
     }
 
-    final left = walk(-1), right = walk(1);
-    final outerW = right - left;
-    if (!(1.0 * sp <= outerW && outerW <= 2.0 * sp)) continue;
+    var left = walk(-1), right = walk(1);
+    var outerW = right - left;
+    // (a stem touching the ring makes it wider)
+    if (!(1.0 * sp <= outerW && outerW <= 2.4 * sp)) continue;
     // Ring sides must be thicker than a stem / letter stroke.
     if ((x0 - left) < 0.12 * sp || (right - x1) < 0.12 * sp) continue;
+
+    // The hole of a sharp or a natural: the strokes on BOTH sides of it
+    // go on well above and below it (a notehead's ring is short; a stem
+    // is only on one side).
+    bool sideLong(int from, int to) {
+      for (int x = from; x <= to; x++) {
+        if (x < 0 || x >= bw.w) continue;
+        int up = 0, dn = 0;
+        int y = y0 - 1;
+        while (y >= 0 && bw.at(x, y) && up < 2 * sp) {
+          y--;
+          up++;
+        }
+        y = y1 + 1;
+        while (y < bw.h && bw.at(x, y) && dn < 2 * sp) {
+          y++;
+          dn++;
+        }
+        if (up > 0.45 * sp && dn > 0.45 * sp) return true;
+      }
+      return false;
+    }
+
+    if (sideLong(x0 - 3, x0 - 1) && sideLong(x1 + 1, x1 + 3)) continue;
+    // A "hole" closed by a bar line (between it and a sign next to it).
+    bool barSide(int from, int to) {
+      for (int x = from; x <= to; x++) {
+        if (x < 0 || x >= bw.w) continue;
+        final y = cy.toInt();
+        int u = 0, d = 0;
+        while (y - u - 1 >= 0 && bw.at(x, y - u - 1) && u < 7 * sp) {
+          u++;
+        }
+        while (y + d + 1 < bw.h && bw.at(x, y + d + 1) && d < 7 * sp) {
+          d++;
+        }
+        if (u + d > 6 * sp) return true;
+      }
+      return false;
+    }
+
+    if (barSide(x0 - 3, x0 - 1) || barSide(x1 + 1, x1 + 3)) continue;
+    // A stem touching the ring: the head ends where the ring does (the
+    // thinner side tells how thick the ring is).
+    final tl = x0 - left, tr = right - x1;
+    if (outerW > 1.9 * sp) {
+      if (tl > tr + 0.2 * sp) {
+        left = x0 - tr - 1;
+      } else if (tr > tl + 0.2 * sp) {
+        right = x1 + tl + 1;
+      }
+      outerW = right - left;
+    }
     heads.add(_Head(left.toDouble(), right.toDouble(), cx, cy, false,
         whole: outerW >= 1.45 * sp));
   }
@@ -1813,6 +2686,40 @@ bool _joinedToStem(_Bin nos, int x, int xs, int r0, int l) {
   return false;
 }
 
+/// A blob as wide as two noteheads with the stem through its middle is
+/// the two notes of a second (one on each side of the stem, one step
+/// apart): returns them as two heads; otherwise just [h].
+List<_Head> _splitSecond(_Bin nos, _Head h, int stx, double sp) {
+  if (h.x1 - h.x0 < 1.5 * sp) return [h];
+  final ya = math.max(0, (h.cy - 1.0 * sp).toInt());
+  final yb = math.min(nos.h - 1, (h.cy + 1.0 * sp).toInt());
+  final out = <_Head>[];
+  for (final r in [
+    [h.x0.toInt(), stx - 2],
+    [stx + 3, h.x1.toInt()]
+  ]) {
+    final xa = math.max(0, r[0]), xb = math.min(nos.w - 1, r[1]);
+    if (xb - xa < 0.4 * sp) return [h];
+    int first = -1, last = -1, count = 0;
+    for (int y = ya; y <= yb; y++) {
+      int ink = 0;
+      for (int x = xa; x <= xb; x++) {
+        if (nos.at(x, y)) ink++;
+      }
+      if (ink >= 0.6 * (xb - xa + 1)) {
+        if (first < 0) first = y;
+        last = y;
+        count++;
+      }
+    }
+    if (count < 0.4 * sp) return [h];
+    out.add(_Head(xa.toDouble(), xb.toDouble(), (xa + xb) / 2, (first + last) / 2, true)
+      ..stem = h.stem);
+  }
+  if ((out[0].cy - out[1].cy).abs() < 0.25 * sp) return [h];
+  return out;
+}
+
 /// Fraction of black pixels in a w x h box centred on (cx, cy).
 double _inkFraction(_Bin img, double cx, double cy, double w, double h) {
   final x0 = (cx - w / 2).round(), x1 = (cx + w / 2).round();
@@ -1839,24 +2746,29 @@ List<_Head> _extendChord(_Bin nos, List<_Head> heads, _Stem stem, double sp) {
       if (stem.dir == 1 ? h.cy < edge.cy : h.cy > edge.cy) edge = h;
     }
     final step = stem.dir == 1 ? -1 : 1;
-    final y = edge.cy + step * sp; // a third (a second would sit on the
-    // other side of the stem)
-    final ya = math.min(edge.cy, y).round(), yb = math.max(edge.cy, y).round();
-    bool reached = true;
-    for (int yy = ya; yy <= yb && reached; yy++) {
-      bool any = false;
-      for (int xx = stem.x - 1; xx <= stem.x + 1; xx++) {
-        if (xx >= 0 && xx < nos.w && yy >= 0 && yy < nos.h && nos.at(xx, yy)) any = true;
+    bool added = false;
+    // A third or a fourth beyond (a second would sit on the other side
+    // of the stem).
+    for (final k in const [2, 3]) {
+      final y = edge.cy + step * k * sp / 2;
+      final ya = math.min(edge.cy, y).round(), yb = math.max(edge.cy, y).round();
+      bool reached = true;
+      for (int yy = ya; yy <= yb && reached; yy++) {
+        bool any = false;
+        for (int xx = stem.x - 1; xx <= stem.x + 1; xx++) {
+          if (xx >= 0 && xx < nos.w && yy >= 0 && yy < nos.h && nos.at(xx, yy)) any = true;
+        }
+        reached = any;
       }
-      reached = any;
+      if (!reached) continue; // the stem must reach the new head
+      if (_inkFraction(nos, edge.cx, y, 0.9 * sp, 0.5 * sp) >= 0.7 &&
+          _inkFraction(nos, edge.cx, y + step * 0.75 * sp, 0.9 * sp, 0.2 * sp) < 0.5) {
+        hs.add(_Head(edge.x0, edge.x1, edge.cx, y, true)..stem = edge.stem);
+        added = true;
+        break;
+      }
     }
-    if (!reached) break;
-    if (_inkFraction(nos, edge.cx, y, 0.9 * sp, 0.5 * sp) >= 0.7 &&
-        _inkFraction(nos, edge.cx, y + step * 0.75 * sp, 0.9 * sp, 0.2 * sp) < 0.5) {
-      hs.add(_Head(edge.x0, edge.x1, edge.cx, y, true)..stem = edge.stem);
-    } else {
-      break;
-    }
+    if (!added) break;
   }
   hs.sort((a, b) => a.cy.compareTo(b.cy));
   return hs;
@@ -1889,6 +2801,109 @@ double _beamThickness(_Bin nos, List<_Head> heads, double sp) {
     }
   });
   return best.toDouble();
+}
+
+/// Which sides of the bar line at [barX] have repeat dots: [left,
+/// right]. Repeat dots are a pair of small round blobs, one in each of
+/// the two middle spaces of a staff, right next to the bar line (left
+/// of it for an end repeat, right of it for a start). Piano music puts
+/// them in both staves; requiring both keeps specks (photo noise at a
+/// page edge) from passing for repeat dots.
+List<bool> _repeatDots(_CompIndex index, List<_Staff> staves, double barX, double sp) {
+  int left = 0, right = 0;
+  for (final st in staves) {
+    final y1 = _lineY(st, 1, barX) + sp / 2; // space below the 2nd line
+    final y2 = _lineY(st, 2, barX) + sp / 2; // space below the middle line
+    for (final side in const [-1, 1]) {
+      final lo = side == -1 ? barX - 2.4 * sp : barX + 0.15 * sp;
+      final hi = side == -1 ? barX - 0.15 * sp : barX + 2.4 * sp;
+      final dots = [
+        for (final c in index.comps)
+          if (lo <= c.x0 + c.w / 2 &&
+              c.x0 + c.w / 2 <= hi &&
+              0.2 * sp <= c.w &&
+              c.w <= 0.8 * sp &&
+              0.2 * sp <= c.h &&
+              c.h <= 0.8 * sp &&
+              c.area >= 0.5 * c.w * c.h)
+            c
+      ];
+      final up = dots.where((c) => (c.y0 + c.h / 2 - y1).abs() <= 0.35 * sp);
+      final down = dots.where((c) => (c.y0 + c.h / 2 - y2).abs() <= 0.35 * sp);
+      final pair = up.any((u) => down.any(
+              (d) => ((u.x0 + u.w / 2) - (d.x0 + d.w / 2)).abs() <= 0.4 * sp));
+      if (pair) {
+        if (side == -1) {
+          left++;
+        } else {
+          right++;
+        }
+      }
+    }
+  }
+  return [left >= staves.length, right >= staves.length];
+}
+
+/// A wavy vertical line just left of a chord (an arpeggio): narrow,
+/// reaching over the whole chord, one stroke per row, swinging left and
+/// right (a stem or an accidental does not swing).
+bool _hasArpeggio(_Bin nos, _CompIndex index, List<_Head> heads, double sp) {
+  double x0 = heads.first.x0, ytop = heads.first.cy, ybot = heads.first.cy;
+  for (final h in heads) {
+    x0 = math.min(x0, h.x0);
+    ytop = math.min(ytop, h.cy);
+    ybot = math.max(ybot, h.cy);
+  }
+  final lo = x0 - 1.9 * sp, hi = x0 - 0.1 * sp;
+  final comps = [
+    for (final c in index.comps)
+      if (c.x0 >= lo && c.x1 <= hi && c.y0 <= ybot + 0.5 * sp && c.y1 >= ytop - 0.5 * sp) c
+  ];
+  for (final k in _clustersByX(comps)) {
+    final cx0 = k[0], cx1 = k[1], cy0 = k[2], cy1 = k[3];
+    final h = cy1 - cy0 + 1, w = cx1 - cx0 + 1;
+    if (cy0 > ytop - 0.1 * sp || cy1 < ybot + 0.1 * sp) continue;
+    if (h < 1.5 * sp || w > 1.0 * sp || w < 0.2 * sp) continue;
+    final centres = <double>[];
+    final widths = <int>[];
+    int singles = 0;
+    for (int y = cy0; y <= cy1; y++) {
+      int first = -1, last = -1, runs = 0;
+      bool prev = false;
+      for (int x = cx0; x <= cx1; x++) {
+        final v = nos.at(x, y);
+        if (v) {
+          if (first < 0) first = x;
+          last = x;
+          if (!prev) runs++;
+        }
+        prev = v;
+      }
+      if (first < 0) continue;
+      if (runs == 1) singles++;
+      widths.add(last - first + 1);
+      centres.add((first + last) / 2);
+    }
+    if (centres.length < 0.8 * h || singles < 0.75 * centres.length) continue;
+    final sortedW = [...widths]..sort();
+    if (sortedW[sortedW.length ~/ 2] > 0.5 * sp) continue;
+    final sortedC = [...centres]..sort();
+    final mid = sortedC[sortedC.length ~/ 2];
+    final thr = 0.1 * sp;
+    int swings = 0, state = 0;
+    for (final c in centres) {
+      final d = c - mid;
+      if (d > thr && state <= 0) {
+        swings++;
+        state = 1;
+      } else if (d < -thr && state >= 0) {
+        swings++;
+        state = -1;
+      }
+    }
+    if (swings >= math.max(3, h / (1.4 * sp))) return true;
+  }
+  return false;
 }
 
 /// Beams/flags at the stem's far end. Beams printed close together may
@@ -1957,13 +2972,99 @@ bool _hasDot(_CompIndex index, double chordX1, double cy, double sp) {
 String _classifyAccidental(_CompIndex index, _Head head, double sp,
     double xLimit, List<List<double>> headCentres) {
   final cy = head.cy;
+  final wx0 = math.max(xLimit, head.x0 - 2.4 * sp);
   final comps = index
-      .inside(math.max(xLimit, head.x0 - 2.4 * sp), cy - 2.2 * sp,
-      head.x0 - 1, cy + 1.8 * sp)
+      .inside(wx0, cy - 2.2 * sp, head.x0 - 1, cy + 1.8 * sp)
       .where((c) => !headCentres.any((p) =>
   c.x0 <= p[0] && p[0] <= c.x0 + c.w && c.y0 <= p[1] && p[1] <= c.y0 + c.h))
       .toList();
-  if (comps.isEmpty) return '';
+  var kind = _accidentalFromComps(index, comps, head, sp);
+  final img = index.nos;
+  if (kind.isEmpty && img != null) {
+    // The sign may touch a bar line, a stem or the note itself: look
+    // again with those cut away. Only sharps and naturals count here —
+    // two strokes are hard to mistake; a flat-like shape is too often a
+    // piece of a beam or a flag.
+    final local = _localSignComps(img, index.stems, head, sp, wx0,
+        cy - 2.6 * sp, cy + 2.0 * sp, headCentres);
+    kind = _accidentalFromComps(index, local, head, sp);
+    if (kind != '+' && kind != 'x' && kind != '++') {
+      kind = '';
+    } else if (kind != '++') {
+      var right = local.first;
+      for (final c in local) {
+        if (c.x1 > right.x1) right = c;
+      }
+      final st = _verticalStrokes(img, right.x0 - 1.0, right.x1 + 1.0,
+          right.y0 - 1.0, right.y1 + 1.0, sp);
+      if (st.length < 2) kind = '';
+    }
+  }
+  return kind;
+}
+
+/// Pieces of ink left of [head], after cutting away long vertical
+/// strokes (bar lines, stems), other noteheads and everything right of
+/// the head's left edge — so a sign touching them comes out on its own.
+List<_Comp> _localSignComps(_Bin nos, List<List<double>> stems, _Head head,
+    double sp, double wx0, double wy0, double wy1, List<List<double>> headCentres) {
+  final xa = math.max(0, wx0.toInt()), xb = math.min(nos.w - 1, (head.x0 - 1).toInt());
+  final ya = math.max(0, wy0.toInt()), yb = math.min(nos.h - 1, wy1.toInt());
+  if (xb - xa < 3 || yb - ya < 3) return const [];
+  final rw = xb - xa + 1, rh = yb - ya + 1;
+  final region = _Bin.empty(rw, rh);
+  for (int y = 0; y < rh; y++) {
+    for (int x = 0; x < rw; x++) {
+      if (nos.at(xa + x, ya + y)) region.d[y * rw + x] = 1;
+    }
+  }
+  void clear(int x0, int y0, int x1, int y1) {
+    for (int y = math.max(0, y0); y <= math.min(rh - 1, y1); y++) {
+      for (int x = math.max(0, x0); x <= math.min(rw - 1, x1); x++) {
+        region.d[y * rw + x] = 0;
+      }
+    }
+  }
+
+  // Long vertical runs, measured over a taller strip.
+  final ta = math.max(0, (ya - 3 * sp).toInt()), tb = math.min(nos.h - 1, (yb + 3 * sp).toInt());
+  for (int x = xa; x <= xb; x++) {
+    for (final r in _columnRunsAt(nos, x, ta, tb)) {
+      if (r[1] > 3.4 * sp) clear(x - xa, r[0] - ya, x - xa, r[0] + r[1] - 1 - ya);
+    }
+  }
+  // Stems of notes (even short ones).
+  for (final st in stems) {
+    final sx = st[0].toInt();
+    if (xa - 2 <= sx && sx <= xb + 2 && st[2] >= ya && st[1] <= yb) {
+      clear(sx - 2 - xa, st[1].toInt() - ya, sx + 2 - xa, st[2].toInt() - ya);
+    }
+  }
+  // Other noteheads (e.g. the far head of a chord with a second).
+  for (final p in headCentres) {
+    if (xa - sp <= p[0] && p[0] <= xb + sp && ya - sp <= p[1] && p[1] <= yb + sp) {
+      clear((p[0] - 0.75 * sp).toInt() - xa, (p[1] - 0.5 * sp).toInt() - ya,
+          (p[0] + 0.75 * sp).toInt() - xa, (p[1] + 0.5 * sp).toInt() - ya);
+    }
+  }
+  final out = <_Comp>[];
+  for (final c in _components(region, eight: true)) {
+    // Small specks (e.g. what is left of a ledger line) are not signs.
+    if (c.area < 0.5 * sp * sp) continue;
+    // A sign is taller than wide and not solid (a piece of a beam is).
+    if (c.h < 1.2 * c.w || c.h < 0.9 * sp || c.area > 0.75 * c.w * c.h) continue;
+    // It must not run out of the area at the top, bottom or left.
+    if (c.y0 == 0 || c.y1 >= rh - 1 || (c.x0 == 0 && xa > wx0.toInt())) continue;
+    out.add(_Comp(xa + c.x0, ya + c.y0, xa + c.x1, ya + c.y1)..area = c.area);
+  }
+  return out;
+}
+
+/// The accidental made by [comps] (pieces of ink left of [head]).
+String _accidentalFromComps(_CompIndex index, List<_Comp> signComps, _Head head, double sp) {
+  final cy = head.cy;
+  if (signComps.isEmpty) return '';
+  final comps = [...signComps];
   // Pieces of one sign (cut by staff-line removal) overlap in x.
   comps.sort((a, b) => (b.x0 + b.w).compareTo(a.x0 + a.w));
   final right = comps.first;
@@ -1992,9 +3093,173 @@ String _classifyAccidental(_CompIndex index, _Head head, double sp,
     return w > 1.15 * sp ? '--' : '-';
   }
   if (h >= 1.7 * sp) {
-    return w <= 0.62 * sp ? 'x' : '+';
+    var kind = w <= 0.62 * sp ? 'x' : '+';
+    // Sharp or natural: a natural's left stroke goes up higher and its
+    // right one down lower; a sharp's strokes are about level.
+    final img = index.nos;
+    if (img != null) {
+      final strokes = _verticalStrokes(img, cx0 - 1.0, cx1 + 1.0, top - 2.0, bot + 2.0, sp);
+      if (strokes.length >= 2) {
+        final l = strokes.first, r = strokes.last;
+        if (r[0] - l[0] >= 0.2 * sp) {
+          kind = (l[1] < r[1] - 0.45 * sp && r[2] > l[2] + 0.45 * sp) ? 'x' : '+';
+        }
+      }
+    }
+    return kind;
   }
   return '';
+}
+
+// =====================================================================
+// Octave signs (8va, 15ma, 8vb, 15mb)
+// =====================================================================
+
+/// An octave sign over (or under) a stretch of a staff: the notes from
+/// [x0] to [x1] sound [octaves] octaves higher (+) or lower (-).
+class _OctaveLine {
+  final double x0, x1;
+  final int octaves;
+
+  /// Box of the "8" / "15" (x0, y0, x1, y1), when there is one.
+  final List<double>? glyph;
+  _OctaveLine(this.x0, this.x1, this.octaves, this.glyph);
+}
+
+/// The octave shift at [x] (0 when no sign covers it).
+int _octaveShiftAt(List<_OctaveLine> lines, double x, double sp) {
+  for (final l in lines) {
+    if (l.x0 - 0.3 * sp <= x && x <= l.x1 + 0.5 * sp) return l.octaves;
+  }
+  return 0;
+}
+
+/// Finds the octave signs of one staff: a dashed line (at least three
+/// short thin dashes in a row at one height) above the staff ([above],
+/// for the treble: 8va / 15ma) or below it (bass: 8vb / 15mb), usually
+/// starting with an "8" or "15". Ledger lines are not dashes: a ledger
+/// line always has a notehead right over it on the far side from the
+/// staff. A line with no number at the start of a system goes on from
+/// the previous system ([carried]).
+List<_OctaveLine> _findOctaveLines(_CompIndex index, _Staff st, bool above,
+    double xFrom, double xTo, double sp, List<_Head> heads, int? carried) {
+  final xm = (xFrom + xTo) / 2;
+  final top = _lineY(st, 0, xm), bottom = _lineY(st, 4, xm);
+  final yA = above ? top - 8 * sp : bottom + 0.6 * sp;
+  final yB = above ? top - 0.6 * sp : bottom + 8 * sp;
+
+  // Dashes.
+  final dashes = <_Comp>[];
+  for (final c in index.comps) {
+    if (c.x1 < xFrom || c.x0 > xTo || c.y1 < yA || c.y0 > yB) continue;
+    if (c.h > 0.45 * sp || c.w < 0.25 * sp || c.w > 1.2 * sp) continue;
+    final cx = (c.x0 + c.x1) / 2, cy = (c.y0 + c.y1) / 2;
+    // A ledger line: a head right over it, farther from the staff.
+    final ledger = heads.any((h) =>
+    (h.cx - cx).abs() <= 0.8 * sp &&
+        (above ? h.cy < cy + 0.2 * sp : h.cy > cy - 0.2 * sp) &&
+        (h.cy - cy).abs() <= 3.0 * sp);
+    if (!ledger) dashes.add(c);
+  }
+  dashes.sort((a, b) => a.x0.compareTo(b.x0));
+
+  // Chains of dashes at one height.
+  final used = List<bool>.filled(dashes.length, false);
+  final lines = <_OctaveLine>[];
+  for (int i = 0; i < dashes.length; i++) {
+    if (used[i]) continue;
+    final chain = [dashes[i]];
+    used[i] = true;
+    for (int j = i + 1; j < dashes.length; j++) {
+      if (used[j]) continue;
+      final last = chain.last, d = dashes[j];
+      final gap = d.x0 - last.x1;
+      if (gap > 1.6 * sp) break;
+      if (gap < 0.1 * sp) continue;
+      if (((d.y0 + d.y1) / 2 - (last.y0 + last.y1) / 2).abs() > 0.3 * sp) continue;
+      chain.add(d);
+      used[j] = true;
+    }
+    if (chain.length < 3) continue;
+    final lineY = chain.map((c) => (c.y0 + c.y1) / 2).reduce((a, b) => a + b) / chain.length;
+    double start = chain.first.x0.toDouble();
+    double end = chain.last.x1.toDouble();
+    // The closing hook: a short vertical stroke at the end.
+    for (final c in index.comps) {
+      if (c.x0 >= end - 0.3 * sp && c.x0 <= end + 0.8 * sp &&
+          c.w <= 0.4 * sp && c.h >= 0.4 * sp && c.h <= 2 * sp &&
+          (above ? (c.y0 - lineY).abs() <= 0.4 * sp : (c.y1 - lineY).abs() <= 0.4 * sp)) {
+        end = math.max(end, c.x1.toDouble());
+      }
+    }
+    // The number ("8", "15", "8va"…) just left of the first dash: the
+    // tallest marks there; "15" has a thin "1" before the "5".
+    final marks = [
+      for (final c in index.comps)
+      // (the first dash is often joined to the number)
+        if (c.x1 <= start + 1.0 * sp &&
+            c.x1 >= start - 4.0 * sp &&
+            c.h >= 0.8 * sp &&
+            c.h <= 2.6 * sp &&
+            c.w <= 2.5 * sp &&
+            c.y1 >= lineY - 2.2 * sp &&
+            c.y0 <= lineY + 1.2 * sp &&
+            // (not a note: no stemmed notehead inside it)
+            !heads.any((h) =>
+            h.stem != null &&
+                c.x0 <= h.cx && h.cx <= c.x1 && c.y0 <= h.cy && h.cy <= c.y1))
+          c
+    ]..sort((a, b) => a.x0.compareTo(b.x0));
+    int? octaves;
+    List<double>? glyph;
+    if (marks.isNotEmpty) {
+      // The numeral: the tallest mark (letters "va" / "vb" are smaller).
+      var numeral = marks.first;
+      for (final c in marks) {
+        if (c.h > numeral.h) numeral = c;
+      }
+      // A numeral is upright: taller than wide, at least a space tall.
+      // …with its middle at the height of the dashes.
+      final numeralY = (numeral.y0 + numeral.y1) / 2;
+      if (numeral.h < 1.0 * sp ||
+          numeral.w > 1.3 * numeral.h ||
+          numeral.w < 0.3 * numeral.h ||
+          (numeralY - lineY).abs() > 0.9 * sp) {
+        if (carried == null || start - xFrom > 8 * sp) continue;
+        lines.add(_OctaveLine(xFrom, end, above ? carried.abs() : -carried.abs(), null));
+        continue;
+      }
+      final i0 = marks.indexOf(numeral);
+      // A thin "1" right before it makes "15".
+      bool fifteen = false;
+      double gx0 = numeral.x0.toDouble();
+      for (int k = 0; k < i0; k++) {
+        final c = marks[k];
+        if (c.w <= 0.4 * c.h && numeral.x0 - c.x1 <= 0.6 * sp && c.h >= 0.7 * numeral.h) {
+          fifteen = true;
+          gx0 = math.min(gx0, c.x0.toDouble());
+        }
+      }
+      octaves = fifteen ? 2 : 1;
+      double gy0 = numeral.y0.toDouble(), gy1 = numeral.y1.toDouble();
+      double gx1 = numeral.x1.toDouble();
+      for (final c in marks) {
+        gy0 = math.min(gy0, c.y0.toDouble());
+        gy1 = math.max(gy1, c.y1.toDouble());
+        gx1 = math.max(gx1, c.x1.toDouble());
+      }
+      glyph = [gx0, gy0, gx1, gy1];
+      start = math.min(start, gx0);
+    } else if (carried != null && start - xFrom <= 8 * sp) {
+      // No number: the line goes on from the previous system.
+      octaves = carried.abs();
+      start = xFrom;
+    } else {
+      continue; // a dashed line with no number: not an octave sign
+    }
+    lines.add(_OctaveLine(start, end, above ? octaves : -octaves, glyph));
+  }
+  return lines;
 }
 
 // =====================================================================
@@ -2004,7 +3269,11 @@ String _classifyAccidental(_CompIndex index, _Head head, double sp,
 /// Staff position in transcription units: treble staff bottom line = 1
 /// ... top line = 5; bass staff top line = -1 ... bottom line = -5;
 /// ledger lines continue the count (middle C = 0 from either staff).
-String _positionOf(_Staff st, bool treble, double x, double y) {
+///
+/// [octaves]: an 8va / 15ma sign over the note (+1 / +2) or 8vb / 15mb
+/// under it (-1 / -2): the note sounds that many octaves (7 steps each)
+/// higher or lower than written.
+String _positionOf(_Staff st, bool treble, double x, double y, [int octaves = 0]) {
   final top = _lineY(st, 0, x), bottom = _lineY(st, 4, x);
   final sp = (bottom - top) / 4;
   int hs;
@@ -2016,6 +3285,7 @@ String _positionOf(_Staff st, bool treble, double x, double y) {
     hs = (2 * (top - y) / sp).round(); // half-spaces above the top line
     base = -1;
   }
+  hs += 7 * octaves;
   if (hs.isEven) return '${base + hs ~/ 2}';
   final lower = base + ((hs - 1) / 2).floor();
   return '$lower/${lower + 1}';

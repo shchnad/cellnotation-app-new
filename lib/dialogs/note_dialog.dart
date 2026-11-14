@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:music_composer/enums/articulation.dart';
 
+import '../utils/cellnotation_transcription_parser.dart' show beatMarker;
 import '../controllers/composition_controller.dart';
 import '../enums/accidental.dart';
 import '../enums/finger.dart';
@@ -81,7 +82,89 @@ class NoteDialog extends StatelessWidget {
   /// `m`/`b` markers), so the whole string can be read back directly
   /// against the original transcription text, not just the isolated
   /// note token.
+  /// The line position of [note] in transcription notation ("2",
+  /// "1/2"…), as in [_transcriptionFor].
+  String _positionCode(Note note) {
+    final offset = note.row - 28;
+    if (offset % 2 == 0) return (offset ~/ 2).toString();
+    final lower = ((offset - 1) / 2).floor();
+    return '$lower/${lower + 1}';
+  }
+
+  /// "a/b" in lowest terms.
+  String _fraction(int part, int whole) {
+    if (whole <= 0 || part <= 0) return '0';
+    final g = part.gcd(whole);
+    final a = part ~/ g, b = whole ~/ g;
+    return b == 1 ? '$a' : '$a/$b';
+  }
+
+  /// The main note [grace] belongs to, or null.
+  Note? _anchorOf(Note grace) {
+    final id = grace.graceOfNoteId;
+    if (id == null) return null;
+    for (final n in controller.notes) {
+      if (n.id == id) return n;
+    }
+    return null;
+  }
+
+  /// A grace note's length as a part of its main note, plus that
+  /// note's number (measure beat octave pitch) — e.g.
+  /// "1/8 of note number 3 2 5 1".
+  String? _gracePartText(Note note) {
+    final anchor = _anchorOf(note);
+    if (anchor == null) return null;
+    final whole = anchor.graceOriginalDurationTicks ?? anchor.durationTicks;
+    return '${_fraction(note.durationTicks, whole)} of note number '
+        '${controller.noteNumber(anchor)}';
+  }
+
+  /// For a main note that has grace notes: the part left to the note
+  /// itself and the part the grace notes take.
+  String? _anchorPartText(Note note) {
+    final whole = note.graceOriginalDurationTicks;
+    if (whole == null) return null;
+    final graceTicks = whole - note.durationTicks;
+    return '${_fraction(note.durationTicks, whole)} of the note '
+        '(grace notes ${_fraction(graceTicks, whole)})';
+  }
+
+  /// The ornament written as part of the note: how many notes it
+  /// plays and, when they're equal, each one's part of the note —
+  /// e.g. "Trill (8 notes, each 1/8 of the note)".
+  String _ornamentText(Note note) {
+    final ornament = note.ornament;
+    if (ornament == null) return 'none';
+    final end = note.startTick + note.durationTicks;
+    final parts = [
+      for (final e in controller.displayNotes)
+        if (e.isGhost &&
+            e.note.row == note.row &&
+            e.note.startTick >= note.startTick &&
+            e.note.startTick < end)
+          e.note.durationTicks
+    ];
+    if (parts.isEmpty) return ornament.label;
+    final allEqual = parts.every((d) => d == parts.first);
+    return allEqual
+        ? '${ornament.label} (${parts.length} notes, each '
+        '${_fraction(parts.first, note.durationTicks)} of the note)'
+        : '${ornament.label} (${parts.length} notes)';
+  }
+
+  /// The text shown for the note's duration: for a grace note its part
+  /// of the main note, for a note with grace notes its own part.
+  String _durationText(Note note, String normal) =>
+      _gracePartText(note) ?? _anchorPartText(note) ?? normal;
+
   String _transcriptionFor(Note note) {
+    // A grace note is written as part of its main note.
+    final gracePart = _gracePartText(note);
+    if (gracePart != null) {
+      return 'grace l${_positionCode(note)}${note.accidental?.sign ?? ''} '
+          '$gracePart';
+    }
     final offset = note.row - 28;
     final String position;
     if (offset % 2 == 0) {
@@ -109,25 +192,15 @@ class NoteDialog extends StatelessWidget {
     // directly here instead, in the parser's own decimal notation
     // (b1.25/b1.5/b1.75 for a quarter/eighth-note-and/three-quarter
     // offset within the beat).
+    // The exact position (in a split beat — triplet… — the column's
+    // exact start), written as the part of the beat: b1&1/2, b2&1/3…
     final measure = controller.getMeasureAtTick(note.startTick);
-    final tickInsideMeasure = note.startTick - measure.startTick;
     final ticksPerBeat = measure.timeSignature.ticksPerBeat;
-    final wholeBeatIndex = tickInsideMeasure ~/ ticksPerBeat;
-    final remainderTicks = tickInsideMeasure - wholeBeatIndex * ticksPerBeat;
-    final fraction = remainderTicks / ticksPerBeat;
-    final beatNumber = wholeBeatIndex + 1;
-    // Only the three quarter-beat fractions the parser itself
-    // recognizes are ever shown — anything else (a note that doesn't
-    // land on a quarter-beat boundary at all) is rounded to the
-    // nearest of those rather than showing an unparseable decimal.
-    final beatSuffix = switch ((fraction * 4).round() % 4) {
-      1 => '.25',
-      2 => '.5',
-      3 => '.75',
-      _ => '',
-    };
+    final beat = 1 +
+        (controller.displayTick(note.startTick) - measure.startTick) /
+            ticksPerBeat;
 
-    return 'm$measureNumber b$beatNumber$beatSuffix $position$accidentalSign$durationCode';
+    return 'm$measureNumber ${beatMarker(beat)} l$position$accidentalSign$durationCode';
   }
 
   /// The note's plain solfège name + octave — e.g. "Mi5", "Do4" —
@@ -287,10 +360,7 @@ class NoteDialog extends StatelessWidget {
           _textWidth('Accidental: ${editedNote.accidental?.label ?? 'none'}') +
               _listTileChrome,
           _textWidth(
-            (editedNote.graceOfNoteId != null ||
-                editedNote.graceOriginalDurationTicks != null)
-                ? 'Duration: ${editedNote.durationTicks} ticks (auto)'
-                : 'Duration: $durationDisplay',
+            'Duration: ${_durationText(editedNote, durationDisplay)}',
           ) +
               _listTileChrome,
           _textWidth('Hand: ${editedNote.hand.name}') + _listTileChrome,
@@ -302,7 +372,7 @@ class NoteDialog extends StatelessWidget {
             'Articulation: ${editedNote.articulation?.label ?? 'none'}',
           ) +
               _listTileChrome,
-          _textWidth('Ornament: ${editedNote.ornament?.label ?? 'none'}') +
+          _textWidth('Ornament: ${_ornamentText(editedNote)}') +
               _listTileChrome,
           _textWidth(
             'Playing Technique: ${editedNote.playingTechnique?.label ?? 'none'}',
@@ -585,10 +655,10 @@ class NoteDialog extends StatelessWidget {
                             // that instead HAS grace notes (the anchor) is marked
                             // by graceOriginalDurationTicks — graceNoteType is
                             // only ever set on grace notes, never the anchor.
-                            text: (editedNote.graceOfNoteId != null ||
-                                editedNote.graceOriginalDurationTicks != null)
-                                ? '${editedNote.durationTicks} ticks (auto)'
-                                : durationDisplay,
+                            // A grace note shows its part of the main
+                            // note (e.g. "1/8 of note number 3 2 5 1"),
+                            // a note with grace notes its own part.
+                            text: _durationText(editedNote, durationDisplay),
                             style: const TextStyle(
                               fontSize: 22,
                               color: Colors.blue,
@@ -790,7 +860,7 @@ class NoteDialog extends StatelessWidget {
                             ),
                           ),
                           TextSpan(
-                            text: editedNote.ornament?.label ?? 'none',
+                            text: _ornamentText(editedNote),
                             style: const TextStyle(
                               fontSize: 22,
                               color: Colors.blue,

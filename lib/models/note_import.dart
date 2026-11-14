@@ -1,7 +1,9 @@
 import '../enums/accidental.dart';
 import '../enums/articulation.dart';
+import '../enums/grace_note_type.dart';
 import '../enums/hand.dart';
 import '../enums/note_duration.dart';
+import '../enums/ornament.dart';
 
 /// Greedily decomposes [ticks] into a list of NoteDuration values
 /// (largest first) summing to it — e.g. an eighth+half combination's
@@ -150,14 +152,79 @@ class ImportEvent {
   final List<NoteDuration> durationParts;
   final List<ImportNoteSpec> pitches;
 
+  /// A note of a tuplet: 3 for a triplet (3 notes in the time of 2),
+  /// 5 for a quintuplet (5 in the time of 4)… 1 for an ordinary note.
+  final int tuplet;
+
+  /// The ornament on the note/chord (see [transcriptionOrnaments]).
+  final Ornament? ornament;
+
+  /// Grace notes before the note (see [transcriptionGraceTypes]); all
+  /// of [graceType].
+  final GraceNoteType? graceType;
+  final List<ImportNoteSpec> graces;
+
+  /// The grace notes come AFTER the note ("l4 d4 gs(l5)") instead of
+  /// before it ("gs(l5) l4 d4").
+  final bool graceAfter;
+
   const ImportEvent({
     required this.beat,
     required this.durationParts,
     this.pitches = const [],
+    this.tuplet = 1,
+    this.ornament,
+    this.graceType,
+    this.graces = const [],
+    this.graceAfter = false,
   });
 
+  ImportEvent withGraces(
+      GraceNoteType? graceType, List<ImportNoteSpec> graces, bool after) =>
+      ImportEvent(
+        beat: beat,
+        durationParts: durationParts,
+        pitches: pitches,
+        tuplet: tuplet,
+        ornament: ornament,
+        graceType: graceType,
+        graces: graces,
+        graceAfter: after,
+      );
+
+  ImportEvent withOrnament(Ornament? ornament) => ImportEvent(
+    beat: beat,
+    durationParts: durationParts,
+    pitches: pitches,
+    tuplet: tuplet,
+    ornament: ornament,
+    graceType: graceType,
+    graces: graces,
+    graceAfter: graceAfter,
+  );
+
+  /// The WRITTEN length (e.g. an eighth for an eighth of a triplet).
   int get durationTicks =>
       durationParts.fold<int>(0, (sum, d) => sum + d.ticks);
+
+  /// The length the note really lasts: in a tuplet of [tuplet] notes
+  /// the written length × [tupletFactor] (2/3 for a triplet).
+  double get exactDurationTicks => durationTicks * tupletFactor(tuplet);
+}
+
+/// How much shorter (or longer) a note of a tuplet of [k] notes is than
+/// written: k notes in the time of the largest power of two below k —
+/// a triplet is 3 in the time of 2 (2/3), a quintuplet 5 in the time
+/// of 4 (4/5), a sextuplet 6 in 4… — and a duplet is 2 in the time of
+/// 3 (3/2).
+double tupletFactor(int k) {
+  if (k <= 1) return 1;
+  if (k == 2) return 3 / 2;
+  int p = 1;
+  while (p * 2 < k) {
+    p *= 2;
+  }
+  return p / k;
 }
 
 /// One measure's worth of transcribed events — [measureIndex] is
@@ -215,3 +282,101 @@ class ImportBatch {
     required this.measures,
   });
 }
+
+
+/// The ornament words of the transcription, one for every [Ornament]
+/// ("l4 d4 mord+"). Built like the printed sign:
+/// - "+" / "-" after the name: upper / lower (mordent, turn);
+/// - an accidental of the auxiliary note in brackets, as printed above
+///   (first) / below (second) the sign, "x" = none: "mord+(-)",
+///   "turn+(-x)", "turn-(x+)";
+/// - "r…" = reversed (mordent at the end of the note), "b…" = between
+///   (turn between two notes, played at the end of the first).
+const Map<String, Ornament> transcriptionOrnaments = {
+  'trill': Ornament.trillDiatonic,
+  'trill-': Ornament.trillChromatic,
+  'trill+': Ornament.trillChromaticSharp,
+  'mord+': Ornament.upperMordent,
+  'mord-': Ornament.lowerMordent,
+  'mord+(-)': Ornament.upperMordentFlat,
+  'mord-(-)': Ornament.lowerMordentFlat,
+  'mord+(+)': Ornament.upperMordentSharp,
+  'mord-(+)': Ornament.lowerMordentSharp,
+  'rmord+': Ornament.reversedUpperMordent,
+  'rmord-': Ornament.reversedLowerMordent,
+  'rmord+(-)': Ornament.reversedUpperMordentFlat,
+  'rmord-(-)': Ornament.reversedLowerMordentFlat,
+  'rmord+(+)': Ornament.reversedUpperMordentSharp,
+  'rmord-(+)': Ornament.reversedLowerMordentSharp,
+  'turn+': Ornament.upperGruppetto,
+  'turn-': Ornament.lowerGruppetto,
+  'turn+(-x)': Ornament.upperGruppetto1Flat,
+  'turn-(-x)': Ornament.lowerGruppetto1Flat,
+  'turn+(+x)': Ornament.upperGruppetto1Sharp,
+  'turn-(+x)': Ornament.lowerGruppetto1Sharp,
+  'turn+(x-)': Ornament.upperGruppetto2Flat,
+  'turn-(x-)': Ornament.lowerGruppetto2Flat,
+  'turn+(x+)': Ornament.upperGruppetto2Sharp,
+  'turn-(x+)': Ornament.lowerGruppetto2Sharp,
+  'turn+(-+)': Ornament.upperGruppettoFlatSharp,
+  'turn-(-+)': Ornament.lowerGruppettoFlatSharp,
+  'turn+(+-)': Ornament.upperGruppettoSharpFlat,
+  'turn-(+-)': Ornament.lowerGruppettoSharpFlat,
+  'turn+(--)': Ornament.upperGruppettoFlatFlat,
+  'turn-(--)': Ornament.lowerGruppettoFlatFlat,
+  'turn+(++)': Ornament.upperGruppettoSharpSharp,
+  'turn-(++)': Ornament.lowerGruppettoSharpSharp,
+  'bturn+': Ornament.betweenUpperGruppetto,
+  'bturn-': Ornament.betweenLowerGruppetto,
+  'bturn+(-x)': Ornament.betweenUpperGruppettoFlat,
+  'bturn-(-x)': Ornament.betweenLowerGruppettoFlat,
+  'bturn+(+x)': Ornament.betweenUpperGruppettoSharp,
+  'bturn-(+x)': Ornament.betweenLowerGruppettoSharp,
+  'bturn+(x-)': Ornament.betweenUpperGruppetto2Flat,
+  'bturn-(x-)': Ornament.betweenLowerGruppetto2Flat,
+  'bturn+(x+)': Ornament.betweenUpperGruppetto2Sharp,
+  'bturn-(x+)': Ornament.betweenLowerGruppetto2Sharp,
+  'bturn+(--)': Ornament.betweenUpperGruppettoFlatFlat,
+  'bturn-(--)': Ornament.betweenLowerGruppettoFlatFlat,
+  'bturn+(++)': Ornament.betweenUpperGruppettoSharpSharp,
+  'bturn-(++)': Ornament.betweenLowerGruppettoSharpSharp,
+  'bturn+(-+)': Ornament.betweenUpperGruppettoFlatSharp,
+  'bturn-(-+)': Ornament.betweenLowerGruppettoFlatSharp,
+  'bturn+(+-)': Ornament.betweenUpperGruppettoSharpFlat,
+  'bturn-(+-)': Ornament.betweenLowerGruppettoSharpFlat,
+  'trem': Ornament.tremolo,
+};
+
+/// Other spellings that are also read.
+const Map<String, Ornament> _ornamentAliases = {
+  'trill(+)': Ornament.trillChromaticSharp,
+  'trill(-)': Ornament.trillChromatic,
+  'turn': Ornament.upperGruppetto,
+  'bturn': Ornament.betweenUpperGruppetto,
+  'mord': Ornament.upperMordent,
+};
+
+/// The ornament a transcription word stands for, or null.
+Ornament? ornamentForTranscriptionWord(String word) =>
+    transcriptionOrnaments[word] ?? _ornamentAliases[word];
+
+/// The transcription word for [ornament], or null when it has none.
+String? transcriptionWordForOrnament(Ornament? ornament) {
+  if (ornament == null) return null;
+  for (final e in transcriptionOrnaments.entries) {
+    if (e.value == ornament) return e.key;
+  }
+  return null;
+}
+
+/// The grace-note letters of the transcription ("gs(l5) l4 d4").
+const Map<String, GraceNoteType> transcriptionGraceTypes = {
+  'a': GraceNoteType.appoggiatura,
+  'l': GraceNoteType.long,
+  'm': GraceNoteType.medium,
+  's': GraceNoteType.short,
+};
+
+/// The transcription letter for a grace-note [type].
+String transcriptionLetterForGrace(GraceNoteType type) =>
+    transcriptionGraceTypes.entries.firstWhere((e) => e.value == type).key;

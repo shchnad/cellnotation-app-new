@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../controllers/composition_controller.dart';
 import '../models/time_signature.dart';
 import '../utils/cellnotation_transcription_parser.dart';
+import '../utils/notation_marks.dart';
 import '../omr/sheet_music_pdf_import_screen.dart';
 
 /// Lets the person paste/type a transcription in the line-position
@@ -33,13 +34,67 @@ void sheetMusicTranscriptionDialog({
   List<TranscriptionParseError>? parseErrors;
   List<String>? importWarnings;
   bool imported = false;
+  // When the composition already has measures: false = add the new
+  // measures after them, true = replace them all.
+  bool replaceExisting = false;
 
   showDialog(
     context: context,
     builder: (dialogContext) {
       return StatefulBuilder(
         builder: (dialogContext, setDialogState) {
-          void runImport() {
+          Future<void> runImport() async {
+            // Imports change the measures, so only in edit mode (not
+            // while repeats are played out / arpeggios spread).
+            if (controller.playbackExpanded) {
+              ScaffoldMessenger.of(dialogContext).showSnackBar(
+                const SnackBar(
+                  content: Text('Go back to edit mode first (pen icon).',
+                      style: TextStyle(fontSize: 22)),
+                ),
+              );
+              return;
+            }
+            var text = textController.text;
+            final existing = controller.measures.length;
+            if (existing > 0 && replaceExisting) {
+              final sure = await showDialog<bool>(
+                context: dialogContext,
+                builder: (c) => AlertDialog(
+                  backgroundColor: Colors.white,
+                  surfaceTintColor: Colors.white,
+                  title: const Text('Replace all measures?',
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  content: Text(
+                    'All $existing measures and their notes will be deleted '
+                        'and replaced by the transcription.',
+                    style: const TextStyle(fontSize: 22),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(c, false),
+                      child: const Text('Close',
+                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black)),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(c, true),
+                      child: const Text('Replace',
+                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.red)),
+                    ),
+                  ],
+                ),
+              );
+              if (sure != true) return;
+              controller.clearAllMeasures();
+            } else if (existing > 0) {
+              // Add after the existing measures: the transcription's
+              // measure 1 becomes measure existing + 1, and so on.
+              text = shiftMeasureNumbers(text, existing);
+            }
+            // Repeat signs and arpeggios ("|:", ":|", "v1", "arp"…) are
+            // taken out here and put on the measures after the import.
+            final marks = extractNotationMarks(text);
+
             // A fresh label each time — this dialog's whole point is
             // one-off pasted text, not a fixed named batch someone
             // might reopen and expect CompositionController's own
@@ -50,7 +105,7 @@ void sheetMusicTranscriptionDialog({
             final label =
                 'Pasted transcription ${DateTime.now().millisecondsSinceEpoch}';
             final result = parseCellnotationTranscription(
-              textController.text,
+              marks.cleanedText,
               label: label,
             );
 
@@ -81,6 +136,19 @@ void sheetMusicTranscriptionDialog({
               }
             }
 
+            // Key changes: each measure from a scale line on gets that
+            // scale, up to the next key change (set before the notes go
+            // in, like the measures' own scale).
+            for (int k = 0; k < marks.scales.length; k++) {
+              final (from, scale) = marks.scales[k];
+              final to = k + 1 < marks.scales.length
+                  ? marks.scales[k + 1].$1
+                  : result.measuresNeeded;
+              for (int i = from; i < to && i < controller.measures.length; i++) {
+                controller.updateMeasureScale(i, scale);
+              }
+            }
+
             // Always import result.batch, even when result.hasErrors
             // — a parse error only means ONE bad token was skipped
             // (see TranscriptionParseResult's own doc: every other
@@ -92,6 +160,7 @@ void sheetMusicTranscriptionDialog({
             // warnings only ever appearing on a fully error-free
             // paste.
             final warnings = controller.importBatch(result.batch);
+            controller.applyNotationMarks(marks.reprise, marks.arpeggios);
             setDialogState(() {
               parseErrors = result.hasErrors ? result.errors : null;
               importWarnings = warnings.map((w) => w.toString()).toList();
@@ -138,6 +207,36 @@ void sheetMusicTranscriptionDialog({
                       ),
                     ],
                   ),
+                  if (controller.measures.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 6,
+                      children: [
+                        for (final replace in const [false, true])
+                          ChoiceChip(
+                            label: Text(
+                              replace
+                                  ? 'Replace all measures'
+                                  : 'Add after measure ${controller.measures.length}',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: replaceExisting == replace
+                                    ? Colors.white
+                                    : Colors.black,
+                              ),
+                            ),
+                            selected: replaceExisting == replace,
+                            selectedColor: replace ? Colors.red : Colors.blue,
+                            backgroundColor: Colors.white,
+                            showCheckmark: false,
+                            onSelected: (_) =>
+                                setDialogState(() => replaceExisting = replace),
+                          ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   Expanded(
                     child: TextField(
@@ -151,7 +250,7 @@ void sheetMusicTranscriptionDialog({
                       ),
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
-                        hintText: 'do major\nt3/4\nm1\nhr b1 rd4 b3 2d8 b3.5 2d8\nm2\nhr b1 2/3d4 b2 2d4 b3 3/4d4\nhl b1 (-4/-3, -3/-2, -2/-1)d2d4\n...',
+                        hintText: 'do major\nt3/4\nm1\nhr b3 l2 d8 b3&1/2 l2 d8\nm2\nhr b1 l2/3 d4 b2 l2 d4 b3 l3/4 d4\nhl b1 (l-4/-3, l-3/-2, l-2/-1) d2d4\n...',
                       ),
                     ),
                   ),
@@ -342,26 +441,24 @@ void _showTranscriptionHelp(BuildContext context) {
                   title: 'Example of transcription',
                   body:
                   'do major\n'
-                      't3/4\n'
+                      't6/8\n'
                       'm1\n'
-                      'hr b1 rd4 b3 2d8 b3.5 2d8\n'
+                      'hr b6 l1 d8\n'
                       'm2\n'
-                      'hr b1 2/3d4 b2 2d4 b3 3/4d4\n'
-                      'hl b1 (-4/-3, -3/-2, -2/-1)d2d4\n'
-                      'm3\n'
-                      'hr b1 3d2 b3 2d8 b3.5 2d8\n'
-                      'hl (-4, -3, -2/-1)d2d4\n'
-                      'm4\n'
-                      'hr b1 2/3d4 b2 2d4 b3 4d4\n'
-                      'hl (-4, -3, -2/-1)d2d4\n\n'
+                      'hr b1 l2/3 d4 b3 l2/3 d8 b4 l2/3 d4 b6 l2/3 d8\n'
+                      'hl b1 l-4/-5 d8 b2 l-2/-3 d8 b3 l-1 d8 b4 l-4/-5 d8 b5 l-2/-3 d8 b6 l-1 d8\n\n'
+
                       'Whitespace and line breaks are for readability only — the parser treats them all the same way.'),
               _HelpSection(
                   title: 'Scale and time signature',
                   body:
                   'The scale and time signature must be specified, so that empty measures with the correct '
-                      'scale and time signature can be created before the import:\n'
-                      '"do major" specifies the scale of the piece.\n'
-                      '"t3/4" specifies the time signature — in this case, each measure contains 3 quarter-note beats.'),
+                      'scale and time signature can be created before the import.\n'
+                      'When the scale changes, write the new scale on its own line inside the first measure in the new key.\n'
+                      'Example:\n'
+                      '"do major" \n'
+                      '"t6/8".'
+              ),
               _HelpSection(
                   title: 'Measure',
                   body: 'The transcription of each measure begins with "m" followed by the measure number:\n'
@@ -379,83 +476,85 @@ void _showTranscriptionHelp(BuildContext context) {
                   'The position within a measure is indicated by "b" followed by the beat number:\n'
                       '"b1" marks the start of beat 1.\n'
                       '"b2" marks the start of beat 2.\n\n'
-                      'If a note starts partway through a beat, the beat number includes a decimal fraction:\n'
-                      '"b1.25" marks a note starting one quarter of the way through beat 1.\n'
-                      '"b1.5" marks a note starting halfway through beat 1.\n'
-                      '"b1.75" marks a note starting three quarters of the way through beat 1.'),
+                      'If a note starts partway through a beat, "&" and the part of the beat follow the beat number:\n'
+                      '"b1&1/2" marks a note starting halfway through beat 1.\n'
+                      '"b1&1/4" marks a note starting one quarter of the way through beat 1.\n'
+                      '"b1&3/4" marks a note starting three quarters of the way through beat 1.\n'
+                      '"b2&1/3" marks a note starting one third of the way through beat 2.'
+              ),
               _HelpSection(
                   title: 'Note',
                   body:
-                  'Because notes on a music sheet are represented by their position relative to horizontal lines, '
-                      'they are transcribed in Cellnotation using line numbers.\n\n'
-                      'Ten of the 27 lines are always visible, divided into 5 lines for the "Sol" clef '
-                      'and 5 lines for the "Fa" clef. Midway between the "Sol" and "Fa" clefs lies an invisible '
-                      'horizontal line numbered 0, which becomes visible only when a note is written in that space.\n\n'
-                      'Lines are numbered starting from line 0:\n'
-                      '- counting upward, lines are numbered positively: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14;\n'
-                      '- counting downward, lines are numbered negatively: -1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12.\n\n'
+                  'Note pitch is represented by "l" followed by a number because notes on music sheets '
+                      'are represented by their position relative to horizontal lines, '
+                      'so the line numbers are used.\n\n'
+                      '5 lines for the "Sol" clef are numbered upward as 1, 2, 3, 4, 5.\n'
+                      '5 lines for the "Fa" clef are numbered downward as -1, -2, -3, -4, -5.\n'
+                      'Midway between the lines of clef "Sol" and lines of clef "Fa" lies an invisible horizontal '
+                      'line numbered 0, which becomes visible only when a note is written in that space.\n'
+                      'Every additional line, over and under those lines continuing the count.\n\n'
                       'A note is transcribed:\n'
-                      '- by a single line number, if the note sits on a line;\n'
-                      '- by two line numbers joined by "/", if the note sits between two lines.\n\n'
-                      'Full correspondence, line position to note name:\n'
-                      '"-12" transcripts Sol0.\n'
-                      '"-12/-11" transcripts La0.\n'
-                      '"-11" transcripts Si0.\n'
-                      '"-11/-10" transcripts Do1.\n'
-                      '"-10" transcripts Re1.\n'
-                      '"-10/-9" transcripts Mi1.\n'
-                      '"-9" transcripts Fa1.\n'
-                      '"-9/-8" transcripts Sol1.\n'
-                      '"-8" transcripts La1.\n'
-                      '"-8/-7" transcripts Si1.\n'
-                      '"-7" transcripts Do2.\n'
-                      '"-7/-6" transcripts Re2.\n'
-                      '"-6" transcripts Mi2.\n'
-                      '"-6/-5" transcripts Fa2.\n'
-                      '"-5" transcripts Sol2.\n'
-                      '"-5/-4" transcripts La2.\n'
-                      '"-4" transcripts Si2.\n'
-                      '"-4/-3" transcripts Do3.\n'
-                      '"-3" transcripts Re3.\n'
-                      '"-3/-2" transcripts Mi3.\n'
-                      '"-2" transcripts Fa3.\n'
-                      '"-2/-1" transcripts Sol3.\n'
-                      '"-1" transcripts La3.\n'
-                      '"-1/0" transcripts Si3.\n'
-                      '"0" transcripts Do4.\n'
-                      '"0/1" transcripts Re4.\n'
-                      '"1" transcripts Mi4.\n'
-                      '"1/2" transcripts Fa4.\n'
-                      '"2" transcripts Sol4.\n'
-                      '"2/3" transcripts La4.\n'
-                      '"3" transcripts Si4.\n'
-                      '"3/4" transcripts Do5.\n'
-                      '"4" transcripts Re5.\n'
-                      '"4/5" transcripts Mi5.\n'
-                      '"5" transcripts Fa5.\n'
-                      '"5/6" transcripts Sol5.\n'
-                      '"6" transcripts La5.\n'
-                      '"6/7" transcripts Si5.\n'
-                      '"7" transcripts Do6.\n'
-                      '"7/8" transcripts Re6.\n'
-                      '"8" transcripts Mi6.\n'
-                      '"8/9" transcripts Fa6.\n'
-                      '"9" transcripts Sol6.\n'
-                      '"9/10" transcripts La6.\n'
-                      '"10" transcripts Si6.\n'
-                      '"10/11" transcripts Do7.\n'
-                      '"11" transcripts Re7.\n'
-                      '"11/12" transcripts Mi7.\n'
-                      '"12" transcripts Fa7.\n'
-                      '"12/13" transcripts Sol7.\n'
-                      '"13" transcripts La7.\n'
-                      '"13/14" transcripts Si7.\n'
-                      '"14" transcripts Do8.\n'
+                      '- by a single line number, if it sits on a line;\n'
+                      '- by two line numbers joined by "/", if it sits between two lines.\n\n'
+                      'Full correspondence of transcription to note name is the following:\n'
+                      '"l14"       transcripts Do8.\n'
+                      '"l13/14"    transcripts Si7.\n'
+                      '"l13"       transcripts La7.\n'
+                      '"l12/13"    transcripts Sol7.\n'
+                      '"l12"       transcripts Fa7.\n'
+                      '"l11/12"    transcripts Mi7.\n'
+                      '"l11"       transcripts Re7.\n'
+                      '"l10/11"    transcripts Do7.\n'
+                      '"l10"       transcripts Si6.\n'
+                      '"l9/10"     transcripts La6.\n'
+                      '"l9"        transcripts Sol6.\n'
+                      '"l8/9"      transcripts Fa6.\n'
+                      '"l8"        transcripts Mi6.\n'
+                      '"l7/8"      transcripts Re6.\n'
+                      '"l7"        transcripts Do6.\n'
+                      '"l6/7"      transcripts Si5.\n'
+                      '"l6"        transcripts La5.\n'
+                      '"l5/6"      transcripts Sol5.\n'
+                      '"l5"        transcripts Fa5.\n'
+                      '"l4/5"      transcripts Mi5.\n'
+                      '"l4"        transcripts Re5.\n'
+                      '"l3/4"      transcripts Do5.\n'
+                      '"l3"        transcripts Si4.\n'
+                      '"l2/3"      transcripts La4.\n'
+                      '"l2"        transcripts Sol4.\n'
+                      '"l1/2"      transcripts Fa4.\n'
+                      '"l1"        transcripts Mi4.\n'
+                      '"l0/1"      transcripts Re4.\n'
+                      '"l0"        transcripts Do4.\n'
+                      '"l0/-1"     transcripts Si3.\n'
+                      '"l-1"       transcripts La3.\n'
+                      '"l-1/-2"    transcripts Sol3.\n'
+                      '"l-2"       transcripts Fa3.\n'
+                      '"l-2/-3"    transcripts Mi3.\n'
+                      '"l-3"       transcripts Re3.\n'
+                      '"l-3/-4"    transcripts Do3.\n'
+                      '"l-4"       transcripts Si2.\n'
+                      '"l-4/-5"    transcripts La2.\n'
+                      '"l-5"       transcripts Sol2.\n'
+                      '"l-5/-6"    transcripts Fa2.\n'
+                      '"l-6"       transcripts Mi2.\n'
+                      '"l-6/-7"    transcripts Re2.\n'
+                      '"l-7"       transcripts Do2.\n'
+                      '"l-7/-8"    transcripts Si1.\n'
+                      '"l-8"       transcripts La1.\n'
+                      '"l-8/-9"    transcripts Sol1.\n'
+                      '"l-9"       transcripts Fa1.\n'
+                      '"l-9/-10"   transcripts Mi1.\n'
+                      '"l-10"      transcripts Re1.\n'
+                      '"l-10/-11"  transcripts Do1.\n'
+                      '"l-11"      transcripts Si0.\n'
+                      '"l-11/-12"  transcripts La0.\n'
+                      '"l-12"      transcripts Sol0.'
               ),
               _HelpSection(
                   title: 'Duration',
                   body:
-                  'Note duration is represented by "d" followed by the note value (1, 2, 4, 8, 16, 32, or 64):\n'
+                  'Note duration is represented by "d" followed by the number 1, 2, 4, 8, 16, 32, or 64:\n'
                       '"d1" represents a whole note.\n'
                       '"d2" represents a half note.\n'
                       '"d4" represents a quarter note.\n'
@@ -472,40 +571,123 @@ void _showTranscriptionHelp(BuildContext context) {
               _HelpSection(
                   title: 'Accidentals',
                   body:
-                  'An accidental is written after the line position and before the duration, using the following signs:\n'
+                  'An accidental is written after the pitch and before the duration, using the following signs:\n'
                       '"+" represents a sharp.\n'
                       '"-" represents a flat.\n'
                       '"++" represents a double sharp.\n'
                       '"--" represents a double flat.\n'
-                      '"x" represents a natural.\n\n'
+                      '"x" represents a natural.\n'
                       'Example:\n'
-                      '"6-d2" represents the note on line 6 with a flat (6-) and a half-note duration (d2) — '
-                      'a half-note La-flat in octave 5.\n'
-                      '"1/2+d8" represents the note between lines 1 and 2 with a sharp (1/2+) '
-                      'and an eighth-note duration (d8) — an eighth-note Fa-sharp in octave 4.\n'
-                      '"-1/-2+d4" represents the note between lines -1 and -2 '
-                      'with a sharp (-1/-2+) and a quarter-note duration (d4) — a quarter-note Sol-sharp in octave 3.\n'
-                      '"0xd1" represents the note on line 0 with a natural (0x) and a whole-note duration (d1) — '
-                      'a whole-note Do in octave 4.'
+                      '"l2+d2" represents Sol4 (l2) sharp (+) of a half-note duration (d2),\n'
+                      '"l-2/-3-d8" represents Mi3 (l-2/-3) flat (-) of an eighth-note duration (d8),\n'
+                      '"l0xd2d4" represents Do4 (l0) natural (x) of a dotted half-note duration (d2d4).\n'
               ),
+              // _HelpSection(
+              //     title: 'Rests',
+              //     body:
+              //     'A rest is represented by "r" followed by duration transcription:\n'
+              //         '"rd1" — a whole rest,\n'
+              //         '"rd2" — a half rest,\n'
+              //         '"rd4" — a quarter rest,\n'
+              //         '"rd8" — an eighth rest,\n'
+              //         '"rd16" — a sixteenth rest,\n'
+              //         '"rd32" — a thirty-second rest,\n'
+              //         '"rd64" — a sixty-fourth rest,\n'
+              // ),
               _HelpSection(
-                  title: 'Rests',
-                  body:
-                  'A rest is represented by "r" followed by "d" and the duration:\n'
-                      '"rd1" — a whole rest.\n'
-                      '"rd2" — a half rest.\n'
-                      '"rd4" — a quarter rest.\n'
-                      '"rd8" — an eighth rest.\n'
-                      '"rd16" — a sixteenth rest.\n'
-                      '"rd32" — a thirty-second rest.\n'
-                      '"rd64" — a sixty-fourth rest.\n'
+                title: 'Repeats',
+                body:
+                'Repeat signs are written as words inside the measure they belong to:\n'
+                    '"|:" — reprise starts,\n'
+                    '":|" — reprise ends,\n'
+                    '"v1" and "v2" — volta 1 and volta 2,\n'
+                    '"𝄋" — Segno,\n'
+                    '"fine" — Fine,\n'
+                    '"dsfine" — D.S. al Fine,\n'
+                    '"tocoda" — To Coda,\n'
+                    '"dscoda" — D.S. al Coda,\n'
+                    '"coda" — Coda.\n'
+                    'Example:\n'
+                    'm1\n|:\nhr b1 l2 d4 …\nm4\n:|\nhr b1 l3 d2d4',
               ),
               _HelpSection(
                 title: 'Chords',
                 body:
-                'Notes played together are wrapped in parentheses and separated by commas to represent a chord, '
-                    'for example:\n'
-                    '"(-5/-4, -1, 0)d4" represents a quarter-note chord of three notes.',
+                'Notes played together are wrapped in parentheses to represent a chord.\n'
+                    'Example:\n'
+                    '"(l-5/-4 l-1 l0) d4" represents a quarter-note chord of three notes.',
+              ),
+              _HelpSection(
+                  title: 'Arpeggio',
+                  body:
+                  'Write "arp" before a chord to put an arpeggio on it.\n'
+                      'Example:\n'
+                      '"hl b1 arp (l-5, l-3, l-1) d4" — left-hand arpeggio on beat 1.\n\n'
+              ),
+              _HelpSection(
+                  title: 'Triplets and tuplets',
+                  body:
+                  'A note of a triplet (3 notes in the time of 2) is written with its printed duration followed by ":3",\n'
+                      'a note of a quintuplet (5 notes in the time of 4) is written with its printed duration followed by ":5",\n'
+                      'a note of a sextuplet (6 notes in the time of 4) is written with its printed duration followed by ":6",\n'
+                      'a note of a septuplet (7 notes in the time of 4) is written with its printed duration followed by ":7",\n'
+                      'Its beat is written with the exact part of the beat.\n'
+                      'Examples in 4/4:\n'
+                      '"b1 l2 d4:3    b1&2/3 l3 d4:3    b2&1/3 l4 d4:3" — a triplet of quarters on beats 1 and 2,\n'
+                      '"b3 (l-1, l0) d8:3     b3&1/3 (l-1, l1) d8:3     b3&2/3 (l0, l1) d8:3" — triplet chords on beat 3.\n\n'
+              ),
+              _HelpSection(
+                title: 'Grace notes',
+                body:
+                'Grace notes are small notes printed just before (or just after) a main note. They are played quickly, '
+                    'taking a little of the time of the main note.\n'
+                    '- Appoggiatura: a small note without a slash. It takes half of the main note.\n'
+                    '- Acciaccatura: a small note with a slash through its stem. It is very short:\n'
+                    '     - Long = a sixteenth,\n'
+                    '     - Medium = a thirty-second,\n'
+                    '     - Short = a sixty-fourth.\n\n'
+                    'They are written with "g", a letter for the type and the pitch of the grace notes in brackets:\n'
+                    '"a" — Appoggiatura.\n'
+                    '"l" — Acciaccatura Long.\n'
+                    '"m" — Acciaccatura Medium.\n'
+                    '"s" — Acciaccatura Short.\n\n'
+                    'Grace notes BEFORE the main note are written just before it, on the same beat:\n'
+                    '"b1 gs(l5) l4 d4" — one short acciaccatura of pitch l5 before the quarter note of pitch l4.\n'
+                    '"b2 gm(l5, l6+) l4 d2" — two medium acciaccaturas of pitch l5 and l6+ before the half note of pitch l4.\n'
+                    '"b3 ga(l4/5) l4 d4" — an appoggiatura of pitch l4/5 before the note of pitch l4.\n\n'
+                    'Grace notes AFTER the main note are written right after it (after its duration and ornament):\n'
+                    '"b1 l4 d2 gs(l3, l4)" — two short acciaccaturas at the end of the half note of pitch l4.\n\n'
+                    'Grace notes have no duration of their own: it is taken from their type and the main note.',
+              ),
+              _HelpSection(
+                title: 'Ornaments',
+                body:
+                'An ornament is written right after the duration of the note:\n\n'
+                    'Mordent\n'
+                    '- "mord+" and "mord-" represent upper mordent and lower mordent;\n'
+                    '- "rmord+" and "rmord-" represent reversed upper mordent and reversed lower mordent;\n'
+                    '- an accidental printed with the sign is written in brackets: "(+)" sharp, "(-)" flat. \n'
+                    'Example:\n'
+                    'l1/2 d4 mord+(+).\n\n'
+                    'Grupetto\n'
+                    '- "turn+" and "turn-" represent upper grupetto and lower grupetto;\n'
+                    '- "rturn+" and "rturn-" represent reversed upper grupetto and reversed lower grupetto;\n'
+                    '- "bturn+" and "bturn-" represent between upper grupetto and between lower grupetto.\n'
+                    'Because there are two auxiliary notes, there are two signs in the brackets: the first is for the first one, the second '
+                    'for the second one, "x" when it has none.\n'
+                    'Example:\n'
+                    '"l-1/-2 d4 rturn-(x+)"\n\n'
+                    'Trill\n'
+                    '"trill" — trill,\n'
+                    '"trill-" — chromatic trill with a flat,\n'
+                    '"trill+" — chromatic trill with a sharp.\n'
+                    'Example:\n'
+                    '"l4 d4 trill".\n\n'
+                    'Tremolo\n'
+                    '"trem" - tremolo,\n'
+                    'Example:\n'
+                    '"l0 d2 trem".\n'
+                ,
               ),
 
             ],

@@ -1,6 +1,7 @@
 import '../enums/accidental.dart';
 import '../enums/hand.dart';
 import '../enums/note_duration.dart';
+import '../enums/grace_note_type.dart';
 import '../models/note_import.dart';
 
 /// Parses the "line-position" transcription notation worked out for
@@ -32,12 +33,15 @@ import '../models/note_import.dart';
 ///   0-based for [ImportMeasure.measureIndex]).
 /// - `hl` / `hr` / `ha` — all following notes belong to the
 ///   left/right/additional hand, until the next `hl`/`hr`/`ha`.
-/// - `b{n}`, `b{n}.25`, `b{n}.5`, or `b{n}.75` — starts a new beat
-///   (1-based); the decimal suffix is a quarter-beat subdivision
-///   (e.g. `b1.5` is the eighth-note "and" of beat 1, `b1.25`/
-///   `b1.75` are sixteenth-note offsets within beat 1) — matching
-///   [ImportEvent.beat]'s own fractional-beat granularity.
-/// - A note token: `{position}{accidental?}{duration}`
+/// - `b{n}` or `b{n}&{a}/{c}` — starts a new beat (1-based); `&a/c`
+///   is the part of the beat where the note starts, e.g. `b1&1/2` is
+///   halfway through beat 1, `b1&1/4` / `b1&3/4` a quarter / three
+///   quarters into it, `b2&1/3` one third into beat 2 (a triplet).
+///   (The older forms `b1.25`, `b1.5`, `b1.75` and `b2+1/3` are still
+///   read.)
+/// - A note token: `l{position}{accidental?}{duration}` — "l" (line)
+///   marks a note position, e.g. `l2d8`, `l3/4d8:3`, `(l-1, l0)d4`
+///   (the older form without "l" is still read).
 ///   - `{position}` is either a single integer (the note sits ON
 ///     that staff line) or `A/B` (the note sits BETWEEN lines A and
 ///     B — order doesn't matter, `-5/-4` and `-4/-5` are the same).
@@ -47,6 +51,13 @@ import '../models/note_import.dart';
 ///     through sixty-fourth), optionally repeated for a dotted/tied
 ///     note — e.g. `d4d8` for a dotted quarter (quarter tied to an
 ///     eighth, per [ImportEvent.durationParts]).
+/// - Tuplets (triplets…): a beat position can also be a fraction of
+///   the beat, `b{n}+{a}/{c}` — e.g. `b2+1/3` and `b2+2/3` are the 2nd
+///   and 3rd notes of a triplet on beat 2 — and a note of a tuplet has
+///   `:{k}` after its duration — e.g. `2d8:3` is an eighth of a triplet
+///   (3 eighths in the time of 2), `2d16:5` a sixteenth of a
+///   quintuplet. On import the beat is split into equal columns
+///   (see CompositionController.setBeatDivision).
 /// - A rest: `r{duration}` — e.g. `rd4` for a quarter rest, `rd8` for
 ///   an eighth rest. Produces an [ImportEvent] with an empty
 ///   [ImportEvent.pitches] list.
@@ -145,7 +156,8 @@ class TranscriptionParseResult {
 // on whitespace doesn't break it apart, even though its own INSIDE
 // contains commas (and possibly spaces after them) between each
 // chord note.
-final RegExp _chordTokenPattern = RegExp(r'^\(([^()]*)\)((?:[dD]\d+)+)$');
+final RegExp _chordTokenPattern =
+RegExp(r'^\(([^()]*)\)((?:[dD]\d+)+)(?::(\d+))?$');
 
 // A single note token: position, optional accidental, duration.
 // Longest-accidental-first alternation (++ before +, -- before -) so
@@ -154,15 +166,15 @@ final RegExp _chordTokenPattern = RegExp(r'^\(([^()]*)\)((?:[dD]\d+)+)$');
 // insensitively — a stray capital D (an easy typo when dictating or
 // typing quickly) shouldn't silently fail to parse.
 final RegExp _noteTokenPattern =
-RegExp(r'^(-?\d+(?:/-?\d+)?)(\+\+|\+|--|-|x)?((?:[dD]\d+)+)$');
+RegExp(r'^[lL]?(-?\d+(?:/-?\d+)?)(\+\+|\+|--|-|x)?((?:[dD]\d+)+)(?::(\d+))?$');
 
 // One note WITHOUT a duration — used for each note inside a chord's
 // parentheses, since the chord's single shared duration is written
 // once after the closing paren instead.
 final RegExp _chordNotePattern =
-RegExp(r'^(-?\d+(?:/-?\d+)?)(\+\+|\+|--|-|x)?$');
+RegExp(r'^[lL]?(-?\d+(?:/-?\d+)?)(\+\+|\+|--|-|x)?$');
 
-final RegExp _restTokenPattern = RegExp(r'^[rR]((?:[dD]\d+)+)$');
+final RegExp _restTokenPattern = RegExp(r'^[rR]((?:[dD]\d+)+)(?::(\d+))?$');
 final RegExp _measureTokenPattern = RegExp(r'^m(\d+)$');
 final RegExp _timeSignatureTokenPattern = RegExp(r'^t(\d+)/(\d+)$');
 
@@ -183,7 +195,8 @@ RegExp(r'^(.+?)\s+(major|minor)$', caseSensitive: false);
 // valid subdivision here). Anchored so "b1.3" (not one of the three
 // allowed fractions) is correctly rejected as unrecognized rather
 // than silently truncated to "b1".
-final RegExp _beatTokenPattern = RegExp(r'^b(\d+)(\.(25|5|75))?$');
+final RegExp _beatTokenPattern =
+RegExp(r'^b(\d+)(?:(\.(25|5|75))|[&+](\d+)/(\d+))?$');
 
 const Map<String, Accidental?> _accidentalBySign = {
   '+': Accidental.sharp,
@@ -326,14 +339,53 @@ List<String> _tokenizeLine(String line) {
     }
   }
   if (buffer.isNotEmpty) tokens.add(buffer.toString());
-  return tokens;
+  // An ornament may be written attached with "~" ("d4~trill"): split
+  // into its own word.
+  final split = <String>[];
+  for (final t in tokens) {
+    final i = t.indexOf('~');
+    if (i > 0) {
+      split.add(t.substring(0, i));
+      split.add(t.substring(i + 1));
+    } else {
+      split.add(i == 0 ? t.substring(1) : t);
+    }
+  }
+  // The duration may be written apart from the note ("l2 d8",
+  // "(l-1, l0) d4"): joined back to the note before it.
+  final joined = <String>[];
+  for (final t in split) {
+    if (joined.isNotEmpty &&
+        _durationOnlyPattern.hasMatch(t) &&
+        (_positionOnlyPattern.hasMatch(joined.last) ||
+            (joined.last.startsWith('(') && joined.last.endsWith(')')))) {
+      joined[joined.length - 1] = joined.last + t;
+    } else {
+      joined.add(t);
+    }
+  }
+  return joined;
 }
+
+/// Grace notes before the next note: g + type letter + positions,
+/// e.g. "gs(l5)", "gm(l5, l6+)".
+final RegExp _graceTokenPattern = RegExp(r'^g([alms])\(([^()]*)\)$');
+
+final RegExp _durationOnlyPattern = RegExp(r'^(?:[dD]\d+)+(?::\d+)?$');
+final RegExp _positionOnlyPattern =
+RegExp(r'^[lL]?-?\d+(?:/-?\d+)?(?:\+\+|\+|--|-|x)?$');
 
 /// Converts a beat token's regex match into its numeric beat value —
 /// whole + a quarter-beat fraction (.25/.5/.75), or just whole when
 /// no fraction suffix is present.
 double _beatValueFromMatch(RegExpMatch match) {
   final whole = int.parse(match.group(1)!);
+  // A part of the beat: "&a/c" (or the older "+a/c").
+  if (match.group(4) != null) {
+    final a = int.parse(match.group(4)!);
+    final c = int.parse(match.group(5)!);
+    if (c > 0 && a < c) return whole + a / c;
+  }
   final fractionDigits = match.group(3); // "25", "5", "75", or null
   double fraction;
   switch (fractionDigits) {
@@ -372,6 +424,12 @@ TranscriptionParseResult parseCellnotationTranscription(
   int? currentMeasureIndex; // 0-based
   Hand? currentHand;
   double? currentBeat;
+  // Grace notes waiting for the main note after them.
+  GraceNoteType? pendingGraceType;
+  var pendingGraces = <ImportNoteSpec>[];
+  // True right after a note/chord (and its ornament word): grace notes
+  // written now come AFTER that note ("l4 d4 gs(l5)").
+  var afterNote = false;
   // Two plain nullable ints rather than a record — see
   // _DegreeOctave's own doc for why records are avoided throughout
   // this file. Reserved for a future mismatch-warning check; not
@@ -402,6 +460,8 @@ TranscriptionParseResult parseCellnotationTranscription(
     }
 
     for (final token in _tokenizeLine(trimmed)) {
+      final wasAfterNote = afterNote;
+      afterNote = false;
       // --- Structural tokens -------------------------------------
       final measureMatch = _measureTokenPattern.firstMatch(token);
       if (measureMatch != null) {
@@ -462,6 +522,55 @@ TranscriptionParseResult parseCellnotationTranscription(
         continue;
       }
 
+      // --- Ornament word after a note: "l4 d4 trill" ---------------
+      final ornament = ornamentForTranscriptionWord(token);
+      if (ornament != null) {
+        final events = measuresByIndex[currentMeasureIndex]!;
+        if (events.isEmpty || events.last.pitches.isEmpty) {
+          errors.add(TranscriptionParseError(
+            lineNumber: lineNumber,
+            line: rawLine,
+            message: '"$token" must follow a note or a chord.',
+          ));
+        } else {
+          events[events.length - 1] = events.last.withOrnament(ornament);
+          afterNote = wasAfterNote; // grace notes may still follow
+        }
+        continue;
+      }
+
+      // --- Grace notes before the next note: "gs(l5) l4 d4" ---------
+      final graceMatch = _graceTokenPattern.firstMatch(token);
+      if (graceMatch != null) {
+        final specs = <ImportNoteSpec>[];
+        for (final piece in graceMatch.group(2)!.trim().split(RegExp(r'[\s,]+'))) {
+          if (piece.isEmpty) continue;
+          final m = _chordNotePattern.firstMatch(piece);
+          final spec = m == null ? null : _noteSpecFromMatch(m, currentHand);
+          if (spec == null) {
+            errors.add(TranscriptionParseError(
+              lineNumber: lineNumber,
+              line: rawLine,
+              message: 'Unrecognized grace note "$piece" in "$token".',
+            ));
+            continue;
+          }
+          specs.add(spec);
+        }
+        final type = transcriptionGraceTypes[graceMatch.group(1)!];
+        final events = measuresByIndex[currentMeasureIndex]!;
+        if (wasAfterNote && events.isNotEmpty && events.last.pitches.isNotEmpty) {
+          // Right after a note: grace notes AFTER it.
+          events[events.length - 1] =
+              events.last.withGraces(type, specs, true);
+        } else {
+          // Before the next note.
+          pendingGraceType = type;
+          pendingGraces = specs;
+        }
+        continue;
+      }
+
       // --- Rest ------------------------------------------------------
       final restMatch = _restTokenPattern.firstMatch(token);
       if (restMatch != null) {
@@ -478,6 +587,7 @@ TranscriptionParseResult parseCellnotationTranscription(
           beat: currentBeat,
           durationParts: durationParts,
           pitches: const [],
+          tuplet: int.tryParse(restMatch.group(2) ?? '') ?? 1,
         ));
         continue;
       }
@@ -500,7 +610,9 @@ TranscriptionParseResult parseCellnotationTranscription(
         // Notes inside a chord are comma-separated (optionally with
         // surrounding whitespace, e.g. "-5/-4, -1, 0" or
         // "-5/-4,-1,0") — per request.
-        for (final notePiece in inner.split(RegExp(r'\s*,\s*'))) {
+        // Notes in a chord are separated by spaces and/or commas:
+        // "(l-5/-4 l-1 l0)" or "(l-5/-4, l-1, l0)".
+        for (final notePiece in inner.split(RegExp(r'[\s,]+'))) {
           if (notePiece.isEmpty) continue;
           final noteMatch = _chordNotePattern.firstMatch(notePiece);
           if (noteMatch == null) {
@@ -531,7 +643,13 @@ TranscriptionParseResult parseCellnotationTranscription(
           beat: currentBeat,
           durationParts: durationParts,
           pitches: pitches,
+          tuplet: int.tryParse(chordMatch.group(3) ?? '') ?? 1,
+          graceType: pendingGraces.isEmpty ? null : pendingGraceType,
+          graces: pendingGraces,
         ));
+        pendingGraces = <ImportNoteSpec>[];
+        pendingGraceType = null;
+        afterNote = true;
         continue;
       }
 
@@ -560,7 +678,13 @@ TranscriptionParseResult parseCellnotationTranscription(
           beat: currentBeat,
           durationParts: durationParts,
           pitches: [spec],
+          tuplet: int.tryParse(noteMatch.group(4) ?? '') ?? 1,
+          graceType: pendingGraces.isEmpty ? null : pendingGraceType,
+          graces: pendingGraces,
         ));
+        pendingGraces = <ImportNoteSpec>[];
+        pendingGraceType = null;
+        afterNote = true;
         continue;
       }
 
@@ -642,15 +766,33 @@ String _pitchCodeFor(ImportNoteSpec pitch) =>
 /// whichever of the three forms [parseCellnotationTranscription]
 /// itself would read back into the same [ImportEvent].
 String _eventTokenFor(ImportEvent event) {
-  final durationCode = _durationCodeFor(event.durationParts);
+  final core = _noteTokenFor(event);
+  final graceType = event.graceType;
+  final graces = graceType == null || event.graces.isEmpty
+      ? ''
+      : 'g${transcriptionLetterForGrace(graceType)}'
+      '(${event.graces.map((p) => 'l${_pitchCodeFor(p)}').join(', ')}) ';
+  final word = transcriptionWordForOrnament(event.ornament);
+  final withWord = '$core${word == null ? '' : ' $word'}';
+  if (graces.isEmpty) return withWord;
+  // Before the note: "gs(l5) l4 d4"; after it: "l4 d4 gs(l5)".
+  return event.graceAfter
+      ? '$withWord ${graces.trimRight()}'
+      : '$graces$withWord';
+}
+
+String _noteTokenFor(ImportEvent event) {
+  final durationCode = _durationCodeFor(event.durationParts) +
+      (event.tuplet > 1 ? ':${event.tuplet}' : '');
   if (event.pitches.isEmpty) {
     return 'r$durationCode';
   }
   if (event.pitches.length == 1) {
-    return '${_pitchCodeFor(event.pitches.first)}$durationCode';
+    return 'l${_pitchCodeFor(event.pitches.first)} $durationCode';
   }
-  final inner = event.pitches.map(_pitchCodeFor).join(', ');
-  return '($inner)$durationCode';
+  // "l" (line) before every note position: l2 d8, (l-1, l0) d4.
+  final inner = event.pitches.map((p) => 'l${_pitchCodeFor(p)}').join(', ');
+  return '($inner) $durationCode';
 }
 
 /// The beat marker for [beat] — "b3", "b1.25", "b1.5", "b1.75" — the
@@ -660,16 +802,27 @@ String _eventTokenFor(ImportEvent event) {
 /// quarter-beat rather than emitting a fraction this notation can't
 /// actually represent.
 String _beatMarkerFor(double beat) {
-  final whole = beat.floor();
+  return beatMarker(beat);
+}
+
+/// The beat marker for [beat] (1-based, with its fraction): "b3",
+/// "b1&1/2", "b1&3/4", "b2&1/3"…
+String beatMarker(double beat) {
+  var whole = beat.floor();
   final fraction = beat - whole;
-  final quarterSteps = (fraction * 4).round() % 4;
-  final suffix = switch (quarterSteps) {
-    1 => '.25',
-    2 => '.5',
-    3 => '.75',
-    _ => '',
-  };
-  return 'b$whole$suffix';
+  if (fraction < 1e-6) return 'b$whole';
+  if (fraction > 1 - 1e-6) return 'b${whole + 1}';
+  for (int c = 2; c <= 128; c++) {
+    final a = (fraction * c).round();
+    if ((fraction * c - a).abs() < 1e-6) {
+      final g = a.gcd(c);
+      return 'b$whole&${a ~/ g}/${c ~/ g}';
+    }
+  }
+  // (not a simple fraction: the nearest 64th of the beat)
+  final a = (fraction * 64).round();
+  final g = a.gcd(64);
+  return 'b$whole&${a ~/ g}/${64 ~/ g}';
 }
 
 /// Converts [measures] (see CompositionController.exportMeasureRange)

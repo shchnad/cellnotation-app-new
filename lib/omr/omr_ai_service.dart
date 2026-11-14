@@ -38,21 +38,62 @@ Future<String> transcribePageWithAi({
   throw Exception('The AI service returned no transcription.');
 }
 
-/// Joins page transcriptions (each with its own scale and "t" lines)
-/// into one text: the header lines are kept from the first page only.
+final _scaleLine = RegExp(r'^\S.*\s(major|minor)$', caseSensitive: false);
+final _timeLine = RegExp(r'^t\d+/\d+$');
+final _measureLine = RegExp(r'^m\d+$');
+
+/// Joins page transcriptions into one text. The header lines (scale and
+/// "t" line) are kept from the first page only; a later page whose
+/// scale differs from where the previous page ended is a key change,
+/// written in that page's first measure. Scale lines inside measures
+/// (key changes) are kept.
 String joinPageTranscriptions(List<String> pages) {
   final out = <String>[];
+  String? current;
   for (int p = 0; p < pages.length; p++) {
+    String? pageScale;
+    bool inMeasures = false;
     for (final raw in const LineSplitter().convert(pages[p])) {
       final line = raw.trim();
       if (line.isEmpty) continue;
-      final isHeader = RegExp(r'^t\d+/\d+$').hasMatch(line) ||
-          RegExp(r'^\S.*\s(major|minor)$', caseSensitive: false).hasMatch(line);
-      if (isHeader && p > 0) continue;
+      if (!inMeasures && _measureLine.hasMatch(line)) {
+        inMeasures = true;
+        out.add(line);
+        if (p > 0 && pageScale != null && pageScale != current) {
+          out.add(pageScale);
+          current = pageScale;
+        }
+        continue;
+      }
+      if (!inMeasures) {
+        if (_scaleLine.hasMatch(line)) {
+          pageScale = line;
+          if (p == 0) {
+            out.add(line);
+            current = line;
+          }
+        } else if (_timeLine.hasMatch(line)) {
+          if (p == 0) out.add(line);
+        } else {
+          out.add(line);
+        }
+        continue;
+      }
+      if (_scaleLine.hasMatch(line)) current = line;
       out.add(line);
     }
   }
   return out.join('\n');
+}
+
+/// The scale a transcription ends in (its last scale line), or null.
+String? lastScaleOf(String transcription) {
+  String? last;
+  for (final raw in const LineSplitter().convert(transcription)) {
+    final line = raw.trim();
+    if (_scaleLine.hasMatch(line)) last = line;
+  }
+  return last;
 }
 
 /// Highest "m<n>" measure number in a transcription (0 if none).

@@ -74,7 +74,10 @@ class TranscriptionColumnWidget extends StatelessWidget {
                 final row = totalRows - 1 - index;
                 final position = _columnPosition(row);
                 final accidentalSign = _scaleAccidentalSignForRow(row);
-                final transcription = '$position$accidentalSign';
+                // Only the staff LINES are labelled (0, 1, 2 … and -1,
+                // -2 …); the rows between two lines stay empty.
+                final isLine = !position.contains('/');
+                final transcription = isLine ? '$position$accidentalSign' : '';
                 return Container(
                   height: cellHeight,
                   alignment: Alignment.center,

@@ -307,9 +307,13 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
       }
     }
 
-    final left = note.startTick * widget.pixelsPerTick;
+    // displayTick: in a split beat (triplet…) the note is shown at the
+    // exact position of its column (ticks are rounded to whole 1/64s).
+    final startX = controller.displayTick(note.startTick);
+    final endX = controller.displayTick(note.startTick + note.durationTicks);
+    final left = startX * widget.pixelsPerTick;
 
-    final noteWidth = max(note.durationTicks * widget.pixelsPerTick, 8.0);
+    final noteWidth = max((endX - startX) * widget.pixelsPerTick, 8.0);
 
     final showPitch = noteWidth >= 24;
 

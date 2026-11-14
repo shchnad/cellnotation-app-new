@@ -216,7 +216,13 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
               context,
               MaterialPageRoute(
                 builder: (_) => CompositionScreen(
-                  controller: CompositionController(composition: comp),
+                  // A COPY of the composition: the screen changes it while you
+                  // edit, and leaving with "No" (don't save) must leave the
+                  // composition in this list (and the next opening) as it
+                  // was saved.
+                  controller: CompositionController(
+                    composition: Composition.fromJson(comp.toJson(), id: comp.id),
+                  ),
                 ),
               ),
             );

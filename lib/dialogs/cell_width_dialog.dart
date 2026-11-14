@@ -92,7 +92,7 @@ void cellWidthDialog(
                     child: const Text(
                       "Min",
                       style: TextStyle(
-                        color: Colors.green,
+                        color: Colors.black,
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                       ),
@@ -106,7 +106,7 @@ void cellWidthDialog(
                     child: const Text(
                       "Reset",
                       style: TextStyle(
-                        color: Colors.blue,
+                        color: Colors.green,
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                       ),
@@ -119,9 +119,9 @@ void cellWidthDialog(
                       Navigator.pop(context);
                     },
                     child: const Text(
-                      "Close",
+                      "Set",
                       style: TextStyle(
-                        color: Colors.black,
+                        color: Colors.blue,
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                       ),
