@@ -36,12 +36,9 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Every button on this page shares one style — a plain blue/white
-    // ElevatedButton.icon at fontSize 22 bold, matching what "Create
-    // Composition" always used — stacked in a single centered column
-    // rather than split between an AppBar row and the body, per
-    // request. Sign out (previously an AppBar action) is now just
-    // "Exit", the last button in that same column.
+    // Every button on this page has the look of the app's dialog
+    // buttons: grey, rounded, black text at size 22. Exit is the round
+    // ✕ button in the top-right corner.
     return Scaffold(
       body: Stack(
         children: [
@@ -83,8 +80,8 @@ class HomeScreen extends StatelessWidget {
                 _HomeMenuButton(
                   icon: Icons.music_video_rounded,
                   label: 'My Compositions',
-                  color: Colors.green,
-                  textColor: Colors.white,
+                  color: Colors.grey.shade300,
+                  textColor: Colors.black,
                   onPressed: () {
                     Navigator.push(
                       context,
@@ -98,8 +95,8 @@ class HomeScreen extends StatelessWidget {
                 _HomeMenuButton(
                   icon: Icons.cloud,
                   label: 'Cloud Library',
-                  color: Colors.blue,
-                  textColor: Colors.white,
+                  color: Colors.grey.shade300,
+                  textColor: Colors.black,
                   onPressed: () {
                     Navigator.push(
                       context,
@@ -115,12 +112,11 @@ class HomeScreen extends StatelessWidget {
                   label: 'Profile',
                   color: Colors.grey.shade300,
                   textColor: Colors.black,
+                  // Profile is a pop-up window over the Home screen.
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ProfileScreen(),
-                      ),
+                    showDialog(
+                      context: context,
+                      builder: (_) => const ProfileScreen(),
                     );
                   },
                 ),
@@ -128,30 +124,30 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
 
-          // EXIT — top-left corner, clickable text + icon (not a
-          // full note-block button like the rest of this page), both
-          // red. SafeArea keeps it clear of any notch/status bar.
+          // EXIT — a round button with a cross in the top-right
+          // corner (signs out).
           SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: InkWell(
-                onTap: () async {
-                  await AuthService().signOut();
-                },
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.logout, color: Colors.red),
-                    SizedBox(width: 6),
-                    Text(
-                      'Exit',
-                      style: TextStyle(
-                        color: Colors.red,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Tooltip(
+                  message: 'Exit',
+                  child: Material(
+                    color: Colors.grey.shade300,
+                    shape: const CircleBorder(),
+                    elevation: 2,
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: () async {
+                        await AuthService().signOut();
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: Icon(Icons.close, color: Colors.black, size: 32),
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -192,30 +188,21 @@ class _HomeMenuButton extends StatelessWidget {
     // a shorter one (e.g. "Profile") unless every button is
     // explicitly constrained to the SAME width like this.
     return SizedBox(
-      width: 300,
-      height: 100,
+      width: 350,
+      height: 80,
       child: ElevatedButton.icon(
         style: ElevatedButton.styleFrom(
           backgroundColor: color,
           foregroundColor: textColor,
-          minimumSize: const Size(double.infinity, 50),
-          elevation: 0,
-          // Rectangular with just a touch of rounding — matches
-          // NoteBlockWidget's own note container exactly
-          // (BorderRadius.circular(4)), so this button reads as a
-          // "note" rather than Material's default pill-shaped button.
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(4),
-          ),
+          minimumSize: const Size(double.infinity, 55),
+          // The same rounded shape as the buttons of the app's
+          // dialogs (noteValuesDialog) — Flutter's default.
         ),
         onPressed: onPressed,
-        icon: Icon(icon),
+        icon: Icon(icon, size: 26),
         label: Text(
           label,
-          style: const TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-          ),
+          style: const TextStyle(fontSize: 22),
         ),
       ),
     );

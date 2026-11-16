@@ -146,7 +146,8 @@ class _AddMeasuresDialogState extends State<AddMeasuresDialog> {
           DefaultValues.dialogPaddingBottomTop,
         ),
         backgroundColor: Colors.white,
-        alignment: Alignment.topCenter,
+        // No alignment: the dialog opens in the middle of the screen and
+        // rises above the keyboard when the number is typed.
         title: const Text(
           'Add Measures',
           textAlign: TextAlign.center,
@@ -157,172 +158,174 @@ class _AddMeasuresDialogState extends State<AddMeasuresDialog> {
         ),
         content: SizedBox(
           width: MediaQuery.of(context).size.width * .35,
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+          child: SingleChildScrollView(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
 
-                _buildSelectionField(
-                  label: 'Scale',
-                  valueText: scaleDisplayLabel,
-                  icon: Icons.music_note,
-                  onTap: () {
-                    scaleDialog(
-                      context: context,
-                      controller: widget.controller,
-                      currentScale: _selectedScale,
-                      onSelected: (scale) {
-                        setState(() {
-                          _selectedScale = scale;
-                        });
-                      },
-                    );
-                  },
-                ),
+                  _buildSelectionField(
+                    label: 'Scale',
+                    valueText: scaleDisplayLabel,
+                    icon: Icons.music_note,
+                    onTap: () {
+                      scaleDialog(
+                        context: context,
+                        controller: widget.controller,
+                        currentScale: _selectedScale,
+                        onSelected: (scale) {
+                          setState(() {
+                            _selectedScale = scale;
+                          });
+                        },
+                      );
+                    },
+                  ),
 
-                const SizedBox(
-                    height: DefaultValues.heightBetweenWidgets
-                ),
+                  const SizedBox(
+                      height: DefaultValues.heightBetweenWidgets
+                  ),
 
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                        color: Colors.grey.shade400
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                          color: Colors.grey.shade400
+                      ),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Time Signature',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Time Signature',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
 
-                      const SizedBox(
-                          height: DefaultValues.heightBetweenWidgets
-                      ),
+                        const SizedBox(
+                            height: DefaultValues.heightBetweenWidgets
+                        ),
 
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
 
-                          Expanded(
-                            child: DropdownButtonFormField<int>(
-                              value: _beatsPerMeasure,
-                              isExpanded: true,
+                            Expanded(
+                              child: DropdownButtonFormField<int>(
+                                value: _beatsPerMeasure,
+                                isExpanded: true,
 
-                              decoration: const InputDecoration(
-                                border: OutlineInputBorder(),
-                                contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
+                                decoration: const InputDecoration(
+                                  border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
                                 ),
-                              ),
 
-                              items: DefaultValues.possibleNumberOfBeatsInMeasure.map((b) {
-                                return DropdownMenuItem<int>(
-                                  value: b,
-                                  child: Center(
-                                    child: Text(
-                                      '$b',
-                                      style: const TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.blue,
+                                items: DefaultValues.possibleNumberOfBeatsInMeasure.map((b) {
+                                  return DropdownMenuItem<int>(
+                                    value: b,
+                                    child: Center(
+                                      child: Text(
+                                        '$b',
+                                        style: const TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.blue,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                );
-                              }).toList(),
-
-                              onChanged: (value) {
-                                setState(() {
-                                  _beatsPerMeasure = value!;
-                                });
-                              },
-                            ),
-                          ),
-
-                          const SizedBox(width: 8),
-
-                          Expanded(
-                            child: SizedBox(
-                              height: 56,
-                              child: InkWell(
-                                onTap: () {
-                                  noteValuesDialog<NoteDuration>(
-                                    allowToCloseNextWindow: false,
-                                    context: context,
-                                    title: 'Beat Duration',
-                                    currentValue: _selectedBeatUnit,
-                                    values: NoteDuration.values,
-                                    labelBuilder: (d) => d.label,
-                                    numberOfColumns: 3,
-                                    onSelected: (duration) {
-                                      setState(() {
-                                        _selectedBeatUnit = duration;
-                                      });
-                                    },
                                   );
+                                }).toList(),
+
+                                onChanged: (value) {
+                                  setState(() {
+                                    _beatsPerMeasure = value!;
+                                  });
                                 },
-                                child: InputDecorator(
-                                  decoration: const InputDecoration(
-                                    border: OutlineInputBorder(),
-                                    contentPadding: EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 8,
+                              ),
+                            ),
+
+                            const SizedBox(width: 8),
+
+                            Expanded(
+                              child: SizedBox(
+                                height: 56,
+                                child: InkWell(
+                                  onTap: () {
+                                    noteValuesDialog<NoteDuration>(
+                                      allowToCloseNextWindow: false,
+                                      context: context,
+                                      title: 'Beat Duration',
+                                      currentValue: _selectedBeatUnit,
+                                      values: NoteDuration.values,
+                                      labelBuilder: (d) => d.label,
+                                      numberOfColumns: 3,
+                                      onSelected: (duration) {
+                                        setState(() {
+                                          _selectedBeatUnit = duration;
+                                        });
+                                      },
+                                    );
+                                  },
+                                  child: InputDecorator(
+                                    decoration: const InputDecoration(
+                                      border: OutlineInputBorder(),
+                                      contentPadding: EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 8,
+                                      ),
                                     ),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      _selectedBeatUnit.label,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.blue,
-                                        fontSize: 22,
+                                    child: Center(
+                                      child: Text(
+                                        _selectedBeatUnit.label,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.blue,
+                                          fontSize: 22,
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
-                      )
-                    ],
+                          ],
+                        )
+                      ],
+                    ),
                   ),
-                ),
 
-                const SizedBox(
-                    height: DefaultValues.heightBetweenWidgets
-                ),
+                  const SizedBox(
+                      height: DefaultValues.heightBetweenWidgets
+                  ),
 
-                TextFormField(
-                  textAlign: TextAlign.center,
-                  controller: _measuresController,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue,
-                    fontSize: 22,
+                  TextFormField(
+                    textAlign: TextAlign.center,
+                    controller: _measuresController,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                      fontSize: 22,
+                    ),
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Measures to Add',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value){
+                      final n = int.tryParse(value ?? '');
+                      if(n == null || n <= 0){
+                        return 'Enter number';
+                      }
+                      return null;
+                    },
                   ),
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Measures to Add',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value){
-                    final n = int.tryParse(value ?? '');
-                    if(n == null || n <= 0){
-                      return 'Enter number';
-                    }
-                    return null;
-                  },
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

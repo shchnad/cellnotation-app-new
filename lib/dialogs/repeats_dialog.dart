@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../controllers/composition_controller.dart';
 
+/// The colour of repeats (reprise) in the app: the same green as the
+/// reprise signs on the grid.
+const Color _green = Colors.green;
+
 /// Repeats (reprises). Four kinds can be set:
 ///  1. Simple reprise — 𝄆 … 𝄇 around a range of measures.
 ///  2. Reprise with voltas — 𝄆 … volta 1 𝄇, then volta 2.
@@ -189,7 +193,7 @@ class _RepeatsDialogState extends State<_RepeatsDialog> {
         textAlign: TextAlign.center,
         style: const TextStyle(
           fontSize: 22,
-          color: Colors.blue,
+          color: _green,
           fontWeight: FontWeight.bold,
         ),
         decoration: InputDecoration(
@@ -236,7 +240,7 @@ class _RepeatsDialogState extends State<_RepeatsDialog> {
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 22,
-                color: Colors.blue,
+                color: _green,
                 fontWeight: FontWeight.bold,
               ),
               decoration: const InputDecoration(
@@ -295,15 +299,15 @@ class _RepeatsDialogState extends State<_RepeatsDialog> {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     dense: true,
-                    leading: const Icon(Icons.repeat,
-                        color: Color(0xFFE65100), size: 28),
+                    leading: Icon(Icons.repeat,
+                        color: Colors.green, size: 28),
                     title: Text(_typeName(r.type),
                         style: const TextStyle(
                             fontSize: 22, fontWeight: FontWeight.bold)),
                     subtitle: Text(_describe(r),
                         style: const TextStyle(fontSize: 22)),
                     trailing: IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red, size: 28),
+                      icon: const Icon(Icons.delete, color: Colors.green, size: 28),
                       tooltip: 'Remove',
                       onPressed: () => setState(() => c.removeReprise(r)),
                     ),
@@ -313,7 +317,7 @@ class _RepeatsDialogState extends State<_RepeatsDialog> {
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
               const SizedBox(height: 6),
               // The kind of repeat: the same buttons as noteValuesDialog —
-              // grey, the chosen one with blue text.
+              // grey, the chosen one with green text.
               for (final t in RepriseType.values)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
@@ -330,7 +334,7 @@ class _RepeatsDialogState extends State<_RepeatsDialog> {
                       _typeName(t),
                       style: TextStyle(
                         fontSize: 22,
-                        color: t == _type ? Colors.blue : Colors.black,
+                        color: t == _type ? _green : Colors.black,
                       ),
                     ),
                   ),
@@ -370,7 +374,7 @@ class _RepeatsDialogState extends State<_RepeatsDialog> {
                 onPressed: _add,
                 child: const Text(
                   'Add',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blue),
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: _green),
                 ),
               ),
           ],

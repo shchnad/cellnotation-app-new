@@ -5,7 +5,6 @@ import '../utils/cellnotation_transcription_parser.dart' show beatMarker;
 import '../controllers/composition_controller.dart';
 import '../enums/accidental.dart';
 import '../enums/finger.dart';
-import '../enums/glissando_direction.dart';
 import '../enums/grace_note_type.dart';
 import '../enums/note_duration.dart';
 import '../enums/ornament.dart';
@@ -200,7 +199,10 @@ class NoteDialog extends StatelessWidget {
         (controller.displayTick(note.startTick) - measure.startTick) /
             ticksPerBeat;
 
-    return 'm$measureNumber ${beatMarker(beat)} l$position$accidentalSign$durationCode';
+    // The ornament word ("trill", "mord+"…) after the duration.
+    final ornamentWord = transcriptionWordForOrnament(note.ornament);
+    return 'm$measureNumber ${beatMarker(beat)} l$position$accidentalSign $durationCode'
+        '${ornamentWord == null ? '' : ' $ornamentWord'}';
   }
 
   /// The note's plain solfège name + octave — e.g. "Mi5", "Do4" —
@@ -960,37 +962,111 @@ class NoteDialog extends StatelessWidget {
                       ),
                     ),
                     onTap: () {
-                      noteValuesDialog<GlissandoDirection>(
-                        context: context,
-                        allowToCloseNextWindow: true,
-                        currentValue: editedNote.glissando,
-                        title: 'Glissando',
-                        values: GlissandoDirection.values,
-                        numberOfColumns: 1,
-                        labelBuilder: (d) => d.label,
-                        onSelected: (direction) {
-                          // Closes this dialog too (allowToCloseNextWindow) so
-                          // the grid is ready for the end-row tap that
-                          // completes it — see
-                          // CompositionController.startGlissandoPick /
-                          // GridWidget's onTapUp.
-                          controller.startGlissandoPick(editedNote, direction);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              duration: const Duration(seconds: 2),
-                              content: Text(
-                                'Tap the grid to set the glissando end row',
-                                style: TextStyle(fontSize: 22),
-                              ),
+                      // No direction to choose: the end note tapped on
+                      // the grid shows whether the glissando goes up or
+                      // down (see CompositionController
+                      // .finishGlissandoPick).
+                      void pickEndNote() {
+                        controller.startGlissandoPick(editedNote);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            duration: Duration(seconds: 2),
+                            content: Text(
+                              'Tap the grid to set the glissando end note',
+                              style: TextStyle(fontSize: 22),
                             ),
-                          );
-                        },
-                        onClear: () {
-                          // Removes the glissando flag AND every generated
-                          // run note belonging to it — see
-                          // CompositionController.clearNoteGlissando.
-                          controller.clearNoteGlissando(editedNote);
-                        },
+                          ),
+                        );
+                      }
+
+                      if (editedNote.glissando == null) {
+                        // Close this dialog so the grid is ready for
+                        // the end-note tap.
+                        Navigator.pop(context);
+                        pickEndNote();
+                        return;
+                      }
+
+                      // The note already has a glissando: change its
+                      // end note or delete it.
+                      showDialog(
+                        context: context,
+                        builder: (glissContext) => AlertDialog(
+                          backgroundColor: Colors.white,
+                          surfaceTintColor: Colors.white,
+                          title: const Text(
+                            'Glissando',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.grey.shade300,
+                                  minimumSize: const Size(260, 55),
+                                ),
+                                onPressed: () {
+                                  Navigator.pop(glissContext);
+                                  Navigator.pop(context);
+                                  pickEndNote();
+                                },
+                                child: const Text(
+                                  'Change end note',
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.grey.shade300,
+                                  minimumSize: const Size(260, 55),
+                                ),
+                                onPressed: () {
+                                  Navigator.pop(glissContext);
+                                  // Removes the glissando flag AND every
+                                  // generated run note belonging to it.
+                                  controller.clearNoteGlissando(editedNote);
+                                },
+                                child: const Text(
+                                  'Delete',
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    color: Colors.red,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          actions: [
+                            const Divider(thickness: 1.0),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(glissContext),
+                                  child: const Text(
+                                    'Close',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       );
                     },
                   ),

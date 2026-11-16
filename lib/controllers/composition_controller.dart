@@ -970,11 +970,13 @@ class CompositionController extends ChangeNotifier {
 
   /// Removes all notes inside the given beat WITHOUT deleting the beat
   /// itself (unlike [removeBeatFromMeasure], which also shrinks the
-  /// measure). Use this for a "Clean Beat" action.
+  /// measure). Use this for a "Clean Beat" action. With [hands], only
+  /// the notes of those hands are removed (null = every hand).
   void clearBeatNotes(
       int measureIndex,
-      int beatIndex,
-      ) {
+      int beatIndex, {
+        Set<Hand>? hands,
+      }) {
     if (measureIndex < 0 || measureIndex >= measures.length) {
       return;
     }
@@ -986,7 +988,8 @@ class CompositionController extends ChangeNotifier {
     notes.removeWhere(
           (note) =>
       note.startTick >= beatStart &&
-          note.startTick < beatEnd,
+          note.startTick < beatEnd &&
+          (hands == null || hands.contains(note.hand)),
     );
     notifyListeners();
   }
@@ -999,9 +1002,14 @@ class CompositionController extends ChangeNotifier {
   /// finish markers AND pedal down/up markers, which share that same
   /// storage (see DynamicChange.pedalDown/pedalUp) — that fall within
   /// the measure. Tempo events are left untouched.
+  ///
+  /// With [hands], only the notes of those hands are removed and the
+  /// dynamics / pedal (which belong to no hand) stay; null (or all
+  /// three hands) cleans everything as before.
   void clearMeasureNotes(
-      int measureIndex,
-      ) {
+      int measureIndex, {
+        Set<Hand>? hands,
+      }) {
     if (measureIndex < 0 || measureIndex >= measures.length) {
       return;
     }
@@ -1009,8 +1017,13 @@ class CompositionController extends ChangeNotifier {
     notes.removeWhere(
           (note) =>
       note.startTick >= measure.startTick &&
-          note.startTick < measure.endTick,
+          note.startTick < measure.endTick &&
+          (hands == null || hands.contains(note.hand)),
     );
+    if (hands != null && !hands.containsAll(Hand.values)) {
+      notifyListeners();
+      return;
+    }
     timeline.dynamicEvents.removeWhere(
           (event) =>
       event.tick >= measure.startTick &&
@@ -1834,13 +1847,14 @@ class CompositionController extends ChangeNotifier {
   /// [copyMeasure]. [fromIndex]/[toIndex] are treated as (min, max)
   /// regardless of which is actually larger; out-of-range indices (or
   /// an empty composition) make this a no-op.
-  void clearMeasureRangeNotes(int fromIndex, int toIndex) {
+  void clearMeasureRangeNotes(int fromIndex, int toIndex,
+      {Set<Hand>? hands}) {
     if (measures.isEmpty) return;
     final start = fromIndex <= toIndex ? fromIndex : toIndex;
     final end = fromIndex <= toIndex ? toIndex : fromIndex;
     if (start < 0 || end >= measures.length) return;
     for (int i = start; i <= end; i++) {
-      clearMeasureNotes(i);
+      clearMeasureNotes(i, hands: hands);
     }
   }
 
@@ -3191,8 +3205,9 @@ class CompositionController extends ChangeNotifier {
   // [finishGlissandoPick]). Mirrors the existing copy/paste pattern
   // ([copiedNote]/[pasteMode]): a pending interaction that the next
   // relevant grid tap completes.
+  // No direction is chosen any more: the end row tapped on the grid
+  // shows it (above the note = up, below = down).
   Note? _pendingGlissandoNote;
-  GlissandoDirection? _pendingGlissandoDirection;
 
   /// Whether the grid's next tap should be interpreted as choosing a
   /// glissando's end row (see [finishGlissandoPick]) rather than its
@@ -3200,15 +3215,14 @@ class CompositionController extends ChangeNotifier {
   bool get isPickingGlissandoEndRow => _pendingGlissandoNote != null;
 
   /// Begins the "pick the end row" interaction for a glissando
-  /// starting at [note] in [direction] — call this from wherever the
-  /// direction is chosen (e.g. NoteDialog's Glissando field), then
+  /// starting at [note] — call this from NoteDialog's Glissando field,
+  /// then
   /// close any dialogs so the person can tap the target row on the
   /// grid. GridWidget checks [isPickingGlissandoEndRow] and routes
   /// its next tap to [finishGlissandoPick] instead of normal tap
   /// handling.
-  void startGlissandoPick(Note note, GlissandoDirection direction) {
+  void startGlissandoPick(Note note) {
     _pendingGlissandoNote = note;
-    _pendingGlissandoDirection = direction;
     notifyListeners();
   }
 
@@ -3217,7 +3231,6 @@ class CompositionController extends ChangeNotifier {
   /// an end row.
   void cancelGlissandoPick() {
     _pendingGlissandoNote = null;
-    _pendingGlissandoDirection = null;
     notifyListeners();
   }
 
@@ -3230,9 +3243,8 @@ class CompositionController extends ChangeNotifier {
   /// The run starts at the row NEXT TO the anchor (not a duplicate
   /// note at the anchor's own row/pitch, since the anchor itself
   /// already sounds that pitch) and continues, one note per row, to
-  /// [endRow] INCLUSIVE. "Up" requires [endRow] to be above the
-  /// anchor's row and "down" requires it to be below — an [endRow] on
-  /// the wrong side (or equal to the anchor's own row) is rejected
+  /// [endRow] INCLUSIVE. An [endRow] above the anchor's row makes the
+  /// glissando go up, below it down; the anchor's own row is rejected
   /// without generating anything or clearing the pending pick, so the
   /// person can just tap again. Returns a short message to show (e.g.
   /// via a SnackBar) on rejection, or null on success.
@@ -3252,25 +3264,26 @@ class CompositionController extends ChangeNotifier {
   /// checked for — the generated run is simply added on top.
   String? finishGlissandoPick(int endRow) {
     final pendingNote = _pendingGlissandoNote;
-    final direction = _pendingGlissandoDirection;
-    if (pendingNote == null || direction == null) return null;
+    if (pendingNote == null) return null;
 
     if (endRow < 0 || endRow >= totalRows) {
       return 'That row is outside the grid';
     }
+    if (endRow == pendingNote.row) {
+      return 'Tap a row above or below the note';
+    }
 
-    final isUp = direction == GlissandoDirection.up;
-    if (isUp && endRow <= pendingNote.row) {
-      return 'Glissando Up needs an end row above the note';
-    }
-    if (!isUp && endRow >= pendingNote.row) {
-      return 'Glissando Down needs an end row below the note';
-    }
+    // The direction comes from the end row: above the note = up,
+    // below the note = down.
+    final isUp = endRow > pendingNote.row;
+    final direction = isUp
+        ? GlissandoDirection.up
+        : GlissandoDirection.values
+        .firstWhere((d) => d != GlissandoDirection.up);
 
     final anchorIndex = notes.indexWhere((n) => n.id == pendingNote.id);
     if (anchorIndex == -1) {
       _pendingGlissandoNote = null;
-      _pendingGlissandoDirection = null;
       notifyListeners();
       return 'That note no longer exists';
     }
@@ -3303,7 +3316,6 @@ class CompositionController extends ChangeNotifier {
     }
 
     _pendingGlissandoNote = null;
-    _pendingGlissandoDirection = null;
     notifyListeners();
     return null;
   }
@@ -3729,9 +3741,9 @@ class CompositionController extends ChangeNotifier {
   // =====================================================
 
   /// Hands whose notes are silent ("cut off") during playback — set
-  /// in the Audio dialog (audio_hands_dialog.dart). By default every
-  /// hand is cut off.
-  final Set<Hand> mutedHands = {...Hand.values};
+  /// in the Audio dialog (audio_hands_dialog.dart). By default the
+  /// right and left hands are heard and the additional hand is silent.
+  final Set<Hand> mutedHands = {Hand.additional};
 
   /// The hands that actually have notes in this composition, in the
   /// order right, left, additional.

@@ -11,7 +11,7 @@ import 'composition_screen.dart';
 
 /// This screen's accent color — green, same as before, so My
 /// Compositions stays visually distinct from the blue Cloud Library.
-const Color _accent = Colors.green;
+const Color _accent = Colors.blue;
 
 class CompositionsListScreen extends StatefulWidget {
   const CompositionsListScreen({super.key});
@@ -51,45 +51,33 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
     required VoidCallback onTap,
     bool showArrow = true,
   }) {
+    // Framed like the fields of the New / Edit Composition dialogs:
+    // the filter's name on the frame, its value in blue bold.
     return Tooltip(
       message: label,
-      child: Material(
-        // Grey like the dialogs' buttons; a filter in use has blue text.
-        color: Colors.grey.shade300,
-        elevation: 2,
-        borderRadius: BorderRadius.circular(20),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () {
-            FocusScope.of(context).unfocus();
-            onTap();
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            child: Row(
-              children: [
-                Icon(icon, size: 22, color: isActive ? Colors.green : Colors.black54),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    valueText,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 20,
-                      color: isActive ? Colors.green : Colors.black,
-                    ),
-                  ),
-                ),
-                if (showArrow)
-                  Icon(
-                    Icons.arrow_drop_down,
-                    color: isActive ? Colors.green : Colors.black54,
-                  ),
-              ],
-            ),
-          ),
+      child: TextField(
+        readOnly: true,
+        controller: TextEditingController(text: valueText),
+        style: TextStyle(
+          fontSize: 22,
+          color: isActive ? Colors.blue : Colors.black,
+          fontWeight: FontWeight.bold,
         ),
+        decoration: InputDecoration(
+          labelText: label.startsWith('Level') ? 'Level' : label,
+          isDense: true,
+          filled: true,
+          fillColor: Colors.white,
+          border: const OutlineInputBorder(),
+          prefixIcon: Icon(icon, size: 22),
+          suffixIcon: showArrow
+              ? const Icon(Icons.arrow_drop_down, color: Colors.blue)
+              : null,
+        ),
+        onTap: () {
+          FocusScope.of(context).unfocus();
+          onTap();
+        },
       ),
     );
   }
@@ -107,13 +95,13 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
             flex: 3,
             child: TextField(
               controller: _searchController,
-              style: const TextStyle(fontSize: 22, color: Colors.green, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 22, color: Colors.blue, fontWeight: FontWeight.bold),
               decoration: InputDecoration(
                 filled: true,
                 fillColor: Colors.white,
                 hintText: 'Search title or composer',
                 hintMaxLines: 1,
-                hintStyle: const TextStyle(fontSize: 20, color: Colors.black45),
+                hintStyle: const TextStyle(fontSize: 22, color: Colors.black45),
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(vertical: 14),
                 prefixIcon: const Icon(Icons.search, color: Colors.black54),
@@ -196,6 +184,26 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
     );
   }
 
+  /// Opens the Edit Composition dialog (the same as the pen) — also
+  /// from the style, instrument and level chips of a card.
+  void _openEdit(Composition comp) {
+    showDialog(
+      context: context,
+      builder: (context) => EditCompositionDialog(
+        composition: comp,
+        onSaved: (updated) async {
+          await _service.saveComposition(updated);
+        },
+        onDelete: () async {
+          if (comp.id != null) {
+            await _service.deleteComposition(comp.id!);
+          }
+        },
+        allowDelete: true,
+      ),
+    );
+  }
+
   /// One composition as a rounded card: title and composer on top,
   /// then small info chips (style, instrument, measure count, last
   /// edited date) instead of a cramped row of table columns, with the
@@ -237,49 +245,65 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          comp.title.isEmpty
-                              ? 'UNTITLED'
-                              : comp.title.toUpperCase(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          comp.composer.isEmpty
-                              ? 'UNKNOWN COMPOSER'
-                              : comp.composer.toUpperCase(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          // Composer: accent color, regular (not italic), bold.
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: _accent,
-                          ),
+                        Row(
+                          children: [
+                            // Title and composer take the whole width
+                            // left of the pen column.
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      comp.title.isEmpty
+                                          ? 'UNTITLED'
+                                          : comp.title.toUpperCase(),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                  ),
+                                  Flexible(
+                                    child: Text(
+                                      // Composer on the same line as the title.
+                                      '  ·  ${comp.composer.isEmpty ? 'UNKNOWN COMPOSER' : comp.composer.toUpperCase()}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                        color: _accent,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 10),
                         Wrap(
                           spacing: 8,
                           runSpacing: 6,
                           children: [
-                            _InfoChip(icon: Icons.palette, text: comp.style),
-                            _InfoChip(icon: Icons.piano, text: comp.instrument),
+                            _InfoChip(icon: Icons.palette, text: comp.style, onTap: () => _openEdit(comp)),
+                            _InfoChip(icon: Icons.piano, text: comp.instrument, onTap: () => _openEdit(comp)),
                             _InfoChip(
                               icon: Icons.signal_cellular_alt,
                               text: 'Level ${comp.complexity}',
+                              onTap: () => _openEdit(comp),
                             ),
                             _InfoChip(
+                              plain: true,
                               icon: Icons.view_week,
                               text: '$measureCount '
-                                  'measure${measureCount == 1 ? '' : 's'}',
+                                  'm${measureCount == 1 ? '' : 's'}',
                             ),
                             _InfoChip(
+                              plain: true,
                               icon: Icons.edit_calendar,
                               text: comp.editedAt
                                   .toLocal()
@@ -293,31 +317,37 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
                     ),
                   ),
                 ),
-                Center(
-                  child: IconButton(
-                    icon: const Icon(Icons.edit, color: _accent),
-                    iconSize: 28,
-                    tooltip: 'Edit info',
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (context) => EditCompositionDialog(
-                          composition: comp,
-                          onSaved: (updated) async {
-                            await _service.saveComposition(updated);
-                          },
-                          onDelete: () async {
-                            if (comp.id != null) {
-                              await _service.deleteComposition(comp.id!);
-                            }
-                          },
-                          allowDelete: true,
+                // EDIT — a round button (the same size as the back
+                // button) with a black pen, white like the style /
+                // instrument / level chips. It has its own column at the
+                // right end of the card, so on every card it sits in the
+                // same place, level with the title, however long or short
+                // the title and composer are.
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 8, 12, 8),
+                  child: Align(
+                    alignment: Alignment.topRight,
+                    child: Tooltip(
+                      message: 'Edit info',
+                      child: Material(
+                        color: Colors.white,
+                        shape: CircleBorder(
+                          side: BorderSide(color: Colors.grey.shade400),
                         ),
-                      );
-                    },
+                        elevation: 2,
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: () => _openEdit(comp),
+                          child: const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: Icon(Icons.edit,
+                                color: Colors.black, size: 32),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 8),
               ],
             ),
           ),
@@ -352,9 +382,28 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         elevation: 1,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
+        centerTitle: true,
+        toolbarHeight: 80,
+        leadingWidth: 88,
+        // Back: a round grey button with an arrow — the same size and
+        // shape as the ✕ (Exit) button of the Home screen.
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 16),
+          child: Center(
+            child: Material(
+              color: Colors.grey.shade300,
+              shape: const CircleBorder(),
+              elevation: 2,
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () => Navigator.pop(context),
+                child: const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Icon(Icons.arrow_back, color: Colors.black, size: 32),
+                ),
+              ),
+            ),
+          ),
         ),
         title: const Text(
           'My Compositions',
@@ -431,7 +480,7 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
                               '${compositions.length} '
                                   'composition${compositions.length == 1 ? '' : 's'}',
                               style: const TextStyle(
-                                fontSize: 18,
+                                fontSize: 22,
                                 color: Colors.black54,
                               ),
                             ),
@@ -458,33 +507,55 @@ class _CompositionsListScreenState extends State<CompositionsListScreen> {
   }
 }
 
-/// A small rounded info chip (icon + text) used on each composition
-/// card for style, instrument, measure count and edited date.
+/// A small info item on a composition card. A chip (white, framed)
+/// when it can be tapped ([onTap]: opens the Edit Composition dialog);
+/// otherwise ([plain]) just an icon and text, so it doesn't look like a
+/// button.
 class _InfoChip extends StatelessWidget {
   final IconData icon;
   final String text;
+  final VoidCallback? onTap;
+  final bool plain;
 
-  const _InfoChip({required this.icon, required this.text});
+  const _InfoChip({
+    required this.icon,
+    required this.text,
+    this.onTap,
+    this.plain = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
+    final content = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 18, color: Colors.black54),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: const TextStyle(fontSize: 22, color: Colors.black87),
+        ),
+      ],
+    );
+    if (plain) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+        child: content,
+      );
+    }
+    return Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade400),
+        side: BorderSide(color: Colors.grey.shade400),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 18, color: Colors.black54),
-          const SizedBox(width: 6),
-          Text(
-            text,
-            style: const TextStyle(fontSize: 18, color: Colors.black87),
-          ),
-        ],
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          child: content,
+        ),
       ),
     );
   }

@@ -16,8 +16,7 @@ void tempoDialog(
 
       final screen = MediaQuery.of(context).size;
 
-      // A tempo change placed exactly at this tick (only this one can
-      // be deleted).
+      // A tempo change placed exactly at this tick, if any.
       TempoEvent? currentEvent;
 
       for(final event in controller.timeline.tempoEvents){
@@ -102,30 +101,12 @@ void tempoDialog(
 
         actions: [
           const Divider(thickness: 1.0),
-          // DELETE BUTTON
+          // No Delete button: a tempo must always be chosen. To change
+          // it, simply tap another tempo.
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              TextButton(
-                onPressed: currentEvent == null
-                    ? null
-                    : () {
-                  controller.deleteTempoEvent(
-                    tick,
-                  );
-                  Navigator.pop(context);
-                },
-                child: const Text(
-                  "Delete",
-                  style: TextStyle(
-                    fontSize: 22,
-                    color: Colors.red,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-
-              // CANCEL BUTTON
+              // CLOSE BUTTON
               TextButton(
                 onPressed: () {
                   Navigator.pop(context);

@@ -274,7 +274,17 @@ class _CompositionScreenState extends State<CompositionScreen>
       tickFromScroll = controller.editTickToPlayback(tickFromScroll);
     }
 
-    if (tickFromScroll <= 0 || tickFromScroll >= controller.maxTicks) {
+    // Continuing after a pause while the lead-in (the space before the
+    // first measure) is still on screen: from exactly there too —
+    // not back to the start of the lead-in, which was a jump.
+    final leadInTicks = (_ghostLeadInBeats *
+        controller.measures.first.timeSignature.ticksPerBeat)
+        .toDouble();
+    final resumingInLeadIn = hadWideLeadingPaddingBefore &&
+        tickFromScroll <= 0 &&
+        tickFromScroll > -leadInTicks;
+    if (!resumingInLeadIn &&
+        (tickFromScroll <= 0 || tickFromScroll >= controller.maxTicks)) {
       // Starting fresh from the very beginning (or resuming from
       // past the end, which _startPlayback already treated as "start
       // over") — begin at a NEGATIVE tick representing
@@ -551,6 +561,336 @@ class _CompositionScreenState extends State<CompositionScreen>
       return () => _showHelpDialog(helpText);
     }
     return action;
+  }
+
+  /// The guide to the application, shown as a pop-up when help mode is
+  /// turned on (instead of banners on the grid). Each section is a
+  /// heading (blue, bold) and its text.
+  static const List<List<String>> _guideSections = [
+    [
+      'CREATE A COMPOSITION',
+      "On the home screen tap 'Create Composition'. Type the title and the composer "
+          "(always in capital letters), choose the Musical Style, the Target Instrument "
+          "and the level, then tap 'Create'.\n"
+          "The new composition is empty: tap the 'Add Measures' icon to add measures. "
+          "Choose the scale, the time signature and how many measures to add, then tap 'Add'.",
+    ],
+    [
+      'EDIT TITLE, COMPOSER, STYLE, INSTRUMENT, LEVEL',
+      "On the 'My Compositions' screen tap the round pen button at the right of the "
+          "composition, or tap its style, instrument or level. The Edit Composition dialog "
+          "opens: change what you need and tap 'Save'.\n"
+          "Inside a composition you can also tap the title on the left of the grid "
+          "(see 'See the title and composer') to open the same dialog.",
+    ],
+    [
+      'SHARE IN THE CLOUD LIBRARY',
+      "To let all users see your composition, turn on 'Visible to all users in Cloud "
+          "Library' in the Create Composition or Edit Composition dialog, then tap "
+          "'Create' or 'Save'. Turn it off to make the composition private again.",
+    ],
+    [
+      'LIKE A COMPOSITION IN THE CLOUD LIBRARY',
+      "On the 'Cloud Library' screen tap the heart next to a composition. A red heart "
+          "means you like it; tap it again to take your like back. Sort the list by "
+          "'Most liked' to see the favourite compositions first. Tap the round import "
+          "button to copy a composition into 'My Compositions'.",
+    ],
+    [
+      'CREATE A NOTE',
+      "First choose the hand with the 'Hand Set' icon and the length of the new notes "
+          "with the 'Note Duration' icon. Then tap the grid on the right row (pitch) and "
+          "beat (column): the note appears there.\n"
+          "To move a note, drag it. To delete it, tap it and choose 'Delete'.",
+    ],
+    [
+      'CHANGE THE VALUE OF A NOTE',
+      "Tap the note to open the note dialog, tap 'Duration' and choose the new value. "
+          "In the same dialog you can change its hand and accidental.",
+    ],
+    [
+      'COPY A NOTE',
+      "Press and hold the note, or tap it and choose 'Copy'. The 'Paste Mode' icon "
+          "lights up: now every tap on the grid pastes a copy. Tap the 'Paste Mode' icon "
+          "again to stop pasting.",
+    ],
+    [
+      'ADD LEGATO',
+      "Tap the 'Legato Mode' icon; it lights up. Now tap the notes that must be played "
+          "legato. Tap the icon again to turn Legato Mode off.",
+    ],
+    [
+      'SEE NOTES WITH ACCIDENTALS',
+      "Tap the 'Accidentals' icon: every note with an accidental (a note that does not "
+          "belong to the scale) turns red. Tap it again to show the notes normally.",
+    ],
+    [
+      'EASY READ MODE',
+      "Tap the 'Easy Read Mode' icon to show every note in the way that is easiest to read. "
+          "It mainly changes notes with accidentals: the scale's own sign for the row and the "
+          "note's accidental are put together into one sound, and the note is shown as simply "
+          "as possible —\n"
+          "• when they cancel each other, the note shows a plain number (1+ with a - shows 1);\n"
+          "• when together they make a whole step, the note is shown on the next row as a plain "
+          "number (1+ with a + shows 2).\n"
+          "The notes themselves do not change — it is only the way they are shown, so turning "
+          "Easy Read off brings the normal notation back at once. While it is on, notes cannot "
+          "be entered or edited.\n"
+          "Easy Read turns on by itself when you start playing from edit mode, when you rotate "
+          "the labels and when you raise or lower the scale. You can turn it off whenever you "
+          "want, also during playback, by tapping its icon.",
+    ],
+    [
+      'HIDE FINGER NUMBERS',
+      "Tap the 'No Fingers Mode' icon to hide the finger numbers on the notes. Tap it "
+          "again to show them.",
+    ],
+    [
+      'SEE THE TITLE AND COMPOSER',
+      "Tap the 'Title Mode' icon (the face): the composer and the title are shown in a "
+          "column on the left of the grid. Tap that column to edit them. Tap the icon "
+          "again to hide them.",
+    ],
+    [
+      'ADD A REPRISE (REPEATS)',
+      "Write every measure only once, then tap the 'Repeats' icon and choose the kind "
+          "of reprise: a simple reprise 𝄆 𝄇, a reprise with voltas 1. and 2., Segno al Fine "
+          "or Segno al Coda. Enter the measure numbers and tap 'Add'. The repeat signs are "
+          "shown in green. During playback the repeated measures are played out, with green "
+          "numbers copying the measures they repeat. Repeats can be changed in edit mode only.",
+    ],
+    [
+      'ADD GRACE NOTES',
+      "Tap the main note, choose 'Grace Note', pick the type and whether it comes before "
+          "or after the note. The 'Grace Notes' icon lights up: tap the grid on the rows "
+          "(pitches) of the grace notes. Tap the icon again to stop adding.\n"
+          "An appoggiatura takes half of the note; an acciaccatura (long, medium, short) "
+          "always has a fixed short length.",
+    ],
+    [
+      'ADD AN ORNAMENT',
+      "Tap the note, choose 'Ornament' and pick a trill, mordent, turn or tremolo. "
+          "To remove it, open the same dialog again.",
+    ],
+    [
+      'ADD AN ARTICULATION',
+      "Tap the note, choose 'Articulation' and pick how the note is played: staccato, "
+          "accent, tenuto, marcato, sforzando … The articulation is shown on the note. To "
+          "remove it, choose 'Articulation' again and tap 'Delete'.",
+    ],
+    [
+      'ADD A PLAYING TECHNIQUE',
+      "Tap the note, choose 'Playing Technique' and pick the technique from the list. It "
+          "is shown on the note. To remove it, choose 'Playing Technique' again and tap "
+          "'Delete'.",
+    ],
+    [
+      'MARK AN ARPEGGIO',
+      "Double-tap the beat of the chord to open the beat-and-measure dialog and choose 'Set Arpeggio'. Choose the hand (left, right or both hands): a wavy line is shown "
+          "before the chord, and during playback the chord is played spread out. To remove it, "
+          "open the same dialog again.",
+    ],
+    [
+      'ADD A GLISSANDO',
+      "Tap the note where the glissando starts and choose 'Glissando', then tap the row "
+          "(pitch) where the glissando must end: a row above the note makes it go up, a row "
+          "below makes it go down. To change the end note or remove the glissando, tap the "
+          "note and choose 'Glissando' again.",
+    ],
+    [
+      'SET A FERMATA',
+      "Double-tap the beat and choose 'Set Fermata'. Pick or enter how many beats this beat "
+          "must last, then tap 'Set'. To remove it, open the same dialog and tap 'Delete'.",
+    ],
+    [
+      'ADD A DYNAMIC',
+      "Double-tap the beat where the dynamic starts and choose 'Set Dynamic'. Pick the "
+          "dynamic (pp, p, mp, mf, f, ff …). It is used from that beat on, until the next "
+          "dynamic. To remove it, open the same dialog and tap 'Delete'.",
+    ],
+    [
+      'ADD A DYNAMIC CHANGE',
+      "Double-tap the beat where the change starts and choose 'Set Dynamic Change'. Pick "
+          "the change (crescendo, diminuendo …). To remove it, open the same dialog and tap "
+          "'Delete'.",
+    ],
+    [
+      'SET THE PEDAL',
+      "Double-tap the beat and choose 'Set Pedal'. Pick the pedal marking (pedal down or "
+          "up). To remove it, open the same dialog and tap 'Delete'.",
+    ],
+    [
+      'CHANGE THE TIME SIGNATURE',
+      "Tap the time signature label at the bottom of the grid, or double-tap the measure "
+          "and choose 'Edit Time Signature'. The Change Time Signature dialog opens with two "
+          "choices, each for 'This measure' or a 'Measure range':\n"
+          "• 'Split each beat to halves' — twice as many beats, each half as long "
+          "(for example 3/4 becomes 6/8);\n"
+          "• 'Unite every two beats to one' — half as many beats, each twice as long "
+          "(for example 6/8 becomes 3/4).\n"
+          "The notes stay where they are.\n"
+          "To split one beat into columns for triplets and other tuplets, double-tap the beat "
+          "and choose 'Split beat'.",
+    ],
+    [
+      'INSERT, DUPLICATE, CLEAN, DELETE A BEAT',
+      "Double-tap the beat to open the beat-and-measure dialog. In the Beat column:\n"
+          "• 'Insert Beat' adds one empty beat at the end of the measure;\n"
+          "• 'Duplicate Beat' adds a copy of this beat with its notes after it;\n"
+          "• 'Clean Beat' removes the notes of this beat and keeps the beat — first choose "
+          "the right, left or additional hand, or all hands;\n"
+          "• 'Delete Beat' removes the beat and its notes.",
+    ],
+    [
+      'INSERT, DUPLICATE, CLEAN, DELETE A MEASURE',
+      "Double-tap the measure to open the beat-and-measure dialog. In the Measure column:\n"
+          "• 'Insert Measure' adds an empty measure before this one;\n"
+          "• 'Duplicate Measure' adds a copy of this measure after it, and 'Duplicate Range' "
+          "copies a range of measures;\n"
+          "• 'Clean Measure' removes the notes of this measure, and 'Clean Range' those of a "
+          "range of measures — the measures stay. First choose the right, left or additional "
+          "hand, or all hands (all hands also removes the dynamics and pedal marks);\n"
+          "• 'Delete Measure' removes the measure, and 'Delete Range' a range of measures.\n"
+          "To add measures at the end, use the 'Add Measures' icon.",
+    ],
+    [
+      'CHANGE THE SCALE',
+      "Tap the scale name at the top of the grid, or double-tap the measure and choose "
+          "'Set Scale' — for this measure or for a range of measures.\n"
+          "To play the whole piece higher or lower, use the 'Scale up' and 'Scale Down' "
+          "icons (a semitone each tap); 'Reset scale' brings back the original pitch.",
+    ],
+    [
+      'CHANGE THE TEMPO',
+      "Tap the tempo label at the bottom of the grid, or double-tap the beat and choose "
+          "'Set Tempo'. Choose the new tempo in the Select Tempo dialog; it is used from "
+          "that beat on.\n"
+          "To play slower or faster without changing the tempo, tap the 'Play' icon and "
+          "choose a speed.",
+    ],
+    [
+      'CHANGE THE CELL SIZE',
+      "Tap the 'Cell Width' icon to make the cells wider or narrower. 'Zoom In' and "
+          "'Zoom Out' make the whole grid bigger or smaller; 'Reset Zoom' brings back the "
+          "normal size.",
+    ],
+    [
+      'SHOW LARGER LABELS',
+      "Tap the 'Large Labels Mode' icon to make the labels on the grid (note names, "
+          "measure numbers, tempo, scale) larger. Tap it again for the normal size.",
+    ],
+    [
+      'DRAW ON THE GRID WITH THE PEN',
+      "Tap the 'Pen' icon: it turns green and a bar appears at the top of the grid. Now "
+          "one finger draws green marks on the grid — for example to mark places to practise "
+          "or check later — and the grid does not scroll.\n"
+          "In the bar: 'Pen' draws, 'Eraser' rubs out the marks you touch, 'Undo' takes back "
+          "the last mark and 'Clear all' removes all marks.\n"
+          "Tap the green 'Pen' icon again to finish. The marks are saved with the composition.",
+    ],
+    [
+      'ROTATE THE LABELS',
+      "Tap the 'Rotate' icon to turn all labels on the grid by 90°, so you can turn the "
+          "tablet sideways and read the cellnotation like a piano roll, with the notes coming "
+          "towards the keyboard. Rotate also turns Lock Mode and Easy Read Mode on. Tap the "
+          "icon again to turn the labels back.",
+    ],
+    [
+      'EXPORT A COMPOSITION',
+      "Tap the 'Export' icon, choose the first and the last measure and tap 'Export'. The "
+          "measures are shown as text in the transcription notation (scale, time signature, "
+          "then every measure with its hands, beats and notes). Tap 'Copy' to put it on the clipboard to "
+          "keep it, send it or paste it into another composition.",
+    ],
+    [
+      'IMPORT A COMPOSITION',
+      "Tap the 'Import' icon to open the Import Sheet Music Transcription dialog. Paste or "
+          "type a transcription (for example one made with Export) and tap 'Import'. If the "
+          "composition already has measures, choose 'Add after measure …' or 'Replace all "
+          "measures'.\n"
+          "'From PDF' reads the notes from a PDF of printed sheet music and puts the result in "
+          "the box, so you can check it and then tap 'Import'. 'Help' explains the whole "
+          "transcription notation, with examples.",
+    ],
+    [
+      'MORE HELP',
+      "While Help Mode is on (the ? icon is red), tap any icon to see what it does. "
+          "Tap the ? icon again to turn Help Mode off and use the icons normally.",
+    ],
+  ];
+
+  void _showGuideDialog() {
+    final size = MediaQuery.of(context).size;
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text(
+          'How to use Cellnotation',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
+        ),
+        content: SizedBox(
+          width: (size.width - 48).clamp(0.0, 700.0),
+          height: size.height * 0.65,
+          child: Scrollbar(
+            thumbVisibility: true,
+            child: ListView.separated(
+              padding: const EdgeInsets.only(right: 12),
+              itemCount: _guideSections.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 20),
+              itemBuilder: (_, i) {
+                final heading = _guideSections[i][0];
+                final text = _guideSections[i][1];
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${i + 1}. $heading',
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      text,
+                      style: const TextStyle(fontSize: 22, color: Colors.black),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+        actions: [
+          const Divider(thickness: 1.0),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text(
+                  'Close',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   void _showHelpDialog(String text) {
@@ -1056,6 +1396,9 @@ class _CompositionScreenState extends State<CompositionScreen>
                             setState(() {
                               _helpMode = !_helpMode;
                             });
+                            // Turning help mode on opens the guide
+                            // to the application.
+                            if (_helpMode) _showGuideDialog();
                             // No longer touches Lock Mode at all,
                             // per request — Help Mode is meant to
                             // be tried alongside actually editing
@@ -1099,7 +1442,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                             child: Icon(
                               Icons.touch_app,
                               color: controller.hideFingerNumbers
-                                  ? Colors.red
+                                  ? Colors.blue
                                   : Colors.black,
                             ),
                           ),
@@ -1130,7 +1473,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                             child: Icon(
                               Icons.open_in_full_sharp,
                               color: controller.highlightAccidentalNotes
-                                  ? Colors.red
+                                  ? Colors.blue
                                   : Colors.black,
                             ),
                           ),
@@ -1396,7 +1739,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                             angle: controller.rotatePitchText ? -pi / 2 : 0,
                             child: Icon(Icons.auto_fix_high,
                               color: controller.showCompensatedNotation
-                                  ? Colors.red
+                                  ? Colors.blue
                                   : Colors.black,
                             ),
                           ),
@@ -1507,20 +1850,21 @@ class _CompositionScreenState extends State<CompositionScreen>
                               }),
                         ),
 
-                        // RED PEN — mark places to check later
+                        // PEN — green marks for places to check later.
+                        // Green while on; tapping it again finishes.
                         IconButton(
                           icon: Transform.rotate(
                             angle: controller.rotatePitchText ? -pi / 2 : 0,
                             child: Icon(
                               Icons.draw,
                               color: controller.penMode
-                                  ? Colors.red
+                                  ? Colors.green
                                   : Colors.black,
                             ),
                           ),
-                          tooltip: 'Red Pen',
+                          tooltip: 'Pen',
                           onPressed: _withHelp(
-                            'Red Pen: \nDraw red marks on the grid with your finger to mark places to check later. While it is on, one finger draws and the grid does not scroll; use Eraser, Undo or Clear all in the bar at the top of the grid, and Done to finish. Marks are saved with the composition.',
+                            'Pen: \nDraw green marks on the grid with your finger to mark places to check later. While it is on (green), one finger draws and the grid does not scroll; use Pen, Eraser, Undo or Clear all in the bar at the top of the grid. Tap this icon again to finish. Marks are saved with the composition.',
                             hasMeasures
                                 ? () {
                               controller.togglePenMode();
@@ -1529,8 +1873,8 @@ class _CompositionScreenState extends State<CompositionScreen>
                                   duration: const Duration(seconds: 1),
                                   content: Text(
                                     controller.penMode
-                                        ? 'Red Pen on — draw with your finger.'
-                                        : 'Red Pen off.',
+                                        ? 'Pen on — draw with your finger.'
+                                        : 'Pen off.',
                                     style: const TextStyle(fontSize: 22),
                                   ),
                                 ),
@@ -1548,13 +1892,14 @@ class _CompositionScreenState extends State<CompositionScreen>
                               Icons.repeat,
                               color: controller.repriseExpanded ||
                                   controller.reprises.isNotEmpty
-                                  ? const Color(0xFFE65100)
+                              // green, like the repeat signs on the grid
+                                  ? const Color(0xFF2E7D32)
                                   : Colors.black,
                             ),
                           ),
                           tooltip: 'Repeats',
                           onPressed: _withHelp(
-                            'Repeats: \nSet reprises the way printed music writes them: a simple reprise 𝄆 𝄇, a reprise with voltas 1. and 2., 𝄋 Segno al Fine, or 𝄋 Segno al Coda. In edit mode you see the signs. While playing (Scroll Lock on) the repeated measures are added after the place where the music goes back, with red numbers copying the measures they repeat; turning Scroll Lock off removes them and the signs come back. Repeats can be changed in edit mode only.',
+                            'Repeats: \nSet reprises the way printed music writes them: a simple reprise 𝄆 𝄇, a reprise with voltas 1. and 2., 𝄋 Segno al Fine, or 𝄋 Segno al Coda. In edit mode you see the signs. While playing (Scroll Lock on) the repeated measures are added after the place where the music goes back, with green numbers copying the measures they repeat; turning Scroll Lock off removes them and the signs come back. Repeats can be changed in edit mode only.',
                             hasMeasures
                                 ? () => repeatsDialog(context, controller)
                                 : null,
@@ -2257,7 +2602,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                         child: RotatedBox(
                           quarterTurns: 3,
                           child: Text(
-                            '${controller.composition.composer} - ${controller.composition.title}',
+                            '${controller.composition.composer.toUpperCase()} - ${controller.composition.title.toUpperCase()}',
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: Colors.black,
@@ -2384,180 +2729,10 @@ class _CompositionScreenState extends State<CompositionScreen>
 
               ),
 
-              // Icon help labels — placed here, in the OUTER Stack
-              // (painted AFTER the whole Row above, so always on
-              // top), rather than nested inside the toolbar's own
-              // narrow column — see _toolbarLabel's doc for why.
-              if (_helpMode) _toolbarLabel(_handIconLink, 'Hand Set'),
-              if (_helpMode) _toolbarLabel(_durationIconLink, 'Note Duration'),
-              if (_helpMode) _toolbarLabel(_pasteIconLink, 'Paste Mode'),
-              if (_helpMode) _toolbarLabel(_graceNotesIconLink, 'Grace Notes'),
-
-              // The full-guide banner and the "tap icons" bubble live
-              // HERE now, in this same OUTER Stack, rather than inside
-              // GridWidget — per request. GridWidget (and everything
-              // inside its own build()) only renders once the
-              // composition already has measures (see the hasMeasures
-              // ternary below), so these previously could never appear
-              // before that point no matter what Help Mode was set to.
-              // This outer Stack, by contrast, always renders, exactly
-              // like the icon labels right above.
-              if (_helpMode)
-                Positioned.fill(
-                  child: Align(
-                    // Centred, and shorter than the screen so it leaves
-                    // the banners above and below it free (it scrolls).
-                    alignment: const Alignment(0.8, 0.0),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxHeight: MediaQuery.of(context).size.height * 0.6,
-                      ),
-                      child: SingleChildScrollView(
-                        child: helpCallout(
-                          "CREATE MEASURES\n\n"
-                              "Start by creating measures: tap the 'Add Measures' icon, or the "
-                              "'Add Measures' button in the middle of the screen.\n"
-                              "Set the scale and time signature while creating them. "
-                              "You can change the scale and time signature later if needed.\n\n"
-
-
-                              "SET HAND AND DURATION\n\n"
-                              "Before creating notes, set the hand by tapping the 'Hand Set' icon, and the duration by "
-                              "tapping the 'Note Duration' icon.\n\n"
-
-                              "CREATE, MOVE, EDIT NOTES\n\n"
-                              "To add a note, tap the grid on the correct row (pitch) and beat (column).\n"
-                              "To edit or delete a note, tap it to open the note-editing dialog.\n"
-                              "To move a note, drag it.\n"
-                              "To copy a note, press and hold it. The 'Paste Mode' icon highlights, and you can now paste the copy "
-                              "by tapping the grid. To stop pasting, tap the 'Paste Mode' icon again to turn it off.\n\n"
-
-                              "EDIT TEMPO, SCALE, TIME SIGNATURE\n\n"
-                              "To edit the tempo, scale, or time signature, tap its label on the grid. "
-                              "You can also edit it by double-tapping the measure to open the beat-and-measure dialog. "
-                              "Choose 'Set Tempo', 'Set Scale', 'Insert Beat', 'Duplicate Beat', or 'Delete Beat'.\n\n"
-
-                              "ADD FINGER NUMBER, ARTICULATION, ORNAMENT, PLAYING TECHNIQUE\n\n"
-                              "To add a finger number, articulation, ornament, or playing technique, tap a note "
-                              "to open the note-editing dialog. "
-                              "Choose 'Finger', 'Articulation', 'Ornament', or 'Playing Technique' "
-                              "to open the matching picker. "
-                              "You can delete the value using the same dialog.\n\n"
-
-                              "ADD GLISSANDO\n\n"
-                              "To add a glissando, tap a note to open the note-editing dialog. "
-                              "Choose 'Glissando', pick a direction, then tap the row (pitch) where the glissando should end. "
-                              "You can delete the glissando using the same dialog.\n\n"
-
-                              "ADD GRACE NOTES\n\n"
-                              "To add grace notes, tap a note to open the note-editing dialog. "
-                              "Choose 'Grace Notes', pick a type and then choose to add before the note or after,"
-                              " then, while the 'Grace Notes' icon is highlighted, tap the grid on the correct "
-                              "rows (pitches). To stop adding, tap this icon to turn Grace Notes Mode off. \n\n"
-                              "Appoggiatura is always half of the note's own length, and only one fits at a time.\n"
-                              "Acciaccatura Long (sixteenth), Medium (thirty-second), Short (sixty-fourth) are always a fixed length, "
-                              "however long the note is.\n\n"
-
-                              "MARK LEGATO\n\n"
-                              "To mark legato, tap the 'Legato Mode' icon; it highlights to show that"
-                              " Legato Mode is on. Now tapping a note marks it to be played legato. "
-                              "Tap the highlighted 'Legato Mode' icon again to turn it off.\n\n"
-
-                              "ADD DYNAMIC, PEDAL\n\n"
-                              "To add or edit a dynamic marking or pedal, double-tap the grid on the correct beat (column) "
-                              "to open the beat-and-measure dialog. Choose 'Set Dynamic', "
-                              "'Set Dynamic Change', or 'Set Pedal'.\n\n"
-
-                              "ADD FERMATA\n\n"
-                              "To add a fermata, double-tap the grid on the correct beat (column) "
-                              "to open the beat-and-measure dialog. Choose 'Set Fermata', then pick or enter "
-                              "how many beats this beat should last. To delete the fermata, use the same dialog.\n\n"
-
-                              "PLAYBACK\n\n"
-                              "To scroll the screen, tap the 'Play/Pause' icon. The scrolling speed depends on the tempo, so you "
-                              "can change the scrolling speed by changing the tempo. "
-                              "Scrolling can be paused by tapping the icon again, or simply by "
-                              "tapping the grid. Tapping the grid again resumes scrolling. "
-                              "Use the 'Scroll to Start' icon to jump to the beginning, and the 'Go to Measure' icon"
-                              " to jump to a chosen measure.\n\n"
-
-                              "LOCK MODE\n\n"
-                              "To prevent editing, tap the 'Lock Mode' icon; it highlights to show it's on. "
-                              "Tap it again to turn it off and allow editing.\n"
-                              "It turns on automatically during playback"
-                              " or while the scale is raised or lowered.\n\n"
-
-                              "EASY READ MODE\n\n"
-                              "While Easy Read Mode is on, notes are shown in whichever way is easiest to read. "
-                              "This mainly concerns notes with accidentals. Easy Read Mode turns on automatically during playback"
-                              " or while the scale is raised or lowered.\n\n"
-
-                              "ROTATE MODE\n\n"
-                              "Tap the 'Rotate Mode' icon to rotate labels 90°, useful to see the cellnotation as piano roll. \n"
-                              "This also turns Lock Mode and Easy Read Mode on. \nTap Rotate Mode off to turn labels back.\n\n"
-
-                              "SCALE UP/DOWN/RESET\n\n"
-                              "Scale Up and Scale Down shift the whole piece by a semitone. "
-                              "Tapping the same icon repeatedly can raise or lower the piece by up to 12 semitones.\n"
-                              "Reset Scale returns it to its original pitch.\n\n"
-
-
-                              "ACCIDENTALS MODE\n\n"
-                              "Tap the 'Accidentals Mode' icon to see every note with an accidental — in other words, every note that doesn't belong to the scale.\n"
-                              "These notes turn red. Tap this icon again to turn Accidentals Mode off.\n\n"
-
-                              "NO FINGERS MODE\n\n"
-                              "Tap the 'No Fingers Mode' icon to hide fingering numbers. Tap it again to turn this mode off.\n\n"
-
-                              "DARK MODE\n\n"
-                              "Tap the 'Dark Mode' icon to switch the grid's background to black, which can make the grid easier to see in low light. Tap it again to switch back to the normal background.\n\n"
-
-                              "REFERENCE COLUMNS\n\n"
-                              "Tapping the 'Reference Columns' icon shows two extra columns: one with each note's letter name (C4, A5#), "
-                              "and one with the staff line numbers used for Export and Import: 0 is the line of middle C (do), "
-                              "1, 2, 3 … are the lines above it and -1, -2, -3 … the lines below it. "
-                              "The rows between two lines are left empty — a note there is written with both line numbers, e.g. 3/4 or -1/-2. "
-                              "A + or - after a line number shows that the current scale raises or lowers that note (4+).\n\n"
-
-                              "REPEATS (REPRISES)\n\n"
-                              "Write every measure only once and tap the 'Repeats' icon to set how the music repeats. Four kinds can be set:\n"
-                              "• Simple reprise — the start and end measure; the range is marked with reprise bars 𝄆 𝄇 and is played twice.\n"
-                              "• Reprise with voltas — the start measure, then the start and end of volta 1 and of volta 2. The reprise bars mark the range up to the end of volta 1, the voltas are marked with brackets '1.' and '2.', and the end of volta 2 with a double bar. The second time, volta 1 is skipped and volta 2 is played.\n"
-                              "• Reprise Segno al Fine — the measures with 𝄋 Segno, Fine and D.S. al Fine. After D.S. al Fine the music goes back to the Segno and ends at Fine.\n"
-                              "• Reprise Segno al Coda — the measures with 𝄋 Segno, To Coda, D.S. al Coda and Coda. After D.S. al Coda the music goes back to the Segno, plays up to To Coda and jumps to the Coda.\n"
-                              "In edit mode only the signs are shown. During playback the repeated measures are added after the place where the music goes back, with red numbers copying the measures they repeat; back in edit mode (pen icon) they disappear and the signs come back. Repeats can be set or removed in edit mode only; the dialog also shows how many measures the composition has. "
-                              "Repeat signs on a PDF page are recognised when it is imported.\n\n"
-
-                              "EXPORT AND IMPORT\n\n"
-                              "Export shows a chosen range of measures as text in the line-position transcription notation, which can be copied to the clipboard. Import lets you paste or type that same notation to add measures and notes; its own 'Help' button explains the full notation.",
-                          // Wider in landscape, per request — more
-                          // horizontal space is actually available
-                          // there, so the long guide text reads in
-                          // fewer, less narrow lines instead of
-                          // being capped at the same width as
-                          // portrait.
-                          maxWidth:
-                          MediaQuery.of(context).orientation ==
-                              Orientation.landscape
-                              ? 600
-                              : 400,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-              if (_helpMode)
-                Positioned.fill(
-                  child: Align(
-                    alignment: const Alignment(-0.70, 0.35),
-                    child: speechBubble(
-                      maxWidth: 150,
-                      'Tap icons to\nsee what they do',
-                      pointerSide: BubblePointerSide.left,
-                    ),
-                  ),
-                ),
+              // Help mode shows no banners or bubbles on the screen any
+              // more: turning it on opens the guide pop-up
+              // (_showGuideDialog), and tapping an icon shows what it
+              // does.
             ],
           );
 

@@ -11,7 +11,7 @@ Future<void> scaleDialog({
 }) async {
   showDialog(
     context: context,
-    builder: (_) {
+    builder: (dialogContext) {
       return AlertDialog(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
@@ -66,7 +66,7 @@ Future<void> scaleDialog({
                       child: Text(
                         scale.replaceFirst(RegExp(r' major$'), ''),
                         style: const TextStyle(
-                          fontSize: 20,
+                          fontSize: 22,
                         ),
                       ),
                     ),
@@ -115,7 +115,7 @@ Future<void> scaleDialog({
                       child: Text(
                         scale.replaceFirst(RegExp(r' minor$'), ''),
                         style: const TextStyle(
-                          fontSize: 20,
+                          fontSize: 22,
                         ),
                       ),
                     ),
@@ -132,24 +132,44 @@ Future<void> scaleDialog({
         // degree spelling and key signature. Choosing a scale there
         // applies it (via the SAME onSelected callback) and closes
         // both dialogs.
+        // CLOSE (black) and HELP (blue), centred under a divider like
+        // the other dialogs.
         actions: [
-          TextButton(
-            onPressed: () {
-              scaleHelpDialog(
-                context: context,
-                controller: controller,
-                currentScale: currentScale,
-                onSelected: onSelected,
-              );
-            },
-            child: const Text(
-              'Help',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
+          const Divider(thickness: 1.0),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text(
+                  'Close',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 22),
+              TextButton(
+                onPressed: () {
+                  scaleHelpDialog(
+                    context: context,
+                    controller: controller,
+                    currentScale: currentScale,
+                    onSelected: onSelected,
+                  );
+                },
+                child: const Text(
+                  'Help',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       );

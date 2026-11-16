@@ -6,6 +6,8 @@ import '../enums/instrument.dart';
 import 'confirm_delete_dialog.dart';
 import 'note_values_dialog.dart';
 import '../widgets/complexity_selector.dart';
+import 'new_composition_dialog.dart'
+    show kDialogContentHeight, UpperCaseTextFormatter;
 
 
 class EditCompositionDialog extends StatefulWidget {
@@ -41,8 +43,8 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
   @override
   void initState() {
     super.initState();
-    _titleController = TextEditingController(text: widget.composition.title);
-    _composerController = TextEditingController(text: widget.composition.composer);
+    _titleController = TextEditingController(text: widget.composition.title.toUpperCase());
+    _composerController = TextEditingController(text: widget.composition.composer.toUpperCase());
 
     // The composition stores style/instrument as label strings, so we
     // resolve back to the matching enum value (falling back to "any"
@@ -82,6 +84,7 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
       ),
       decoration: InputDecoration(
         labelText: label,
+        labelStyle: const TextStyle(fontSize: 22),
         isDense: true,
         border: const OutlineInputBorder(),
         prefixIcon: Icon(icon, size: 22),
@@ -101,7 +104,8 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      alignment: Alignment.topCenter,
+      // In the middle of the screen, moving up above the keyboard —
+      // like the New Composition dialog.
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.white,
       title: const Text(
@@ -114,8 +118,11 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
         ),
       ),
       content: SingleChildScrollView(
-        child: SizedBox(
-          width: MediaQuery.of(context).size.width * 0.70,
+        child: Container(
+          // The same size as the New Composition dialog and the Profile.
+          width: (MediaQuery.of(context).size.width - 48).clamp(0.0, 500.0),
+          constraints: const BoxConstraints(minHeight: kDialogContentHeight),
+          alignment: Alignment.topCenter,
           child: Form(
             key: _formKey,
             child: Column(
@@ -131,8 +138,13 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
                         children: [
                           TextFormField(
                             controller: _titleController,
+                            // Always in capital letters.
+                            textCapitalization: TextCapitalization.characters,
+                            inputFormatters: [UpperCaseTextFormatter()],
                             decoration: const InputDecoration(
                               labelText: 'Composition Title',
+                              labelStyle: TextStyle(fontSize: 22),
+                              errorStyle: TextStyle(fontSize: 22),
                               isDense: true,
                               border: OutlineInputBorder(),
                               prefixIcon: Icon(Icons.title, size: 22),
@@ -150,8 +162,13 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
                           const SizedBox(height: 15),
                           TextFormField(
                             controller: _composerController,
+                            // Always in capital letters.
+                            textCapitalization: TextCapitalization.characters,
+                            inputFormatters: [UpperCaseTextFormatter()],
                             decoration: const InputDecoration(
                               labelText: 'Composer',
+                              labelStyle: TextStyle(fontSize: 22),
+                              errorStyle: TextStyle(fontSize: 22),
                               isDense: true,
                               border: OutlineInputBorder(),
                               prefixIcon: Icon(Icons.person, size: 22),
@@ -231,7 +248,7 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
                     const Expanded(
                       child: Text(
                         'Visible to all users in Cloud Library',
-                        style: TextStyle(fontSize: 22),
+                        style: TextStyle(fontSize: 22, color: Colors.black),
                       ),
                     ),
                     Switch(
@@ -251,17 +268,6 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Close',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-            ),
 
             if (widget.onDelete != null && widget.allowDelete)
               TextButton(
@@ -283,6 +289,17 @@ class _EditCompositionDialogState extends State<EditCompositionDialog> {
                 ),
               ),
 
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Close',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+            ),
 
             TextButton(
               onPressed: () {

@@ -1,19 +1,16 @@
 import 'package:flutter/material.dart';
 
 import 'auth_service.dart';
-
+import 'auth_widgets.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
   @override
-  State<RegisterScreen> createState() =>
-      _RegisterScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-
 class _RegisterScreenState extends State<RegisterScreen> {
-
   final AuthService _authService = AuthService();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
@@ -21,7 +18,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool loading = false;
   bool _obscurePassword = true;
 
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
+  void _message(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 2),
+        content: Text(text, style: const TextStyle(fontSize: 22)),
+      ),
+    );
+  }
+
   Future<void> register() async {
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       loading = true;
     });
@@ -31,39 +45,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
         passwordController.text.trim(),
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            duration: const Duration(seconds: 2),
-            content: Text(
-              'Verification email sent — check your inbox.',
-              style: TextStyle(fontSize: 22),
-            ),
-          ),
-        );
+        _message('Verification email sent — check your inbox.');
         // popUntil, not a plain pop — RegisterScreen may have been
         // reached via a pushed route on top of AuthGate. Registering
         // signs the new user in right away, so AuthGate's own
-        // StreamBuilder is about to reactively show VerifyEmailScreen
-        // — but that happens UNDERNEATH whatever's currently pushed
-        // on top of it. A plain pop() would only remove one route
-        // (potentially landing back on a stale pushed LoginScreen,
-        // the same bug already fixed once in "Back to Login?");
-        // clearing back to the root guarantees AuthGate's reactive
-        // content is what actually becomes visible.
+        // StreamBuilder is about to show VerifyEmailScreen — but
+        // UNDERNEATH whatever is pushed on top of it. Clearing back to
+        // the root guarantees AuthGate's content is what becomes
+        // visible.
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          duration: const Duration(seconds: 2),
-          content: Text(
-            e.toString(),
-            style: TextStyle(fontSize: 22),
-          ),
-        ),
-      );
+      _message(e.toString());
     }
     if (mounted) {
       setState(() {
@@ -72,258 +66,85 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-
+  // Navigator.pop, not push — RegisterScreen was reached BY pushing
+  // from LoginScreen (via "Create account"), so going back returns to
+  // that SAME instance. Pushing a new LoginScreen instead would stack a
+  // duplicate route on top of AuthGate, and a later successful sign-in
+  // on that copy would look like it failed.
+  void _backToLogin() => Navigator.pop(context);
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
-      // true (the default) now, per request — with false, the body
-      // never shrinks for the keyboard, so Flutter never realizes it
-      // needs to scroll a focused field (e.g. Password, in landscape)
-      // up above the keyboard, leaving it hidden underneath it.
-      resizeToAvoidBottomInset : true,
-      // appBar: AppBar(
-      //   title: const Text('Register'),
-      // ),
-      body: Stack(
+      // true so the card moves up above the keyboard and a focused
+      // field (e.g. Password, in landscape) is never hidden under it.
+      resizeToAvoidBottomInset: true,
+      body: AuthBackground(
+        title: 'Cellnotation',
+        subtitle: 'enjoy the music playing',
+        // BACK TO LOGIN — a small round button with an arrow in the
+        // top-left corner of the card.
+        // topLeft: AuthBackButton(
+        //   tooltip: 'Back to Login',
+        //   onTap: _backToLogin,
+        // ),
         children: [
-          // BACKGROUND — same cellnotation_background.jpg + dark
-          // scrim treatment as home_screen.dart / LoginScreen, per
-          // request, so the whole pre-login flow shares one
-          // consistent look. Placed FIRST so it paints behind
-          // everything else in this Stack.
-          Positioned.fill(
-            child: Image.asset(
-              'assets/cellnotation_background.jpg',
-              fit: BoxFit.cover,
-            ),
+          AuthField(
+            controller: emailController,
+            label: 'Email',
+            icon: Icons.email_outlined,
+            keyboardType: TextInputType.emailAddress,
+            onClear: () => setState(emailController.clear),
           ),
-          Positioned.fill(
-            child: Container(color: Colors.black.withOpacity(0.35)),
+          const SizedBox(height: 18),
+          AuthField(
+            controller: passwordController,
+            label: 'Password',
+            icon: Icons.lock_outline,
+            obscure: _obscurePassword,
+            onToggleObscure: () =>
+                setState(() => _obscurePassword = !_obscurePassword),
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) {
+              if (!loading) register();
+            },
+            onClear: () => setState(passwordController.clear),
+          ),
+          const SizedBox(height: 28),
+
+          AuthMainButton(
+            label: 'Create Account',
+            loading: loading,
+            onPressed: register,
           ),
 
-          // LayoutBuilder + a min-height ConstrainedBox centers the
-          // content when it's SHORTER than the viewport, while still
-          // allowing it to scroll normally if it ever overflows a
-          // short (e.g. landscape, or landscape + keyboard) screen —
-          // same pattern as login_screen.dart/profile_screen.dart. A
-          // plain Center() alone can't tell a ScrollView how tall the
-          // viewport actually is, so it wouldn't center short content
-          // this way on its own.
-          LayoutBuilder(
-            builder: (context, constraints) {
-              return SingleChildScrollView(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                  child: Center(
-                    child: SizedBox(
-                      // Widened from 500 to 660, per request — matches
-                      // login_screen.dart's own treatment, keeping
-                      // both auth screens visually consistent, even
-                      // though a single 300px button (see below) would
-                      // already fit comfortably within the old 500.
-                      width: 660,
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
+          const SizedBox(height: 22),
 
-                            // const SizedBox(height: 100),
-
-                            // Text('cellnotation',
-                            //   style: TextStyle(
-                            //     color: Colors.white,
-                            //     fontSize: 110,
-                            //     fontWeight: FontWeight.bold,
-                            //   ),
-                            // ),
-                            //
-                            // const SizedBox(height: 20),
-
-                            SizedBox(
-                              height: 50,
-                              child: TextField(
-                                controller: emailController,
-                                obscureText: false,
-                                style: const TextStyle(
-                                  color: Colors.green,
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                decoration: InputDecoration(
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                  labelText: 'Email',
-                                  labelStyle: const TextStyle(
-                                    color: Colors.green,
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  border: const OutlineInputBorder(),
-                                  suffixIcon: IconButton(
-                                    icon: const Icon(Icons.clear),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                    visualDensity: VisualDensity.compact,
-                                    onPressed: () {
-                                      setState(() {
-                                        emailController.clear();
-                                      });
-                                    },
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            const SizedBox(height: 20),
-
-                            SizedBox(
-                              height: 50,
-                              child: TextField(
-                                controller: passwordController,
-                                obscureText: _obscurePassword,
-                                style: const TextStyle(
-                                  color: Colors.green,
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                decoration: InputDecoration(
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                  labelText: 'Password',
-                                  labelStyle: const TextStyle(
-                                    color: Colors.green,
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  border: const OutlineInputBorder(),
-                                  suffixIcon: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const SizedBox(width: 8),
-                                      IconButton(
-                                        icon: Icon(
-                                          _obscurePassword
-                                              ? Icons.visibility
-                                              : Icons.visibility_off,
-                                        ),
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(),
-                                        visualDensity: VisualDensity.compact,
-                                        onPressed: () {
-                                          setState(() {
-                                            _obscurePassword = !_obscurePassword;
-                                          });
-                                        },
-                                      ),
-                                      const SizedBox(width: 8),
-                                      IconButton(
-                                        icon: const Icon(Icons.clear),
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(),
-                                        visualDensity: VisualDensity.compact,
-                                        onPressed: () {
-                                          setState(() {
-                                            passwordController.clear();
-                                          });
-                                        },
-                                      ),
-                                      const SizedBox(width: 8),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            const SizedBox(height:20),
-
-                            SizedBox(
-                              // width: double.infinity,
-                              width: 300,
-                              height: 100,
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                  // Matches the outer SizedBox exactly now — a
-                                  // mismatched minimumSize (this was double.
-                                  // infinity x 50 while the SizedBox constrained
-                                  // to 300x100) is a likely cause of buttons not
-                                  // sizing as expected elsewhere in this app too.
-                                  minimumSize: const Size(300, 100),
-                                  elevation: 0,
-                                  // Same note-block shape as the home screen's
-                                  // buttons — matches NoteBlockWidget's own
-                                  // BorderRadius.circular(4).
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                ),
-                                onPressed: loading ? null : register,
-                                child: loading
-                                    ? const CircularProgressIndicator()
-                                    : const Text(
-                                  'Register',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            const SizedBox(height: 30),
-
-                            // BACK TO LOGIN — now a plain text button placed
-                            // directly under Register, per request (was
-                            // previously a top-left corner icon+text link,
-                            // now removed).
-                            TextButton(
-                              onPressed: () {
-                                // Navigator.pop, not push — RegisterScreen was
-                                // reached BY pushing from LoginScreen (via
-                                // "Create Account"), so "Back to Login" should
-                                // return to that SAME instance. Pushing a new
-                                // LoginScreen here instead stacks a duplicate
-                                // route on top of AuthGate — if a successful
-                                // sign-in later happens on THAT pushed copy,
-                                // AuthGate's own StreamBuilder switches to
-                                // HomeScreen underneath it, but the pushed
-                                // LoginScreen stays visible on top, making a
-                                // successful login look like it silently
-                                // failed.
-                                Navigator.pop(context);
-                              },
-                              child: const Text(
-                                'Back to Login',
-                                style: TextStyle(
-                                  color: Colors.red,
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-
-                          ],
-
-                        ),
-
-                      ),
-                    ),
+          // ALREADY HAVE AN ACCOUNT — a link back to login, as well as
+          // the arrow button at the top.
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              const Text(
+                'Already have an account?',
+                style: TextStyle(fontSize: 22, color: Colors.black54),
+              ),
+              TextButton(
+                onPressed: loading ? null : _backToLogin,
+                child: const Text(
+                  'Login',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: authBlue,
                   ),
                 ),
-              );
-            },
+              ),
+            ],
           ),
-
         ],
       ),
-
     );
-
   }
-
 }

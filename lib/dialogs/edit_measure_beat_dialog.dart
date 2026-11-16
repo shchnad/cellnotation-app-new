@@ -5,6 +5,7 @@ import '../controllers/composition_controller.dart';
 import 'arpeggio_dialog.dart';
 import 'beat_subdivision_dialog.dart';
 import 'beat_split_dialog.dart';
+import 'clean_hands_dialog.dart';
 import 'dynamic_change_dialog.dart';
 import 'dynamic_dialog.dart';
 import 'measure_range_dialog.dart';
@@ -326,8 +327,15 @@ void editMeasureBeatDialog({
                             ),
                           ),
                           onTap: () {
-                            controller.clearMeasureNotes(measureIndex);
                             Navigator.pop(context);
+                            // First: which hand to clean.
+                            cleanHandsDialog(
+                              context: context,
+                              title: 'Clean Measure',
+                              onChosen: (hands) => controller
+                                  .clearMeasureNotes(measureIndex,
+                                  hands: hands),
+                            );
                           },
                         ),
 
@@ -350,7 +358,19 @@ void editMeasureBeatDialog({
                               actionLabel: 'Clean',
                               actionColor: Colors.black,
                               onConfirm: (from, to) {
-                                controller.clearMeasureRangeNotes(from, to);
+                                // Then: which hand to clean. (Deferred:
+                                // measureRangeDialog calls onConfirm
+                                // before closing itself.)
+                                Future.delayed(Duration.zero, () {
+                                  if (!context.mounted) return;
+                                  cleanHandsDialog(
+                                    context: context,
+                                    title: 'Clean Measures ${from + 1}–${to + 1}',
+                                    onChosen: (hands) => controller
+                                        .clearMeasureRangeNotes(from, to,
+                                        hands: hands),
+                                  );
+                                });
                               },
                             );
                           },
@@ -545,8 +565,15 @@ void editMeasureBeatDialog({
                             ),
                           ),
                           onTap: () {
-                            controller.clearBeatNotes(measureIndex, beatIndex);
                             Navigator.pop(context);
+                            // First: which hand to clean.
+                            cleanHandsDialog(
+                              context: context,
+                              title: 'Clean Beat',
+                              onChosen: (hands) => controller.clearBeatNotes(
+                                  measureIndex, beatIndex,
+                                  hands: hands),
+                            );
                           },
                         ),
 

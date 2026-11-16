@@ -7,6 +7,7 @@ import '../controllers/composition_controller.dart';
 import '../enums/music_style.dart';
 import '../enums/instrument.dart';
 import '../dialogs/note_values_dialog.dart';
+import '../dialogs/edit_composition_dialog.dart';
 import 'composition_screen.dart';
 
 /// This screen's accent color — blue, same as before, so the Cloud
@@ -46,7 +47,7 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           duration: Duration(seconds: 2),
-          content: Text('Copied to My Compositions', style: TextStyle(fontSize: 20)),
+          content: Text('Copied to My Compositions', style: TextStyle(fontSize: 22)),
         ),
       );
     } catch (e) {
@@ -54,7 +55,7 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           duration: const Duration(seconds: 2),
-          content: Text('Copy failed: $e', style: const TextStyle(fontSize: 20)),
+          content: Text('Copy failed: $e', style: const TextStyle(fontSize: 22)),
         ),
       );
     }
@@ -69,7 +70,7 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           duration: const Duration(seconds: 2),
-          content: Text('Failed: $e', style: const TextStyle(fontSize: 18)),
+          content: Text('Failed: $e', style: const TextStyle(fontSize: 22)),
         ),
       );
     }
@@ -90,45 +91,33 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
     required VoidCallback onTap,
     bool showArrow = true,
   }) {
+    // Framed like the fields of the New / Edit Composition dialogs:
+    // the filter's name on the frame, its value in blue bold.
     return Tooltip(
       message: label,
-      child: Material(
-        // Grey like the dialogs' buttons; a filter in use has blue text.
-        color: Colors.grey.shade300,
-        elevation: 2,
-        borderRadius: BorderRadius.circular(20),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () {
-            FocusScope.of(context).unfocus();
-            onTap();
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            child: Row(
-              children: [
-                Icon(icon, size: 22, color: isActive ? Colors.blue : Colors.black54),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    valueText,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 20,
-                      color: isActive ? Colors.blue : Colors.black,
-                    ),
-                  ),
-                ),
-                if (showArrow)
-                  Icon(
-                    Icons.arrow_drop_down,
-                    color: isActive ? Colors.blue : Colors.black54,
-                  ),
-              ],
-            ),
-          ),
+      child: TextField(
+        readOnly: true,
+        controller: TextEditingController(text: valueText),
+        style: TextStyle(
+          fontSize: 22,
+          color: isActive ? Colors.blue : Colors.black,
+          fontWeight: FontWeight.bold,
         ),
+        decoration: InputDecoration(
+          labelText: label.startsWith('Level') ? 'Level' : label,
+          isDense: true,
+          filled: true,
+          fillColor: Colors.white,
+          border: const OutlineInputBorder(),
+          prefixIcon: Icon(icon, size: 22),
+          suffixIcon: showArrow
+              ? const Icon(Icons.arrow_drop_down, color: Colors.blue)
+              : null,
+        ),
+        onTap: () {
+          FocusScope.of(context).unfocus();
+          onTap();
+        },
       ),
     );
   }
@@ -152,7 +141,7 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
                 fillColor: Colors.white,
                 hintText: 'Search title or composer',
                 hintMaxLines: 1,
-                hintStyle: const TextStyle(fontSize: 20, color: Colors.black45),
+                hintStyle: const TextStyle(fontSize: 22, color: Colors.black45),
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(vertical: 14),
                 prefixIcon: const Icon(Icons.search, color: Colors.black54),
@@ -249,6 +238,26 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
     );
   }
 
+  /// Opens the Edit Composition dialog (the same as the pen) — also
+  /// from the style, instrument and level chips of a card.
+  void _openEdit(Composition comp) {
+    showDialog(
+      context: context,
+      builder: (context) => EditCompositionDialog(
+        composition: comp,
+        onSaved: (updated) async {
+          await _service.saveComposition(updated);
+        },
+        onDelete: () async {
+          if (comp.id != null) {
+            await _service.deleteComposition(comp.id!);
+          }
+        },
+        allowDelete: true,
+      ),
+    );
+  }
+
   /// One shared composition as a rounded card: title, composer and
   /// who shared it on top, then info chips (style, instrument,
   /// measure count), with the Like and Copy actions on the right.
@@ -298,73 +307,108 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
                       children: [
                         Row(
                           children: [
-                            Flexible(
-                              child: Text(
-                                comp.title.isEmpty
-                                    ? 'UNTITLED'
-                                    : comp.title.toUpperCase(),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black,
-                                ),
+                            // Title, composer (and "yours") take the room
+                            // left, so the import button is always at the
+                            // right end.
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      comp.title.isEmpty
+                                          ? 'UNTITLED'
+                                          : comp.title.toUpperCase(),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                  ),
+                                  Flexible(
+                                    child: Text(
+                                      // Composer on the same line as the title.
+                                      '  ·  ${comp.composer.isEmpty ? 'UNKNOWN COMPOSER' : comp.composer.toUpperCase()}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                        color: _accent,
+                                      ),
+                                    ),
+                                  ),
+                                  if (isMine) ...[
+                                    const SizedBox(width: 10),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: _accent,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Text(
+                                        'yours',
+                                        style: TextStyle(
+                                          fontSize: 22,
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
-                            if (isMine) ...[
-                              const SizedBox(width: 10),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 2,
+                            const SizedBox(width: 12),
+                            // IMPORT — a round button (the same size as the
+                            // back button) with a black icon, white like the
+                            // style / instrument / level chips: copies the
+                            // composition to My Compositions.
+                            Tooltip(
+                              message: 'Copy to My Compositions',
+                              child: Material(
+                                color: Colors.white,
+                                shape: CircleBorder(
+                                  side: BorderSide(color: Colors.grey.shade400),
                                 ),
-                                decoration: BoxDecoration(
-                                  color: _accent,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Text(
-                                  'yours',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
+                                elevation: 2,
+                                child: InkWell(
+                                  customBorder: const CircleBorder(),
+                                  onTap: () => _copyToMyLibrary(context, comp),
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(12),
+                                    child: Icon(Icons.download,
+                                        color: Colors.black, size: 32),
                                   ),
                                 ),
                               ),
-                            ],
+                            ),
                           ],
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          comp.composer.isEmpty
-                              ? 'UNKNOWN COMPOSER'
-                              : comp.composer.toUpperCase(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          // Composer: accent color, regular (not italic), bold.
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: _accent,
-                          ),
                         ),
                         const SizedBox(height: 10),
                         Wrap(
                           spacing: 8,
                           runSpacing: 6,
                           children: [
-                            _InfoChip(icon: Icons.person, text: comp.userName),
-                            _InfoChip(icon: Icons.palette, text: comp.style),
-                            _InfoChip(icon: Icons.piano, text: comp.instrument),
+                            _InfoChip(plain: true, icon: Icons.person, text: comp.userName),
+                            _InfoChip(plain: !isMine, icon: Icons.palette, text: comp.style, onTap: isMine ? () => _openEdit(comp) : null),
+                            _InfoChip(plain: !isMine, icon: Icons.piano, text: comp.instrument, onTap: isMine ? () => _openEdit(comp) : null),
                             _InfoChip(
                               icon: Icons.signal_cellular_alt,
                               text: 'Level ${comp.complexity}',
+                              plain: !isMine,
+                              onTap: isMine ? () => _openEdit(comp) : null,
                             ),
                             _InfoChip(
+                              plain: true,
                               icon: Icons.view_week,
                               text: '$measureCount '
-                                  'measure${measureCount == 1 ? '' : 's'}',
+                                  'm${measureCount == 1 ? '' : 's'}',
                             ),
                           ],
                         ),
@@ -388,20 +432,12 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
                     Text(
                       '${comp.likeCount}',
                       style: const TextStyle(
-                        fontSize: 18,
+                        fontSize: 22,
                         fontWeight: FontWeight.bold,
                         color: Colors.black87,
                       ),
                     ),
                   ],
-                ),
-                Center(
-                  child: IconButton(
-                    icon: const Icon(Icons.download, color: _accent),
-                    iconSize: 28,
-                    tooltip: 'Copy to My Compositions',
-                    onPressed: () => _copyToMyLibrary(context, comp),
-                  ),
                 ),
                 const SizedBox(width: 8),
               ],
@@ -438,9 +474,28 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         elevation: 1,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
+        centerTitle: true,
+        toolbarHeight: 80,
+        leadingWidth: 88,
+        // Back: a round grey button with an arrow — the same size and
+        // shape as the ✕ (Exit) button of the Home screen.
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 16),
+          child: Center(
+            child: Material(
+              color: Colors.grey.shade300,
+              shape: const CircleBorder(),
+              elevation: 2,
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () => Navigator.pop(context),
+                child: const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Icon(Icons.arrow_back, color: Colors.black, size: 32),
+                ),
+              ),
+            ),
+          ),
         ),
         title: const Text(
           'Cloud Library',
@@ -524,7 +579,7 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
                               '${compositions.length} '
                                   'composition${compositions.length == 1 ? '' : 's'}',
                               style: const TextStyle(
-                                fontSize: 18,
+                                fontSize: 22,
                                 color: Colors.black54,
                               ),
                             ),
@@ -551,33 +606,55 @@ class _CloudLibraryScreenState extends State<CloudLibraryScreen> {
   }
 }
 
-/// A small rounded info chip (icon + text) used on each composition
-/// card for shared-by, style, instrument and measure count.
+/// A small info item on a composition card. A chip (white, framed)
+/// when it can be tapped ([onTap]: opens the Edit Composition dialog);
+/// otherwise ([plain]) just an icon and text, so it doesn't look like a
+/// button.
 class _InfoChip extends StatelessWidget {
   final IconData icon;
   final String text;
+  final VoidCallback? onTap;
+  final bool plain;
 
-  const _InfoChip({required this.icon, required this.text});
+  const _InfoChip({
+    required this.icon,
+    required this.text,
+    this.onTap,
+    this.plain = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
+    final content = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 18, color: Colors.black54),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: const TextStyle(fontSize: 22, color: Colors.black87),
+        ),
+      ],
+    );
+    if (plain) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+        child: content,
+      );
+    }
+    return Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade400),
+        side: BorderSide(color: Colors.grey.shade400),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 18, color: Colors.black54),
-          const SizedBox(width: 6),
-          Text(
-            text,
-            style: const TextStyle(fontSize: 18, color: Colors.black87),
-          ),
-        ],
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          child: content,
+        ),
       ),
     );
   }

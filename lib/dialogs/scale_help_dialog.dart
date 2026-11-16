@@ -81,10 +81,9 @@ void scaleHelpDialog({
           final isLandscape = screenSize.width >= screenSize.height;
           final maxDialogHeight = screenSize.height * 0.8;
           final maxDialogWidth = screenSize.width * 0.9;
-          // Smaller in portrait, where the whole list needs to fit in
-          // one narrower column — landscape has more room (two
-          // columns) so keeps the larger, easier-to-read size.
-          final rowFontSize = isLandscape ? 22.0 : 16.0;
+          // Size 22 in both orientations, like the rest of the app
+          // (the list scrolls in portrait if it does not fit).
+          const rowFontSize = 22.0;
 
           final Widget listContent;
 
@@ -139,16 +138,22 @@ void scaleHelpDialog({
               child: SingleChildScrollView(child: listContent),
             ),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                child: const Text(
-                  'Close',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
+              const Divider(thickness: 1.0),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    child: const Text(
+                      'Close',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ],
           );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/composition.dart';
 import '../models/timeline.dart';
 import '../models/measure.dart';
@@ -11,6 +12,18 @@ import '../widgets/complexity_selector.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 
+
+/// The height of the content of the New Composition dialog and the
+/// Profile panel — the same for both, so they are the same size.
+const double kDialogContentHeight = 360;
+
+/// Turns everything typed into capital letters (title, composer).
+class UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) =>
+      newValue.copyWith(text: newValue.text.toUpperCase());
+}
 
 class NewCompositionDialog extends StatefulWidget {
   final Function(Composition) onCompositionCreated;
@@ -26,8 +39,8 @@ class _NewCompositionDialogState extends State<NewCompositionDialog> {
   final currentUserId = FirebaseAuth.instance.currentUser!.uid;
 
   final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController(text: DefaultValues.title);
-  final _composerController = TextEditingController(text: DefaultValues.composer);
+  final _titleController = TextEditingController(text: DefaultValues.title.toUpperCase());
+  final _composerController = TextEditingController(text: DefaultValues.composer.toUpperCase());
 
   MusicStyle _selectedStyle = DefaultValues.style;
   Instrument _selectedInstrument = DefaultValues.instrument;
@@ -57,6 +70,7 @@ class _NewCompositionDialogState extends State<NewCompositionDialog> {
       ),
       decoration: InputDecoration(
         labelText: label,
+        labelStyle: const TextStyle(fontSize: 22),
         isDense: true,
         border: const OutlineInputBorder(),
         prefixIcon: Icon(icon, size: 22),
@@ -75,11 +89,14 @@ class _NewCompositionDialogState extends State<NewCompositionDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      alignment: Alignment.topCenter,//keep the dialog on top of screen
+      // In the middle of the screen. When the keyboard comes up, the
+      // dialog moves up above it (Flutter's dialogs do that by
+      // themselves) and its content scrolls, so everything stays
+      // reachable.
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.white,
       title: const Text(
-        'New Composition',
+        'Create Composition',
         textAlign: TextAlign.center,
         style: TextStyle(
           fontSize: 22,
@@ -88,8 +105,12 @@ class _NewCompositionDialogState extends State<NewCompositionDialog> {
         ),
       ),
       content: SingleChildScrollView(
-        child: SizedBox(
-          width: MediaQuery.of(context).size.width * 0.70,
+        child: Container(
+          // The same width as the Profile panel.
+          width: (MediaQuery.of(context).size.width - 48).clamp(0.0, 500.0),
+          // At least as high as the Profile panel (the same size).
+          constraints: const BoxConstraints(minHeight: kDialogContentHeight),
+          alignment: Alignment.topCenter,
           child: Form(
             key: _formKey,
             child: Column(
@@ -105,8 +126,13 @@ class _NewCompositionDialogState extends State<NewCompositionDialog> {
                         children: [
                           TextFormField(
                             controller: _titleController,
+                            // Always in capital letters.
+                            textCapitalization: TextCapitalization.characters,
+                            inputFormatters: [UpperCaseTextFormatter()],
                             decoration: const InputDecoration(
                               labelText: 'Composition Title',
+                              labelStyle: TextStyle(fontSize: 22),
+                              errorStyle: TextStyle(fontSize: 22),
                               isDense: true,
                               border: OutlineInputBorder(),
                               prefixIcon: Icon(Icons.title, size: 22),
@@ -124,8 +150,13 @@ class _NewCompositionDialogState extends State<NewCompositionDialog> {
                           const SizedBox(height: 15),
                           TextFormField(
                             controller: _composerController,
+                            // Always in capital letters.
+                            textCapitalization: TextCapitalization.characters,
+                            inputFormatters: [UpperCaseTextFormatter()],
                             decoration: const InputDecoration(
                               labelText: 'Composer',
+                              labelStyle: TextStyle(fontSize: 22),
+                              errorStyle: TextStyle(fontSize: 22),
                               isDense: true,
                               border: OutlineInputBorder(),
                               prefixIcon: Icon(Icons.person, size: 22),

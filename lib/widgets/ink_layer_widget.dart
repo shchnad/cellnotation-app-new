@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../controllers/composition_controller.dart';
 
-/// Red-pen marks drawn over the grid (above the notes).
+/// Pen marks (green) drawn over the grid (above the notes).
 ///
 /// Always paints the saved marks. While Pen mode is on
 /// (CompositionController.penMode) it also takes the finger: one finger
-/// draws a thin red line (or a dot on a tap), or — with the Eraser
+/// draws a thin green line (or a dot on a tap), or — with the Eraser
 /// selected — erases every mark it touches. While Pen mode is off it
 /// ignores touches completely, so the grid works exactly as before.
 ///
@@ -129,7 +129,7 @@ class InkPainter extends CustomPainter {
   });
 
   static const double strokeWidth = 3.0;
-  static const Color inkColor = Color(0xFFE53935); // clear, bright red
+  static const Color inkColor = Color(0xFF2E7D32); // clear green
 
   @override
   void paint(Canvas canvas, Size size) {

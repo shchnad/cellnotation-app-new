@@ -82,7 +82,7 @@ void beatSubdivisionDialog({
         measureRangeDialog(
           context: context,
           controller: controller,
-          title: 'Change Time Signature',
+          title: 'Edit Time Signature',
           actionLabel: 'Apply',
           actionColor: Colors.blue,
           onConfirm: apply,
@@ -93,7 +93,7 @@ void beatSubdivisionDialog({
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         title: const Text(
-          'Change Time Signature',
+          'Edit Time Signature',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 22,

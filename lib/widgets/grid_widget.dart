@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../controllers/composition_controller.dart';
 import '../dialogs/beat_subdivision_dialog.dart';
 import '../dialogs/edit_measure_beat_dialog.dart';
-import '../dialogs/scale_dialog.dart';
+import '../dialogs/set_scale_dialog.dart';
 import '../dialogs/tempo_dialog.dart';
 import '../dialogs/dynamic_dialog.dart';
 import '../dialogs/dynamic_change_dialog.dart';
@@ -207,7 +207,7 @@ String _fermataLabelText(dynamic beatDuration, int multiplier) {
 String _measureNumberText(int measureNumber) => '$measureNumber';
 
 /// Color of the reprise signs (𝄆 𝄇, voltas, 𝄋, Coda, Fine, D.S.).
-const Color _repriseColor = Color(0xFFE65100);
+const Color _repriseColor = Color(0xFF2E7D32); // green, like the pen
 
 TextPainter _repriseTextPainter(String text, double fontSize,
     {bool italic = false, double scale = 1.0, Color color = _repriseColor}) {
@@ -916,13 +916,6 @@ class GridWidget extends StatelessWidget {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, child) {
-        final scaleLabelHits = helpMode
-            ? _computeScaleLabelHits(controller, pixelsPerTick)
-            : const <_ScaleLabelHit>[];
-        final labelHits = helpMode
-            ? _computeLabelHits(controller, pixelsPerTick, gridHeight)
-            : const <_LabelHit>[];
-
         return LayoutBuilder(
           builder: (context, constraints) {
             // Trailing padding, symmetric to [leadingPadding] at the
@@ -1140,8 +1133,9 @@ class GridWidget extends StatelessWidget {
                                   }
 
                                   // 4. Check the scale name label at the top —
-                                  //    tapping it opens a scale picker for that
-                                  //    measure, not creating a note.
+                                  //    tapping it opens Set Scale (this measure
+                                  //    or a range, then the scale), not
+                                  //    creating a note.
                                   final scaleLabelHits = _computeScaleLabelHits(
                                     controller,
                                     pixelsPerTick,
@@ -1149,18 +1143,14 @@ class GridWidget extends StatelessWidget {
 
                                   for (final hit in scaleLabelHits) {
                                     if (hit.rect.contains(details.localPosition)) {
-                                      final measure =
-                                      controller.measures[hit.measureIndex];
-                                      scaleDialog(
+                                      // First choose this measure or a
+                                      // range of measures, then the scale
+                                      // (the same Set Scale dialog as in
+                                      // the beat-and-measure dialog).
+                                      setScaleDialog(
                                         context: context,
                                         controller: controller,
-                                        currentScale: measure.scaleName,
-                                        onSelected: (newScale) {
-                                          controller.updateMeasureScale(
-                                            hit.measureIndex,
-                                            newScale,
-                                          );
-                                        },
+                                        measureIndex: hit.measureIndex,
                                       );
                                       return; // don't fall through to note creation
                                     }
@@ -1417,46 +1407,9 @@ class GridWidget extends StatelessWidget {
                               ),
                             ),
 
-                            // HELP MODE — tempo callouts, positioned just
-                            // below each tempo label's own rect. Points
-                            // DOWN (per request) since the bubble sits
-                            // ABOVE the tempo/time-signature label it's
-                            // pointing at.
-                            if (helpMode)
-                              ...labelHits.where((h) => h.isTempo).map(
-                                    (hit) => Positioned(
-                                  left: hit.rect.left,
-                                  // Positioned via `bottom` (relative to the
-                                  // stack's own bottom edge) rather than
-                                  // `top`, since the callout's own rendered
-                                  // height isn't known in advance here —
-                                  // this puts its bottom edge 2px above the
-                                  // tempo label's own top edge, i.e. ABOVE
-                                  // the tempo name, per request (previously
-                                  // below it).
-                                  bottom: gridHeight - hit.rect.top + 2,
-                                  child: speechBubble(
-                                    'To edit tempo or\ntime signature,\ntap its label',
-                                    pointerSide: BubblePointerSide.bottom,
-                                  ),
-                                ),
-                              ),
-
-                            // HELP MODE — scale callouts, positioned just
-                            // below each scale name label's own rect.
-                            // Points UP (per request) since the bubble
-                            // sits BELOW the scale label it's pointing at.
-                            if (helpMode)
-                              ...scaleLabelHits.map(
-                                    (hit) => Positioned(
-                                  left: hit.rect.left,
-                                  top: hit.rect.bottom + 2,
-                                  child: speechBubble(
-                                    'To edit scale,\ntap its label',
-                                    pointerSide: BubblePointerSide.top,
-                                  ),
-                                ),
-                              ),
+                            // (Help mode no longer puts bubbles on the grid:
+                            // turning it on opens the guide pop-up instead —
+                            // see CompositionScreen._showGuideDialog.)
 
                             // RED PEN MARKS — on top of everything, so
                             // marks are visible over notes. Takes the
@@ -1861,12 +1814,11 @@ class GridPainter extends CustomPainter {
       // measure (unlike the scale name below it, which only repeats
       // where the scale actually changes).
       // A temporary reprise copy (playback mode) shows the number of
-      // the measure it copies, in red.
+      // the measure it copies, in green.
       final isCopy = measure.isTemporary;
       final measureNumberPainter = isCopy
           ? _repriseTextPainter(
-          _measureNumberText(shownNumbers[i]), fontSize,
-          color: Colors.red)
+          _measureNumberText(shownNumbers[i]), fontSize)
           : _measureNumberTextPainter(
         _measureNumberText(shownNumbers[i]),
         fontSize,
@@ -2109,7 +2061,7 @@ class GridPainter extends CustomPainter {
 
 
 /// Small floating bar shown while Pen mode is on: Pen / Eraser / Undo /
-/// Clear all / Done.
+/// Clear all (tap the Pen icon in the app bar again to finish).
 class _PenToolbar extends StatelessWidget {
   final CompositionController controller;
 
@@ -2120,44 +2072,40 @@ class _PenToolbar extends StatelessWidget {
     final erasing = controller.inkEraser;
     final hasInk = controller.inkStrokeCount > 0;
 
+    // The same buttons as the app's choice dialogs (noteValuesDialog):
+    // grey, black text — the tool in use with blue text.
+    // The same buttons as the app's choice dialogs: grey, black text.
+    // Pen and Eraser are green: the one in use is a green button with
+    // white text, the other a grey button with green text.
     Widget tool({
       required IconData icon,
       required String label,
       required Color color,
       required VoidCallback? onTap,
       bool selected = false,
+      bool green = false,
     }) {
       final enabled = onTap != null;
       final fg = !enabled
           ? Colors.grey
-          : (selected ? Colors.white : color);
+          : green
+          ? (selected ? Colors.white : Colors.green)
+          : Colors.black;
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 3),
-        child: Material(
-          color: selected ? color : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(20),
-            onTap: onTap,
-            child: Padding(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(icon, color: fg, size: 22),
-                  const SizedBox(width: 4),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: fg,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor:
+            green && selected ? Colors.green : Colors.grey.shade300,
+            disabledBackgroundColor: Colors.grey.shade200,
+            minimumSize: const Size(0, 50),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          ),
+          onPressed: onTap,
+          icon: Icon(icon, color: fg, size: 24),
+          label: Text(
+            label,
+            style: TextStyle(color: fg, fontSize: 22),
           ),
         ),
       );
@@ -2166,9 +2114,9 @@ class _PenToolbar extends StatelessWidget {
     return Material(
       color: Colors.white,
       elevation: 6,
-      borderRadius: BorderRadius.circular(26),
+      borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.all(4),
+        padding: const EdgeInsets.all(6),
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
@@ -2177,7 +2125,8 @@ class _PenToolbar extends StatelessWidget {
               tool(
                 icon: Icons.draw,
                 label: 'Pen',
-                color: Colors.red,
+                color: Colors.green,
+                green: true,
                 selected: !erasing,
                 onTap: () => controller.setInkEraser(false),
               ),
@@ -2185,6 +2134,7 @@ class _PenToolbar extends StatelessWidget {
                 icon: Icons.cleaning_services,
                 label: 'Eraser',
                 color: Colors.blue,
+                green: true,
                 selected: erasing,
                 onTap: hasInk ? () => controller.setInkEraser(true) : null,
               ),
@@ -2206,36 +2156,44 @@ class _PenToolbar extends StatelessWidget {
                       backgroundColor: Colors.white,
                       surfaceTintColor: Colors.white,
                       title: const Text(
-                        'Clear all red marks?',
+                        'Clear all marks?',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
+                          color: Colors.black,
                         ),
                       ),
                       actions: [
-                        TextButton(
-                          onPressed: () =>
-                              Navigator.pop(dialogContext, false),
-                          child: const Text(
-                            'Cancel',
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
+                        const Divider(thickness: 1.0),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            TextButton(
+                              onPressed: () =>
+                                  Navigator.pop(dialogContext, false),
+                              child: const Text(
+                                'Close',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () =>
-                              Navigator.pop(dialogContext, true),
-                          child: const Text(
-                            'Clear',
-                            style: TextStyle(
-                              color: Colors.red,
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
+                            TextButton(
+                              onPressed: () =>
+                                  Navigator.pop(dialogContext, true),
+                              child: const Text(
+                                'Clear',
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ],
                     ),
@@ -2243,12 +2201,6 @@ class _PenToolbar extends StatelessWidget {
                   if (ok == true) controller.clearAllInk();
                 }
                     : null,
-              ),
-              tool(
-                icon: Icons.check,
-                label: 'Done',
-                color: Colors.green,
-                onTap: controller.togglePenMode,
               ),
             ],
           ),
