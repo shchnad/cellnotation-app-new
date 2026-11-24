@@ -664,8 +664,9 @@ class _CompositionScreenState extends State<CompositionScreen>
       "Tap the main note, choose 'Grace Note', pick the type and whether it comes before "
           "or after the note. The 'Grace Notes' icon lights up: tap the grid on the rows "
           "(pitches) of the grace notes. Tap the icon again to stop adding.\n"
-          "An appoggiatura takes half of the note; an acciaccatura (long, medium, short) "
-          "always has a fixed short length.",
+          "Each grace note takes a part of the main note: an appoggiatura a half (only 1 per "
+          "note), an acciaccatura long a quarter (up to 3), medium a sixth (up to 4) and short "
+          "an eighth (up to 6).",
     ],
     [
       'ADD AN ORNAMENT',
@@ -811,6 +812,15 @@ class _CompositionScreenState extends State<CompositionScreen>
           "'From PDF' reads the notes from a PDF of printed sheet music and puts the result in "
           "the box, so you can check it and then tap 'Import'. 'Help' explains the whole "
           "transcription notation, with examples.",
+    ],
+    [
+      'SOUND AND INSTRUMENT OF EACH HAND',
+      "Tap the 'Audio' icon. In the Off and On columns choose which hands are heard. In the "
+          "Instrument column tap a hand's instrument and pick another one — each hand can be "
+          "played with its own instrument, for example the right hand with a violin and the left "
+          "hand with a piano. 'All hands' gives all three the same instrument. Tap 'Set'.\n"
+          "The instruments are saved with the composition. At first every hand plays the "
+          "composition's Target Instrument.",
     ],
     [
       'MORE HELP',

@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 import '../controllers/composition_controller.dart';
 import '../enums/hand.dart';
+import '../enums/instrument.dart';
+import 'note_values_dialog.dart';
 
+/// Opens from the Audio icon. A third column, Instrument, shows the
+/// instrument each hand is played with (by default the Target
+/// Instrument); tapping it opens the instrument list. Set applies the
+/// sound choice and the instruments together.
+///
 /// Opens from the Audio icon. Left column "No Sound", right column
 /// "Sound", each with Right hand, Left hand, Additional hand and All
 /// hands. Buttons whose choice is in effect have coloured text — red in
@@ -16,6 +23,12 @@ void audioHandsDialog(
   final muted = <Hand>{
     for (final h in Hand.values)
       if (controller.isHandMuted(h)) h,
+  };
+
+  // The instrument of each hand as chosen in this dialog (applied by
+  // Set).
+  final instruments = <Hand, Instrument>{
+    for (final h in Hand.values) h: controller.instrumentForHand(h),
   };
 
   const rows = <(String, List<Hand>)>[
@@ -61,6 +74,46 @@ void audioHandsDialog(
                 ),
               );
 
+          // INSTRUMENT column: each hand's instrument (blue); tapping
+          // opens the instrument list. "All hands" gives all three the
+          // same instrument.
+          Widget instrumentColumn() => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Instrument', style: headStyle),
+              const SizedBox(height: 6),
+              for (final (_, hands) in rows)
+                button(
+                  hands.length == 1
+                      ? instruments[hands.first]!.label
+                      : (hands.map((h) => instruments[h]).toSet().length ==
+                      1
+                      ? instruments[hands.first]!.label
+                      : 'All hands'),
+                  true,
+                  Colors.blue,
+                      () => noteValuesDialog<Instrument>(
+                    context: context,
+                    allowToCloseNextWindow: false,
+                    title: hands.length == 1
+                        ? 'Instrument'
+                        : 'Instrument for all hands',
+                    currentValue: instruments[hands.first]!,
+                    values: Instrument.values
+                        .where((i) => i != Instrument.any)
+                        .toList(),
+                    labelBuilder: (i) => i.label,
+                    numberOfColumns: 3,
+                    onSelected: (instrument) => setState(() {
+                      for (final h in hands) {
+                        instruments[h] = instrument;
+                      }
+                    }),
+                  ),
+                ),
+            ],
+          );
+
           Widget column(String title, bool silent) => Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -101,6 +154,8 @@ void audioHandsDialog(
                   column('Off', true),
                   const SizedBox(width: 16),
                   column('On', false),
+                  const SizedBox(width: 16),
+                  instrumentColumn(),
                 ],
               ),
             ),
@@ -113,6 +168,7 @@ void audioHandsDialog(
                     onPressed: () {
                       Navigator.pop(dialogContext);
                       controller.setMutedHandsTo(muted);
+                      controller.setHandInstruments(instruments);
                     },
                     child: const Text(
                       'Set',

@@ -14,6 +14,7 @@ import '../enums/ornament.dart';
 import '../enums/playing_technique.dart';
 import '../enums/tempo.dart';
 import '../enums/hand.dart';
+import '../enums/instrument.dart';
 import '../enums/note_duration.dart';
 
 import '../models/composition.dart';
@@ -77,8 +78,12 @@ class CompositionController extends ChangeNotifier {
   /// again — pitches already prepared are skipped.
   void warmUpSounds() {
     try {
-      final frequencies = <double>{};
+      // Grouped by the sound of each hand's instrument, so every
+      // (instrument, pitch) pair that playback needs is ready.
+      final byTimbre = <SoundTimbre, Set<double>>{};
       for (final note in notes) {
+        final frequencies =
+        byTimbre.putIfAbsent(timbreForHand(note.hand), () => <double>{});
         if (note.glissandoSourceId != null) {
           frequencies.add(getWhiteKeyFrequencyHz(note.row));
           continue;
@@ -93,7 +98,12 @@ class CompositionController extends ChangeNotifier {
           }
         }
       }
-      NoteSoundService.instance.warmUp(frequencies);
+      () async {
+        for (final entry in byTimbre.entries) {
+          await NoteSoundService.instance
+              .warmUp(entry.value, timbre: entry.key);
+        }
+      }();
     } catch (_) {
       // Warm-up is only an optimization — never let it break opening
       // a composition.
@@ -640,13 +650,25 @@ class CompositionController extends ChangeNotifier {
       d.start + (k * d.ticks / d.columns).round();
 
   /// The exact (fractional) position of [tick] for showing and playing
-  /// notes: in a split beat, the exact start of the nearest column;
-  /// elsewhere the tick itself.
+  /// notes: in a split beat, a column's (rounded) start tick is its
+  /// exact start, and a tick INSIDE a column — e.g. a grace note carved
+  /// from the start of a triplet note — lies proportionally between
+  /// that column's exact start and end, so grace notes keep their own
+  /// place and length there too; elsewhere the tick itself.
   double displayTick(int tick) {
     final d = dividedBeatAt(tick);
     if (d == null) return tick.toDouble();
-    final k = ((tick - d.start) * d.columns / d.ticks).round();
-    return d.start + k * d.ticks / d.columns;
+    for (int k = d.columns - 1; k >= 0; k--) {
+      final start = _columnTick(d, k);
+      if (tick >= start) {
+        final end = _columnTick(d, k + 1);
+        final exactStart = d.start + k * d.ticks / d.columns;
+        final exactWidth = d.ticks / d.columns;
+        if (end <= start) return exactStart;
+        return exactStart + (tick - start) * exactWidth / (end - start);
+      }
+    }
+    return d.start.toDouble();
   }
 
   /// The column of a split beat that [tick] falls in (start tick and
@@ -3396,7 +3418,9 @@ class CompositionController extends ChangeNotifier {
         note.graceOriginalDurationTicks ?? note.durationTicks;
     final perNote = type.durationTicksFor(originalDuration);
     if (perNote <= 0) return 0;
-    final durationBasedMax = (originalDuration / perNote).floor();
+    // The main note always keeps at least one tick of its own (on a
+    // very short note, fewer grace notes fit than the type allows).
+    final durationBasedMax = ((originalDuration - 1) / perNote).floor();
     final cap = type.maxCountOverride ?? maxGraceNotesPerNote;
     return durationBasedMax.clamp(0, cap);
   }
@@ -3636,6 +3660,10 @@ class CompositionController extends ChangeNotifier {
         graceDurations.add(fixedDuration);
         totalGraceDuration += fixedDuration;
       }
+      // AFTER the main note: the LONGEST grace note comes first, right
+      // after the main note (the pitches keep their tapped order —
+      // only the lengths are arranged).
+      graceDurations.sort((a, b) => b.compareTo(a));
 
       final newAnchorEnd = (originalEndTick - totalGraceDuration)
           .clamp(fixedStartTick + 1, originalEndTick);
@@ -3677,12 +3705,18 @@ class CompositionController extends ChangeNotifier {
       return;
     }
 
+    // BEFORE the main note: the LONGEST grace note comes last, right
+    // before the main note (the pitches keep their tapped order —
+    // only the lengths are arranged).
+    final graceDurations = [
+      for (final idx in graceIndices)
+        notes[idx].graceNoteType?.durationTicksFor(originalDuration) ?? 1,
+    ]..sort();
+
     int runningTick = originalStartTick;
     for (int k = 0; k < count; k++) {
       final idx = graceIndices[k];
-      final graceType = notes[idx].graceNoteType;
-      final fixedDuration =
-          graceType?.durationTicksFor(originalDuration) ?? 1;
+      final fixedDuration = graceDurations[k];
       notes[idx] = notes[idx].copyWith(
         startTick: runningTick,
         durationTicks: fixedDuration,
@@ -3784,6 +3818,100 @@ class CompositionController extends ChangeNotifier {
       ..clear()
       ..addAll(muted);
     notifyListeners();
+  }
+
+  // ---------------- INSTRUMENT PER HAND ----------------
+
+  /// The composition's Target Instrument as an [Instrument] ('any' and
+  /// unknown names play the piano).
+  Instrument get targetInstrument {
+    final value = composition.instrument.toLowerCase();
+    for (final i in Instrument.values) {
+      if (i.label.toLowerCase() == value || i.name.toLowerCase() == value) {
+        return i == Instrument.any ? Instrument.piano : i;
+      }
+    }
+    return Instrument.piano;
+  }
+
+  /// The instrument [hand] is played with — chosen in the Audio dialog
+  /// and saved with the composition; by default the Target Instrument.
+  Instrument instrumentForHand(Hand hand) {
+    final name = composition.handInstruments[hand.name];
+    if (name != null) {
+      for (final i in Instrument.values) {
+        if (i.name == name) return i;
+      }
+    }
+    return targetInstrument;
+  }
+
+  /// Plays [hand] with [instrument] from now on (saved with the
+  /// composition) and prepares that instrument's sounds.
+  void setHandInstrument(Hand hand, Instrument instrument) {
+    composition.handInstruments[hand.name] = instrument.name;
+    warmUpSounds();
+    notifyListeners();
+  }
+
+  /// Sets the instruments of several hands at once (the Audio dialog's
+  /// Set button).
+  void setHandInstruments(Map<Hand, Instrument> instruments) {
+    instruments.forEach((hand, instrument) {
+      composition.handInstruments[hand.name] = instrument.name;
+    });
+    warmUpSounds();
+    notifyListeners();
+  }
+
+  SoundTimbre timbreForHand(Hand hand) =>
+      timbreForInstrument(instrumentForHand(hand));
+
+  /// The kind of sound each instrument is played with.
+  static SoundTimbre timbreForInstrument(Instrument instrument) {
+    switch (instrument) {
+      case Instrument.any:
+      case Instrument.piano:
+        return SoundTimbre.piano;
+      case Instrument.keyboard:
+        return SoundTimbre.electricPiano;
+      case Instrument.organ:
+        return SoundTimbre.organ;
+      case Instrument.accordion:
+      case Instrument.bayan:
+        return SoundTimbre.reed;
+      case Instrument.guitar6Strings:
+      case Instrument.guitar7Strings:
+        return SoundTimbre.guitar;
+      case Instrument.guitarElectro:
+        return SoundTimbre.electricGuitar;
+      case Instrument.guitarBass:
+        return SoundTimbre.bassGuitar;
+      case Instrument.cello:
+        return SoundTimbre.bowedLow;
+      case Instrument.violin:
+        return SoundTimbre.bowed;
+      case Instrument.ukelele:
+      case Instrument.balalaika:
+      case Instrument.banjo:
+        return SoundTimbre.bright;
+      case Instrument.harp:
+        return SoundTimbre.harp;
+      case Instrument.clarinet:
+        return SoundTimbre.clarinet;
+      case Instrument.cornet:
+      case Instrument.trumpet:
+      case Instrument.trombone:
+        return SoundTimbre.brass;
+      case Instrument.horn:
+        return SoundTimbre.horn;
+      case Instrument.flute:
+        return SoundTimbre.flute;
+      case Instrument.saxophone:
+        return SoundTimbre.saxophone;
+      case Instrument.xylophone:
+        return SoundTimbre.xylophone;
+    }
   }
 
   void setAllHandsMuted(bool muted) {
@@ -4093,6 +4221,7 @@ class CompositionController extends ChangeNotifier {
     NoteSoundService.instance.playTone(
       frequencyHz: frequencyHz,
       durationSeconds: durationSeconds,
+      timbre: timbreForHand(note.hand),
     );
   }
 
@@ -4119,6 +4248,7 @@ class CompositionController extends ChangeNotifier {
         shift: shift,
       ),
       durationSeconds: getNoteDurationSeconds(ghost),
+      timbre: timbreForHand(baseNote.hand),
     );
   }
 
@@ -4632,8 +4762,8 @@ class CompositionController extends ChangeNotifier {
   /// The trill for [note] as a shiftMap of equal short notes, each
   /// lasting about [trillNoteSeconds] at the note's tempo. Alternates
   /// the auxiliary note and the main note in the order the ornament
-  /// defines (upper note first) and always ends on the main note,
-  /// so the count is always even. Computed at the written tempo, not
+  /// defines and always ends with a part of the note's own pitch
+  /// (see the comment below). Computed at the written tempo, not
   /// the Scroll Speed setting, so the grid looks the same at any
   /// playback speed.
   List _trillShiftMap(Note note, Ornament ornament) {
@@ -4651,16 +4781,31 @@ class CompositionController extends ChangeNotifier {
       final seconds = note.durationTicks / beatTicks * 60.0 / bpm;
       count = (seconds / trillNoteSeconds).round();
     }
-    if (count.isOdd) count += 1; // end on the main note
+    // A trill ALWAYS ends on the note's own pitch (shift 0):
+    // - if the trill alternates with the main note, the number of parts
+    //   is chosen so that the last one is the main note;
+    // - if neither of its two pitches is the main note itself, one
+    //   part of the main pitch is added at the end.
+    // (The last part also takes any ticks left over when the note
+    // can't be divided exactly — see displayNotes.)
+    final endsOnFirst = first == 0;
+    final endsOnSecond = second == 0 && !endsOnFirst;
+    final addMainAtEnd = !endsOnFirst && !endsOnSecond;
+
     count = count.clamp(2, _maxTrillNotes);
-    // Never shorter than one tick per short note.
-    while (count > 2 && count > note.durationTicks) {
+    if (endsOnFirst && count.isEven) count += 1; // odd: ends on first
+    if (endsOnSecond && count.isOdd) count += 1; // even: ends on second
+    // Never shorter than one tick per short note (keeping the parity
+    // that makes the trill end on the main pitch).
+    while (count > 3 && count > note.durationTicks) {
       count -= 2;
     }
+    final alternating = addMainAtEnd ? count - 1 : count;
 
     return [
-      for (int i = 0; i < count; i++)
+      for (int i = 0; i < alternating; i++)
         {'coeff': 1.0, 'shift': i.isEven ? first : second},
+      if (addMainAtEnd) {'coeff': 1.0, 'shift': 0},
     ];
   }
 
@@ -4710,17 +4855,32 @@ class CompositionController extends ChangeNotifier {
         continue;
       }
 
-      double runningTick = note.startTick.toDouble();
+      // Whole ticks for every part. When the note can't be divided
+      // exactly (e.g. a trill or tremolo of 8 parts on a 12-tick
+      // note), every part gets its share rounded DOWN and the VERY
+      // LAST part takes the ticks left over — so the extra length is
+      // always at the end of the ornament, never a longer part
+      // somewhere in the middle.
+      final partTicks = <int>[];
+      int usedTicks = 0;
+      for (int i = 0; i < shiftMap.length; i++) {
+        final coeff =
+            ((shiftMap[i] as Map)['coeff'] as num).toDouble() / totalCoeff;
+        final ticks = i == shiftMap.length - 1
+            ? note.durationTicks - usedTicks
+            : (note.durationTicks * coeff + 1e-9).floor();
+        partTicks.add(ticks);
+        usedTicks += ticks;
+      }
+
+      int runningTick = note.startTick;
       for (int i = 0; i < shiftMap.length; i++) {
         final entry = shiftMap[i] as Map;
-        final coeff = (entry['coeff'] as num).toDouble() / totalCoeff;
         final shift = (entry['shift'] as num).toInt();
 
-        final rawDuration = note.durationTicks * coeff;
-        final startTickRounded = runningTick.round();
-        final endTickRounded = (runningTick + rawDuration).round();
-        final subDuration = endTickRounded - startTickRounded;
-        runningTick += rawDuration;
+        final startTickRounded = runningTick;
+        final subDuration = partTicks[i];
+        runningTick += subDuration;
         if (subDuration <= 0) continue;
 
         // Only the ornament's unaltered/base-pitch entries (raw

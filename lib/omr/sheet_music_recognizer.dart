@@ -315,8 +315,10 @@ OmrPageResult recognizeSheetMusicPage(Uint8List gray, int width, int height) {
       keyCounts.add(_signCounts(_keySignList(
           nos, hand == 'hr' ? tr : bs, inf.clefEnd! + 0.2 * sp, ke - 0.1 * sp, sp)));
     }
+    // (No sign read at all: the key goes on from before — a real
+    // change back to C major / A minor shows naturals, read as 0.)
     final int? systemKey =
-    keyCounts.isEmpty ? null : (_keyFromCounts(keyCounts) ?? 0);
+    keyCounts.isEmpty ? null : _keyFromCounts(keyCounts);
 
     // 8va / 15ma lines over the treble staff, 8vb / 15mb under the bass
     // staff. A line going on from the previous system keeps its sign.
@@ -671,9 +673,160 @@ Map<String, List<int>> _measureOnsets(OmrMeasure m, int meter, int unit) {
       starts.add(t);
       prev = t;
     }
+    // Ran out of room (the durations read were too long, or the
+    // measure is a pickup): several notes would pile up on the same
+    // last position. Rather than stacking them there, place this hand's
+    // notes by their x position across the measure, on the finest grid
+    // (a 32nd), keeping their order.
+    bool piled = false;
+    for (int k = 1; k < starts.length; k++) {
+      if (starts[k] <= starts[k - 1]) {
+        piled = true;
+        break;
+      }
+    }
+    if (piled) {
+      final fine = 4 * _tupletScale; // a 32nd
+      final span = math.max(1.0, xEnd - xFirst);
+      final byX = <int>[];
+      int last = -fine;
+      for (final e in ev) {
+        var t = (((e.x - xFirst) / span * meterS) / fine).round() * fine;
+        if (t <= last) t = last + fine;
+        byX.add(t);
+        last = t;
+      }
+      // Use it only when it fits in the measure.
+      if (byX.isEmpty || byX.last < meterS) {
+        result[hand] = byX;
+        continue;
+      }
+    }
     result[hand] = starts;
   }
   return result;
+}
+
+/// Repairs misread beam counts in one hand of a measure so that it
+/// fills the measure ([meter], 1/128ths) exactly. A slur, a fingering
+/// or a "Ped." sign touching a stem can add a beam that isn't there
+/// (a 16th read as a 32nd), and a faint beam can be missed (a 16th
+/// read as an 8th). When the hand's notes don't add up to the meter,
+/// beamed notes whose length differs from their neighbours' are given
+/// their neighbours' length — one at a time, the most obvious first —
+/// as long as that brings the total closer. The changes are kept only
+/// if the hand then fills the measure EXACTLY; otherwise nothing is
+/// changed (a pickup, a real 32nd, a misread note…).
+void _fitBeamCounts(List<OmrEvent> ev, int meter) {
+  if (ev.isEmpty ||
+      ev.any((e) => e.duration <= 0 || e.tuplet > 1 || e.isRest)) {
+    return;
+  }
+  int total(List<int> d) => d.fold<int>(0, (s, x) => s + x);
+  final durs = [for (final e in ev) e.duration];
+  if (total(durs) == meter) return;
+  if (ev.length < 2) return;
+
+  // Plain (undotted) beamed lengths only: 8th, 16th, 32nd, 64th.
+  bool beamed(int d) => d == 16 || d == 8 || d == 4 || d == 2;
+
+  final work = [...durs];
+  for (int step = 0; step < ev.length; step++) {
+    final t = total(work);
+    if (t == meter) break;
+    int bestI = -1, bestD = 0, bestScore = 0;
+    for (int i = 0; i < work.length; i++) {
+      final d = work[i];
+      if (!beamed(d)) continue;
+      final prev = i > 0 ? work[i - 1] : null;
+      final next = i + 1 < work.length ? work[i + 1] : null;
+      for (final nd in [d * 2, d ~/ 2]) {
+        if (!beamed(nd)) continue;
+        final newT = t - d + nd;
+        if ((newT - meter).abs() >= (t - meter).abs()) continue;
+        // How much it agrees with its neighbours after the change.
+        int score = 0;
+        if (prev == nd) score++;
+        if (next == nd) score++;
+        // A note that agreed with neither neighbour before is the
+        // likelier misread.
+        if (prev != d && next != d) score++;
+        if (score > bestScore) {
+          bestScore = score;
+          bestI = i;
+          bestD = nd;
+        }
+      }
+    }
+    if (bestI < 0 || bestScore < 2) break;
+    work[bestI] = bestD;
+  }
+  if (total(work) != meter) return;
+  for (int i = 0; i < ev.length; i++) {
+    if (work[i] != ev[i].duration) {
+      final e = ev[i];
+      ev[i] = OmrEvent(e.x, work[i], e.notes,
+          arpeggio: e.arpeggio, tuplet: e.tuplet, top: e.top, bottom: e.bottom)
+        ..tupletPrinted = e.tupletPrinted;
+    }
+  }
+}
+
+/// In a beat that holds triplet notes (in either hand), the other notes
+/// starting inside that beat are put on the triplet grid too — e.g. the
+/// dotted eighth + sixteenth over triplets of the Moonlight Sonata: the
+/// sixteenth goes with the last note of the triplet (written d4:3 +
+/// d8:3), as it is played. Without this the beat needs 12 columns in
+/// the app instead of 3. [onsets] (1/(128 × [_tupletScale])) and the
+/// events of [m] are changed in place; [unit] is the beat in 1/128ths.
+void _alignToTriplets(OmrMeasure m, Map<String, List<int>> onsets, int unit) {
+  final beatS = unit * _tupletScale;
+  final third = beatS ~/ 3;
+  if (third * 3 != beatS) return;
+  // Beats with a triplet note in them.
+  final tripletBeats = <int>{};
+  for (final hand in const ['hr', 'hl']) {
+    final ev = m.hands[hand] ?? const <OmrEvent>[];
+    final st = onsets[hand] ?? const <int>[];
+    for (int i = 0; i < ev.length && i < st.length; i++) {
+      if (ev[i].tuplet == 3) tripletBeats.add(st[i] ~/ beatS);
+    }
+  }
+  if (tripletBeats.isEmpty) return;
+  for (final hand in const ['hr', 'hl']) {
+    final ev = m.hands[hand];
+    final st = onsets[hand];
+    if (ev == null || st == null) continue;
+    for (int i = 0; i < ev.length && i < st.length; i++) {
+      final e = ev[i];
+      if (e.tuplet > 1 || e.duration <= 0) continue;
+      final beat = st[i] ~/ beatS;
+      if (!tripletBeats.contains(beat)) continue;
+      final f = st[i] - beat * beatS; // position inside the beat
+      final len = _effectiveDuration(e);
+      final end = f + len;
+      if (f % third == 0 && (end % third == 0 || end >= beatS)) continue;
+      // Nearest triplet column (3/4 of the beat → the last one).
+      final ns = ((f / third).round() * third).clamp(0, 2 * third).toInt();
+      int newLen;
+      if (end >= beatS) {
+        newLen = len + (f - ns); // keep its end
+      } else {
+        int ne = ((end / third).round() * third).clamp(third, 3 * third).toInt();
+        if (ne <= ns) ne = ns + third;
+        newLen = ne - ns;
+      }
+      st[i] = beat * beatS + ns;
+      // A length of 1 or 2 triplet notes is written as a triplet note
+      // (2/3 of its written length); a whole beat or more stays plain.
+      if (newLen % beatS != 0 && newLen % third == 0) {
+        final written = newLen * 3 ~/ 2 ~/ _tupletScale;
+        ev[i] = OmrEvent(e.x, written, e.notes,
+            arpeggio: e.arpeggio, tuplet: 3, top: e.top, bottom: e.bottom)
+          ..tupletPrinted = e.tupletPrinted;
+      }
+    }
+  }
 }
 
 /// The beat marker for a start [t] (see [_measureOnsets]) with beats of
@@ -1012,12 +1165,12 @@ String omrMeasuresToTranscription(
     }
   }
 
-  final has32 = measures.any((m) => const ['hr', 'hl'].any((h) =>
-      (m.hands[h] ?? const <OmrEvent>[])
-          .any((e) => e.duration > 0 && e.duration % 8 != 0)));
   int unit = 32; // quarter
   if (timeSignature != null) unit = math.max(2, 128 ~/ timeSignature[1]);
-  if (unit > 16 && (has32 || meter % unit != 0)) unit = 16; // eighth
+  // An eighth-note beat only when the meter needs it (3/8, 5/8, 7/8…).
+  // 32nd notes alone don't: in 3/4 they simply start at b2&1/8 … —
+  // before, they turned a 3/4 piece into "6/8".
+  if (unit > 16 && meter % unit != 0) unit = 16; // eighth
   final out = StringBuffer();
   out.writeln(firstScale);
   var currentScale = firstScale;
@@ -1038,6 +1191,8 @@ String omrMeasuresToTranscription(
       out.writeln(currentScale);
     }
     for (final hand in const ['hr', 'hl']) {
+      final hev = m.hands[hand];
+      if (hev != null) _fitBeamCounts(hev, meter);
       final ev = m.hands[hand] ?? <OmrEvent>[];
       _settleTuplets(ev, meter, allowUnmarked: printedTupletSeen);
       if (ev.any((e) => e.tuplet > 1 && e.tupletPrinted)) {
@@ -1045,6 +1200,7 @@ String omrMeasuresToTranscription(
       }
     }
     final onsets = _measureOnsets(m, meter, unit);
+    _alignToTriplets(m, onsets, unit);
     final keyHasAccidentals = auto
         ? currentScale != 'do major' && currentScale != 'la minor'
         : scaleHasAccidentals;
@@ -1945,7 +2101,30 @@ double _staffHeaderEnd(_CompIndex index, _Staff st, double xStart, double sp,
   for (final g in _clustersByX(others)) {
     final gx0 = g[0], gx1 = g[1], gy0 = g[2], gy1 = g[3];
     if (gx0 - end > 2.0 * sp) break;
-    if (gx1 - gx0 + 1 > 1.8 * sp || gy1 - gy0 + 1 < 0.5 * sp) break;
+    if (gy1 - gy0 + 1 < 0.5 * sp) break;
+    if (gx1 - gx0 + 1 > 1.8 * sp) {
+      // Too wide for one sign — unless it is a KEY SIGNATURE whose
+      // sharps / flats touch each other (tightly engraved, or merged
+      // by a low-resolution scan), which then form one wide group:
+      // e.g. the three sharps of A major. Accepted when the group is
+      // a run of signs (no notehead or stem in it) about as wide as
+      // its signs.
+      final signs = _keySignList(
+          nos, st, gx0 - 0.1 * sp, gx1 + 0.1 * sp, sp);
+      final width = gx1 - gx0 + 1;
+      final isSignRun = signs.length >= 2 &&
+          width <= 7.5 * sp &&
+          signs.length * 1.4 * sp >= 0.7 * width &&
+          !_stemThrough(stems, gx0.toDouble(), gx1.toDouble(),
+              gy0.toDouble(), gy1.toDouble()) &&
+          !heads.any((hd) =>
+          hd.stem != null &&
+              gx0 <= hd.cx && hd.cx <= gx1 &&
+              gy0 <= hd.cy && hd.cy <= gy1);
+      if (!isSignRun) break;
+      end = math.max(end, gx1.toDouble());
+      continue;
+    }
     // A time signature fills the staff from its top to its bottom line.
     var isTime = (gy0 - top).abs() <= 0.4 * sp && (gy1 - bot).abs() <= 0.4 * sp;
     if (isTime) {

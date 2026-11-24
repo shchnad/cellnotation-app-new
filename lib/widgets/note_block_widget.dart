@@ -555,6 +555,30 @@ class _NoteBlockWidgetState extends State<NoteBlockWidget> {
                   return;
                 }
                 if (_blockedFromEditing(context)) return;
+                // GRACE NOTES / GLISSANDO END — while one of these
+                // picks is on, a tap on a note counts as a tap on its
+                // row, the same as a tap on an empty cell. So a grace
+                // note can have the same pitch as its main note (tap
+                // the main note itself), and the glissando can end on
+                // the row of another note.
+                if (controller.isAddingGraceNotes ||
+                    controller.isPickingGlissandoEndRow) {
+                  final message = controller.isAddingGraceNotes
+                      ? controller.addGraceNoteAtRow(interactionNote.row)
+                      : controller.finishGlissandoPick(interactionNote.row);
+                  if (message != null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        duration: const Duration(seconds: 2),
+                        content: Text(
+                          message,
+                          style: const TextStyle(fontSize: 22),
+                        ),
+                      ),
+                    );
+                  }
+                  return;
+                }
                 if (controller.pasteMode) {
                   return;
                 }

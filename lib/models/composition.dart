@@ -22,6 +22,14 @@ class Composition {
   static const int minComplexity = 1;
   static const int maxComplexity = 3;
 
+  /// The instrument each hand is played with: hand name ('right',
+  /// 'left', 'additional') → Instrument name ('piano', 'violin' …).
+  /// A hand that is missing plays the composition's Target Instrument
+  /// (see CompositionController.instrumentForHand), so compositions
+  /// saved before this existed sound as before. Mutable, so the Audio
+  /// dialog can change it.
+  final Map<String, String> handInstruments;
+
   // Internal backing field for your mutable scaleName parameter
   String _scaleName;
 
@@ -44,6 +52,7 @@ class Composition {
     this.isPublic = false,
     List<String>? likedBy,
     int complexity = 1,
+    Map<String, String>? handInstruments,
     required String scaleName,
     required this.timeline,
     required this.notes,
@@ -55,6 +64,7 @@ class Composition {
         dynamicEvents = dynamicEvents ?? [],
         likedBy = likedBy ?? [],
         complexity = complexity.clamp(minComplexity, maxComplexity).toInt(),
+        handInstruments = {...?handInstruments},
         _scaleName = scaleName;
 
   // The Explicit Getter
@@ -84,6 +94,7 @@ class Composition {
     bool? isPublic,
     List<String>? likedBy,
     int? complexity,
+    Map<String, String>? handInstruments,
     String? scaleName,
     Timeline? timeline,
     List<Note>? notes,
@@ -104,6 +115,7 @@ class Composition {
       isPublic: isPublic ?? this.isPublic,
       likedBy: likedBy ?? this.likedBy,
       complexity: complexity ?? this.complexity,
+      handInstruments: handInstruments ?? this.handInstruments,
       scaleName: scaleName ?? this.scaleName,
       timeline: timeline ?? this.timeline,
       notes: notes ?? this.notes,
@@ -128,6 +140,7 @@ class Composition {
       'isPublic': isPublic,
       'likedBy': likedBy,
       'complexity': complexity,
+      'handInstruments': handInstruments,
       'scaleName': scaleName,
       'timeline': timeline.toJson(),
       'notes': notes.map((n) => n.toJson()).toList(),
@@ -152,6 +165,11 @@ class Composition {
       likedBy: (json['likedBy'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [],
       // Compositions saved before levels existed open as level 1.
       complexity: (json['complexity'] as num?)?.toInt() ?? 1,
+      // Saved before per-hand instruments existed: empty (every hand
+      // plays the Target Instrument).
+      handInstruments: (json['handInstruments'] as Map?)?.map(
+            (k, v) => MapEntry(k.toString(), v.toString()),
+      ),
       scaleName: json['scaleName'] as String,
       timeline: Timeline.fromJson(json['timeline'] as Map<String, dynamic>),
       notes: (json['notes'] as List<dynamic>)

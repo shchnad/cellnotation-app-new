@@ -12,16 +12,12 @@ import '../utils/cellnotation_transcription_parser.dart';
 /// [scrollController], but never scrolls on its own — dragging
 /// happens on the grid, the same way [PitchColumnWidget] behaves.
 ///
-/// When the CURRENT MEASURE's scale gives a row's degree its own
-/// inherent alteration (the scale token ending in "+" or "-" — see
-/// CompositionController.getPitchNameForRow), that sign is appended
-/// directly to the position code — e.g. "0/1+" — matching how a
-/// sharp/flat note is written in the transcription notation itself.
+/// Only the line numbers are shown — negative, positive and 0 — on
+/// the rows that are lines; rows between two lines stay empty. No
+/// accidental signs.
 ///
-/// Wrapped in an AnimatedBuilder listening to [controller] for the
-/// same reason as [PitchColumnWidget]: selecting a different measure
-/// on the grid changes controller.currentMeasure's scale, which this
-/// column's own accidental signs depend on.
+/// Wrapped in an AnimatedBuilder listening to [controller] so it
+/// follows the Rotate toggle and the number of rows.
 class TranscriptionColumnWidget extends StatelessWidget {
   final CompositionController controller;
   final double cellHeight;
@@ -35,19 +31,6 @@ class TranscriptionColumnWidget extends StatelessWidget {
     required this.cellHeight,
     required this.scrollController,
   });
-
-  /// The scale's own inherent alteration sign for [row]'s degree, in
-  /// the CURRENT measure — "+"/"-" if the scale token for that degree
-  /// ends in one (see CompositionController.getPitchNameForRow,
-  /// which already returns tokens like "1+"/"2-"), or "" for a
-  /// natural degree. Reads the scale token directly rather than
-  /// duplicating ScaleResolver's own logic.
-  String _scaleAccidentalSignForRow(int row) {
-    final token = controller.getPitchNameForRow(row);
-    if (token.endsWith('+')) return '+';
-    if (token.endsWith('-')) return '-';
-    return '';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,12 +55,12 @@ class TranscriptionColumnWidget extends StatelessWidget {
                 // PitchColumnWidget, so this column's rows always
                 // line up with its own and with the grid's.
                 final row = totalRows - 1 - index;
+                // Only the rows that ARE lines show their number (no
+                // accidental sign); a row between two lines stays
+                // empty.
                 final position = _columnPosition(row);
-                final accidentalSign = _scaleAccidentalSignForRow(row);
-                // Only the staff LINES are labelled (0, 1, 2 … and -1,
-                // -2 …); the rows between two lines stay empty.
-                final isLine = !position.contains('/');
-                final transcription = isLine ? '$position$accidentalSign' : '';
+                final transcription =
+                position.contains('/') ? '' : position;
                 return Container(
                   height: cellHeight,
                   alignment: Alignment.center,
