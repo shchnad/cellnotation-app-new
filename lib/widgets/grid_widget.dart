@@ -1923,7 +1923,8 @@ class GridPainter extends CustomPainter {
         }
 
         // SPLIT BEAT (triplet…) — thin lines between its equal columns
-        // and the number of columns in blue at the bottom of the beat.
+        // and the number of columns at the bottom of the beat, in the
+        // same colour as the time signature.
         final division = measure.beatDivisions[beatIdx];
         if (division != null && division > 1) {
           final beatWidthPx = thisBeatTicks * pixelsPerTick;
@@ -1935,7 +1936,7 @@ class GridPainter extends CustomPainter {
             text: TextSpan(
               text: '$division',
               style: TextStyle(
-                color: Colors.blue,
+                color: AppColors.gridLabelText(isDarkMode),
                 fontSize: fontSize,
                 fontWeight: FontWeight.bold,
               ),

@@ -776,9 +776,10 @@ class _CompositionScreenState extends State<CompositionScreen>
           "normal size.",
     ],
     [
-      'SHOW LARGER LABELS',
-      "Tap the 'Large Labels Mode' icon to make the labels on the grid (note names, "
-          "measure numbers, tempo, scale) larger. Tap it again for the normal size.",
+      'LABEL SIZE',
+      "The labels on the grid (note names, measure numbers, tempo, scale) are large. Tap "
+          "the 'Small Labels Mode' icon to make them smaller — the icon is highlighted. Tap it "
+          "again for the large labels.",
     ],
     [
       'DRAW ON THE GRID WITH THE PEN',
@@ -821,6 +822,13 @@ class _CompositionScreenState extends State<CompositionScreen>
           "hand with a piano. 'All hands' gives all three the same instrument. Tap 'Set'.\n"
           "The instruments are saved with the composition. At first every hand plays the "
           "composition's Target Instrument.",
+    ],
+    [
+      'UNDO AND REDO',
+      "Tap the 'Undo' icon (the arrow turning left, under Repeats) to take back the last change to the "
+          "composition: a note added, moved or deleted, a measure, a scale, a tempo, a repeat, "
+          "pen marks… Tap it again to go further back, up to 50 changes. 'Redo' (the arrow "
+          "turning right, under Audio) does again what Undo took back. A drag counts as one change.",
     ],
     [
       'MORE HELP',
@@ -981,6 +989,67 @@ class _CompositionScreenState extends State<CompositionScreen>
   /// when they fit, and scrollable when they don't (landscape, where
   /// the screen is too short for all of them) — so the lowest icons are
   /// never cut off.
+  /// UNDO — in the left icon column, under Repeats. Takes back the last change to the
+  /// composition (notes, measures, scale, tempo, repeats, marks…).
+  Widget _undoButton(BuildContext context) {
+    return IconButton(
+      icon: Transform.rotate(
+        angle: controller.rotatePitchText ? -pi / 2 : 0,
+        child: Icon(
+          Icons.undo,
+          color: controller.canUndo && !_isPlaying
+              ? Colors.black
+              : Colors.grey,
+        ),
+      ),
+      tooltip: 'Undo',
+      onPressed: _withHelp(
+          'Undo: \nTakes back the last change to the composition — a note added, moved or deleted, a measure, a scale, a tempo, a repeat… Tap again to go further back (up to 50 changes).',
+              () {
+            if (_isPlaying) return;
+            if (!controller.undo()) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  duration: Duration(seconds: 2),
+                  content: Text('Nothing to undo.',
+                      style: TextStyle(fontSize: 22)),
+                ),
+              );
+            }
+          }),
+    );
+  }
+
+  /// REDO — in the right icon column, under Audio.
+  Widget _redoButton(BuildContext context) {
+    return IconButton(
+      icon: Transform.rotate(
+        angle: controller.rotatePitchText ? -pi / 2 : 0,
+        child: Icon(
+          Icons.redo,
+          color: controller.canRedo && !_isPlaying
+              ? Colors.black
+              : Colors.grey,
+        ),
+      ),
+      tooltip: 'Redo',
+      onPressed: _withHelp(
+          'Redo: \nDoes again the change that Undo took back.',
+              () {
+            if (_isPlaying) return;
+            if (!controller.redo()) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  duration: Duration(seconds: 2),
+                  content: Text('Nothing to redo.',
+                      style: TextStyle(fontSize: 22)),
+                ),
+              );
+            }
+          }),
+    );
+  }
+
   Widget _iconColumn(BuildContext context, List<Widget> children) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -1916,6 +1985,10 @@ class _CompositionScreenState extends State<CompositionScreen>
                           ),
                         ),
 
+                        // UNDO — under Repeats.
+                        _undoButton(context),
+
+
 
                         _iconGap(context),
 
@@ -1993,8 +2066,7 @@ class _CompositionScreenState extends State<CompositionScreen>
                             controller.resetZoom,
                           ),
                         ),
-                      ],
-                      ),
+                      ]),
                     ),
                   ),
 
@@ -2073,18 +2145,20 @@ class _CompositionScreenState extends State<CompositionScreen>
                             angle: controller.rotatePitchText ? -pi / 2 : 0,
                             child: Icon(
                               Icons.format_size,
+                              // Highlighted when the labels are SMALL
+                              // (large is the normal size).
                               color: controller.gridFontSize ==
-                                  DefaultValues.gridFontSizeLarge
+                                  DefaultValues.gridFontSize
                                   ? Colors.blue
                                   : Colors.black,
                             ),
                           ),
                           tooltip: controller.gridFontSize ==
-                              DefaultValues.gridFontSizeLarge
-                              ? 'Large Labels Mode on'
-                              : 'Large Labels Mode off',
+                              DefaultValues.gridFontSize
+                              ? 'Small Labels Mode on'
+                              : 'Small Labels Mode off',
                           onPressed: _withHelp(
-                              'Large Labels Mode: \nToggles size of labels on the grid.',
+                              'Small Labels Mode: \nThe labels on the grid are large; this makes them smaller (the icon is highlighted). Tap it again for the large labels.',
                                   () {
                                 controller.toggleGridFontSize();
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -2092,9 +2166,9 @@ class _CompositionScreenState extends State<CompositionScreen>
                                     duration: const Duration(seconds: 1),
                                     content: Text(
                                       controller.gridFontSize ==
-                                          DefaultValues.gridFontSizeLarge
-                                          ? 'Large Labels Mode on.'
-                                          : 'Large Labels Mode off.',
+                                          DefaultValues.gridFontSize
+                                          ? 'Small Labels Mode on.'
+                                          : 'Small Labels Mode off.',
                                       style: const TextStyle(fontSize: 22),
                                     ),
                                   ),
@@ -2420,6 +2494,10 @@ class _CompositionScreenState extends State<CompositionScreen>
                               }),
                         ),
 
+                        // REDO — under Audio.
+                        _redoButton(context),
+
+
                         _iconGap(context),
 
                         // GRID SIZE
@@ -2595,8 +2673,7 @@ class _CompositionScreenState extends State<CompositionScreen>
 
 
 
-                      ],
-                      ),
+                      ]),
                     ),
                   ),
 

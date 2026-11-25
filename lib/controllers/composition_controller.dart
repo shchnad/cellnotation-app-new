@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -44,6 +46,109 @@ class CompositionController extends ChangeNotifier {
     // NoteSoundService.warmUp.
     repairTempoBeats();
     warmUpSounds();
+    _lastState = _snapshot();
+  }
+
+  // ---------------- UNDO / REDO ----------------
+  //
+  // Every change to the composition (notes, measures, scales, tempo,
+  // repeats, pen marks…) can be undone. Instead of each editing method
+  // remembering what it changed, the whole composition is remembered:
+  // after a change has settled (no further change for a moment — so a
+  // drag, or a burst of changes from one action, is ONE step), its
+  // previous state is pushed on the undo list.
+
+  /// How many steps can be undone.
+  static const int maxUndoSteps = 50;
+
+  final List<String> _undoStates = [];
+  final List<String> _redoStates = [];
+
+  /// The composition as it was after the last recorded change.
+  String? _lastState;
+  Timer? _historyTimer;
+  bool _restoringState = false;
+
+  String _snapshot() => jsonEncode(composition.toJson());
+
+  /// (A change still settling counts too.)
+  bool get canUndo => _undoStates.isNotEmpty || _historyTimer != null;
+
+  bool get canRedo => _redoStates.isNotEmpty;
+
+  @override
+  void notifyListeners() {
+    if (!_restoringState) {
+      // Record a little later, once the change has settled.
+      _historyTimer?.cancel();
+      _historyTimer = Timer(const Duration(milliseconds: 400), _flushHistory);
+    }
+    super.notifyListeners();
+  }
+
+  /// Records the current state if it differs from the last recorded one.
+  void _flushHistory() {
+    _historyTimer?.cancel();
+    _historyTimer = null;
+    if (_restoringState) return;
+    final now = _snapshot();
+    final last = _lastState;
+    if (last == null) {
+      _lastState = now;
+      return;
+    }
+    if (now == last) return;
+    _undoStates.add(last);
+    if (_undoStates.length > maxUndoSteps) _undoStates.removeAt(0);
+    _redoStates.clear();
+    _lastState = now;
+  }
+
+  /// Goes back to the composition as it was before the last change.
+  /// Returns false when there is nothing to undo.
+  bool undo() {
+    _flushHistory();
+    if (_undoStates.isEmpty) return false;
+    _redoStates.add(_lastState ?? _snapshot());
+    _restoreState(_undoStates.removeLast());
+    return true;
+  }
+
+  /// Does again what [undo] took back. Returns false when there is
+  /// nothing to redo.
+  bool redo() {
+    _flushHistory();
+    if (_redoStates.isEmpty) return false;
+    _undoStates.add(_lastState ?? _snapshot());
+    _restoreState(_redoStates.removeLast());
+    return true;
+  }
+
+  void _restoreState(String state) {
+    _restoringState = true;
+    try {
+      composition = Composition.fromJson(
+        jsonDecode(state) as Map<String, dynamic>,
+        id: composition.id,
+      );
+      // Picks that point at notes that may no longer exist.
+      pasteMode = false;
+      _graceNoteAnchor = null;
+      _graceNoteTypeBeingAdded = null;
+      _pendingGlissandoNote = null;
+      timeline.rebuild();
+      _lastState = state;
+      warmUpSounds();
+      super.notifyListeners();
+    } finally {
+      _restoringState = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _historyTimer?.cancel();
+    super.dispose();
   }
 
   /// Fixes measures whose remembered tempo beat makes them play at a
@@ -4384,7 +4489,8 @@ class CompositionController extends ChangeNotifier {
   /// read this instead of a hardcoded const style now). Starts at
   /// [DefaultValues.gridFontSize] and toggles up to
   /// [DefaultValues.gridFontSizeLarge] and back.
-  double gridFontSize = DefaultValues.gridFontSize;
+  // Large labels by default; the icon switches to the smaller size.
+  double gridFontSize = DefaultValues.gridFontSizeLarge;
 
   void toggleGridFontSize() {
     gridFontSize = gridFontSize == DefaultValues.gridFontSize
