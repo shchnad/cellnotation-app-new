@@ -602,7 +602,9 @@ List<_DynamicChangeLineHit> _computeDynamicChangeLineHits(
         event.dynamic_change == DynamicChange.pedalUp) {
       continue;
     }
-    final x = event.tick * pixelsPerTick;
+    // The end of a crescendo / diminuendo is on the RIGHT side of its
+    // beat.
+    final x = controller.dynamicChangeDrawTick(event) * pixelsPerTick;
     hits.add(
       _DynamicChangeLineHit(
         event.tick,
@@ -1615,7 +1617,9 @@ class GridPainter extends CustomPainter {
               canvas,
               paint,
               crescendoBegin.tick * pixelsPerTick,
-              event.tick * pixelsPerTick,
+              // Ends on the right side of its beat (the whole beat is
+              // included).
+              controller.dynamicChangeDrawTick(event) * pixelsPerTick,
               y,
             );
             crescendoBegin = null;
@@ -1632,7 +1636,7 @@ class GridPainter extends CustomPainter {
               canvas,
               paint,
               diminuendoBegin.tick * pixelsPerTick,
-              event.tick * pixelsPerTick,
+              controller.dynamicChangeDrawTick(event) * pixelsPerTick,
               y,
             );
             diminuendoBegin = null;
@@ -1716,7 +1720,7 @@ class GridPainter extends CustomPainter {
           event.dynamic_change == DynamicChange.pedalUp) {
         continue;
       }
-      final x = event.tick * pixelsPerTick;
+      final x = controller.dynamicChangeDrawTick(event) * pixelsPerTick;
       canvas.drawLine(
         Offset(x, 0),
         Offset(x, size.height),

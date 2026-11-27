@@ -1638,6 +1638,105 @@ class CompositionController extends ChangeNotifier {
   // ARPEGGIOS
   // =====================================================
 
+  // ---------------- DYNAMICS IN TRANSCRIPTIONS ----------------
+  //
+  // A transcription line "dy b1 pp b3 cresc b4&1/2 /cresc b1 ped b4 *"
+  // holds a measure's dynamics (see notation_marks.dart).
+
+  static const Map<String, DynamicChange> _dynamicChangeWords = {
+    'cresc': DynamicChange.crescendoStart,
+    '/cresc': DynamicChange.crescendoFinish,
+    'dim': DynamicChange.diminuendoStart,
+    '/dim': DynamicChange.diminuendoFinish,
+    'decresc': DynamicChange.diminuendoStart,
+    '/decresc': DynamicChange.diminuendoFinish,
+    'ped': DynamicChange.pedalDown,
+    '*': DynamicChange.pedalUp,
+  };
+
+  /// The transcription word of [c] (the first word of
+  /// [_dynamicChangeWords] for it), or its name.
+  static String _wordForDynamicChange(DynamicChange c) {
+    for (final e in _dynamicChangeWords.entries) {
+      if (e.value == c) return e.key;
+    }
+    return c.name;
+  }
+
+  /// The tick of [beat] (as written: 1, 2.5, 3.333…) in measure
+  /// [measureIndex].
+  int _tickOfWrittenBeat(int measureIndex, double beat) {
+    final m = measures[measureIndex];
+    final t = m.startTick + ((beat - 1) * m.timeSignature.ticksPerBeat).round();
+    return t.clamp(m.startTick, m.endTick - 1).toInt();
+  }
+
+  /// Puts the dynamics of a transcription on the composition: each
+  /// (0-based measure, beat, word). Returns the words it didn't know.
+  List<String> applyDynamicMarks(List<(int, double, String)> marks) {
+    final unknown = <String>[];
+    for (final (mi, beat, word) in marks) {
+      if (mi < 0 || mi >= measures.length) continue;
+      final tick = _tickOfWrittenBeat(mi, beat);
+      final lower = word.toLowerCase();
+      final change = _dynamicChangeWords[lower];
+      if (change != null) {
+        timeline.addDynamicChangeEvent(
+            DynamicChangeEvent(tick: tick, dynamic_change: change));
+        continue;
+      }
+      MusicalDynamic? level;
+      for (final d in MusicalDynamic.values) {
+        if (d.abbreviation.toLowerCase() == lower) level = d;
+      }
+      if (level == null) {
+        unknown.add('measure ${mi + 1}: "$word"');
+        continue;
+      }
+      final i = timeline.dynamicEvents.indexWhere((e) => e.tick == tick);
+      if (i >= 0) {
+        timeline.dynamicEvents[i].musical_dynamic = level;
+      } else {
+        timeline.addDynamicEvent(DynamicEvent(tick: tick, musical_dynamic: level));
+      }
+    }
+    timeline.dynamicEvents.sort((a, b) => a.tick.compareTo(b.tick));
+    timeline.dynamicChangeEvents.sort((a, b) => a.tick.compareTo(b.tick));
+    notifyListeners();
+    return unknown;
+  }
+
+  /// The "dy …" line of every measure from [fromIndex] to [toIndex]
+  /// (0-based) that has dynamics, keyed by measure index — for Export.
+  /// [beatMarker] writes a beat ("b1", "b2&1/2").
+  Map<int, String> exportDynamicsLines(
+      int fromIndex, int toIndex, String Function(double beat) beatMarker) {
+    final result = <int, String>{};
+    for (int mi = fromIndex; mi <= toIndex && mi < measures.length; mi++) {
+      final m = measures[mi];
+      final items = <(int, String)>[];
+      for (final e in timeline.dynamicEvents) {
+        if (e.tick >= m.startTick && e.tick < m.endTick) {
+          items.add((e.tick, e.musical_dynamic.abbreviation));
+        }
+      }
+      for (final e in timeline.dynamicChangeEvents) {
+        if (e.tick >= m.startTick && e.tick < m.endTick) {
+          items.add((e.tick, _wordForDynamicChange(e.dynamic_change)));
+        }
+      }
+      if (items.isEmpty) continue;
+      items.sort((a, b) => a.$1.compareTo(b.$1));
+      final parts = <String>[];
+      for (final (tick, word) in items) {
+        final beat = 1 + (tick - m.startTick) / m.timeSignature.ticksPerBeat;
+        parts.add('${beatMarker(beat)} $word');
+      }
+      result[mi] = 'dy ${parts.join(' ')}';
+    }
+    return result;
+  }
+
   /// Puts repeat signs and arpeggios read from an imported
   /// transcription (see notation_marks.dart) on the measures.
   /// [reprise]: (0-based measure, sign); [arpeggios]: (0-based measure,
@@ -2202,6 +2301,29 @@ class CompositionController extends ChangeNotifier {
 // =====================================================
   // DYNAMIC CHANGES (crescendo / diminuendo)
   // =====================================================
+
+  /// The tick where the beat holding [tick] ends.
+  int beatEndTick(int tick) {
+    if (measures.isEmpty) return tick;
+    final m = measures[measureIndexAtTick(tick)];
+    final tpb = m.timeSignature.ticksPerBeat;
+    if (tpb <= 0) return tick;
+    final idx = (tick - m.startTick) ~/ tpb;
+    return math.min(m.startTick + (idx + 1) * tpb, m.endTick);
+  }
+
+  /// Where a crescendo / diminuendo mark is DRAWN: its start at the
+  /// start of its beat, its END at the end (right side) of its beat —
+  /// the beat on which the change ends is included entirely. (The event
+  /// itself stays on the beat's first tick, so the beat's dialog finds
+  /// it.)
+  int dynamicChangeDrawTick(DynamicChangeEvent e) {
+    if (e.dynamic_change == DynamicChange.crescendoFinish ||
+        e.dynamic_change == DynamicChange.diminuendoFinish) {
+      return beatEndTick(e.tick);
+    }
+    return e.tick;
+  }
 
   DynamicChangeEvent? getDynamicChangeAtTick(int tick) {
     try {
